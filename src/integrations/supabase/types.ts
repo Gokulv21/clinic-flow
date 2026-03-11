@@ -14,16 +14,211 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      patients: {
+        Row: {
+          address: string | null
+          age: number
+          created_at: string
+          id: string
+          name: string
+          phone: string
+          sex: string
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          age: number
+          created_at?: string
+          id?: string
+          name: string
+          phone: string
+          sex: string
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          age?: number
+          created_at?: string
+          id?: string
+          name?: string
+          phone?: string
+          sex?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      prescriptions: {
+        Row: {
+          advice_image: string | null
+          created_at: string
+          diagnosis: string | null
+          id: string
+          is_printed: boolean
+          medicines: Json
+          patient_id: string
+          pdf_url: string | null
+          signature_image: string | null
+          updated_at: string
+          visit_id: string
+        }
+        Insert: {
+          advice_image?: string | null
+          created_at?: string
+          diagnosis?: string | null
+          id?: string
+          is_printed?: boolean
+          medicines?: Json
+          patient_id: string
+          pdf_url?: string | null
+          signature_image?: string | null
+          updated_at?: string
+          visit_id: string
+        }
+        Update: {
+          advice_image?: string | null
+          created_at?: string
+          diagnosis?: string | null
+          id?: string
+          is_printed?: boolean
+          medicines?: Json
+          patient_id?: string
+          pdf_url?: string | null
+          signature_image?: string | null
+          updated_at?: string
+          visit_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prescriptions_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prescriptions_visit_id_fkey"
+            columns: ["visit_id"]
+            isOneToOne: false
+            referencedRelation: "visits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          full_name: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          full_name: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          full_name?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      visits: {
+        Row: {
+          blood_pressure: string | null
+          cbg: number | null
+          created_at: string
+          diagnosis: string | null
+          id: string
+          patient_id: string
+          pulse_rate: number | null
+          spo2: number | null
+          status: string
+          temperature: number | null
+          token_number: number
+          updated_at: string
+          weight: number | null
+        }
+        Insert: {
+          blood_pressure?: string | null
+          cbg?: number | null
+          created_at?: string
+          diagnosis?: string | null
+          id?: string
+          patient_id: string
+          pulse_rate?: number | null
+          spo2?: number | null
+          status?: string
+          temperature?: number | null
+          token_number: number
+          updated_at?: string
+          weight?: number | null
+        }
+        Update: {
+          blood_pressure?: string | null
+          cbg?: number | null
+          created_at?: string
+          diagnosis?: string | null
+          id?: string
+          patient_id?: string
+          pulse_rate?: number | null
+          spo2?: number | null
+          status?: string
+          temperature?: number | null
+          token_number?: number
+          updated_at?: string
+          weight?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visits_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_next_token: { Args: never; Returns: number }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_clinic_staff: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "doctor" | "nurse" | "printer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +345,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["doctor", "nurse", "printer"],
+    },
   },
 } as const
