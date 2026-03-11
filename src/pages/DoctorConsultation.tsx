@@ -8,7 +8,11 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { User, Clock, CheckCircle, Plus, Trash2, Save, Loader2 } from 'lucide-react';
+import { User, Clock, CheckCircle, Plus, Trash2, Save, Loader2, PenTool, Eye, Menu, Printer } from 'lucide-react';
+import DigitalPrescription from '@/components/DigitalPrescription';
+import PrescriptionTemplate from '@/components/PrescriptionTemplate';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 
 interface Medicine {
   name: string;
@@ -26,6 +30,9 @@ export default function DoctorConsultation() {
   const [medicines, setMedicines] = useState<Medicine[]>([{ name: '', dosage: '', frequency: '', duration: '' }]);
   const [advice, setAdvice] = useState('');
   const [saving, setSaving] = useState(false);
+  const [showDigitalRx, setShowDigitalRx] = useState(false);
+  const [prescriptionImage, setPrescriptionImage] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
 
   const fetchQueue = async () => {
     const today = new Date().toISOString().split('T')[0];
@@ -53,6 +60,7 @@ export default function DoctorConsultation() {
     setDiagnosis(visit.diagnosis || '');
     setMedicines([{ name: '', dosage: '', frequency: '', duration: '' }]);
     setAdvice('');
+    setPrescriptionImage(null);
 
     // Update status to in_consultation
     if (visit.status === 'waiting') {
@@ -78,8 +86,8 @@ export default function DoctorConsultation() {
   const savePrescription = async () => {
     if (!selectedVisit || !patient) return;
     const validMeds = medicines.filter(m => m.name.trim());
-    if (!diagnosis.trim() && validMeds.length === 0) {
-      toast.error('Please add diagnosis or medicines');
+    if (!diagnosis.trim() && validMeds.length === 0 && !prescriptionImage) {
+      toast.error('Please add diagnosis, medicines or handwriting');
       return;
     }
     setSaving(true);
@@ -90,7 +98,7 @@ export default function DoctorConsultation() {
         patient_id: patient.id,
         diagnosis: diagnosis || null,
         medicines: validMeds as any,
-        advice_image: advice || null,
+        advice_image: prescriptionImage || advice || null,
       });
       if (rxError) throw rxError;
 
@@ -100,6 +108,7 @@ export default function DoctorConsultation() {
       toast.success('Prescription saved & sent to print queue');
       setSelectedVisit(null);
       setPatient(null);
+      setPrescriptionImage(null);
       fetchQueue();
     } catch (err: any) {
       toast.error(err.message);
@@ -114,56 +123,82 @@ export default function DoctorConsultation() {
     return 'bg-success/10 text-success border-success/30';
   };
 
-  return (
-    <div className="flex h-[calc(100vh-0px)] md:h-screen">
-      {/* Left panel — Queue */}
-      <div className="w-80 border-r border-border bg-card flex flex-col shrink-0">
-        <div className="p-4 border-b border-border">
-          <h2 className="font-heading font-bold text-lg">Patient Queue</h2>
-          <p className="text-sm text-muted-foreground">{queue.length} patients today</p>
-        </div>
-        <div className="flex-1 overflow-auto">
-          {queue.map(visit => (
-            <button
-              key={visit.id}
-              onClick={() => selectVisit(visit)}
-              className={cn(
-                "w-full text-left p-4 border-b border-border hover:bg-secondary/50 transition-colors",
-                selectedVisit?.id === visit.id && "bg-secondary"
-              )}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                    <span className="font-heading font-bold text-primary text-sm">#{visit.token_number}</span>
-                  </div>
-                  <div>
-                    <p className="font-medium text-sm">{visit.patients?.name}</p>
-                    <p className="text-xs text-muted-foreground">{visit.patients?.age}y · {visit.patients?.sex}</p>
-                  </div>
+  const queuePanel = (
+    <div className="h-full flex flex-col bg-card">
+      <div className="p-4 border-b border-border bg-card sticky top-0 z-10">
+        <h2 className="font-heading font-bold text-lg">Patient Queue</h2>
+        <p className="text-sm text-muted-foreground">{queue.length} patients today</p>
+      </div>
+      <div className="flex-1 overflow-auto">
+        {queue.map(visit => (
+          <button
+            key={visit.id}
+            onClick={() => selectVisit(visit)}
+            className={cn(
+              "w-full text-left p-4 border-b border-border hover:bg-secondary/50 transition-colors",
+              selectedVisit?.id === visit.id && "bg-secondary"
+            )}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <span className="font-heading font-bold text-primary text-sm">#{visit.token_number}</span>
                 </div>
-                <Badge variant="outline" className={cn("text-xs", statusColor(visit.status))}>
-                  {visit.status === 'waiting' ? 'Wait' : visit.status === 'in_consultation' ? 'Active' : 'Done'}
-                </Badge>
+                <div>
+                  <p className="font-medium text-sm">{visit.patients?.name}</p>
+                  <p className="text-xs text-muted-foreground">{visit.patients?.age}y · {visit.patients?.sex}</p>
+                </div>
               </div>
-            </button>
-          ))}
-          {queue.length === 0 && (
-            <div className="p-8 text-center text-muted-foreground">
-              <Clock className="w-12 h-12 mx-auto mb-3 opacity-30" />
-              <p>No patients in queue</p>
+              <Badge variant="outline" className={cn("text-xs", statusColor(visit.status))}>
+                {visit.status === 'waiting' ? 'Wait' : visit.status === 'in_consultation' ? 'Active' : 'Done'}
+              </Badge>
             </div>
-          )}
+          </button>
+        ))}
+        {queue.length === 0 && (
+          <div className="p-8 text-center text-muted-foreground">
+            <Clock className="w-12 h-12 mx-auto mb-3 opacity-30" />
+            <p>No patients in queue</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="flex flex-col md:flex-row h-[calc(100vh-64px)] md:h-[calc(100vh-0px)]">
+      {/* Mobile Queue Toggle */}
+      <div className="md:hidden flex items-center justify-between p-4 bg-card border-b border-border sticky top-0 z-20">
+        <div className="flex items-center gap-2">
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon"><Menu className="w-6 h-6" /></Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="p-0 w-80">
+              {queuePanel}
+            </SheetContent>
+          </Sheet>
+          <span className="font-bold underline decoration-primary decoration-2 underline-offset-4">QUEUE</span>
         </div>
+        {selectedVisit && (
+          <Badge variant="outline" className="font-bold text-primary border-primary/20">
+            Current: #{selectedVisit.token_number}
+          </Badge>
+        )}
       </div>
 
-      {/* Right panel — Details & Prescription */}
-      <div className="flex-1 overflow-auto p-6">
+      {/* Desktop Queue Panel */}
+      <div className="hidden md:block w-80 border-r border-border shrink-0">
+        {queuePanel}
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex-1 overflow-auto p-4 md:p-6 bg-slate-50/30">
         {!selectedVisit ? (
           <div className="flex items-center justify-center h-full text-muted-foreground">
             <div className="text-center">
-              <User className="w-16 h-16 mx-auto mb-4 opacity-20" />
-              <p className="text-lg">Select a patient from the queue</p>
+              <User className="w-16 h-16 mx-auto mb-4 opacity-10" />
+              <p className="text-lg font-medium opacity-50">Select a patient for consultation</p>
             </div>
           </div>
         ) : (
@@ -225,8 +260,33 @@ export default function DoctorConsultation() {
 
             {/* Prescription */}
             <Card>
-              <CardHeader><CardTitle>Prescription</CardTitle></CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle>Prescription</CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowDigitalRx(true)}
+                  className="bg-primary/5 border-primary/20 text-primary hover:bg-primary/10"
+                >
+                  <PenTool className="w-4 h-4 mr-2" />
+                  Open Template (iPad/Pen)
+                </Button>
+              </CardHeader>
               <CardContent className="space-y-4">
+                {prescriptionImage && (
+                  <div className="relative group border rounded-lg overflow-hidden bg-slate-50 mb-4 h-32 flex items-center justify-center">
+                    <img src={prescriptionImage} alt="Handwritten Rx" className="max-h-full" />
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => setPrescriptionImage(null)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <Label>Diagnosis</Label>
                   <Input value={diagnosis} onChange={e => setDiagnosis(e.target.value)} placeholder="Enter diagnosis" />
@@ -255,15 +315,61 @@ export default function DoctorConsultation() {
                   <Input value={advice} onChange={e => setAdvice(e.target.value)} placeholder="General advice for the patient" />
                 </div>
 
-                <Button onClick={savePrescription} disabled={saving} className="w-full">
-                  {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-                  Save Prescription & Complete Visit
-                </Button>
+                <div className="grid grid-cols-2 gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11"
+                    onClick={() => setShowPreview(true)}
+                  >
+                    <Eye className="w-4 h-4 mr-2" />
+                    Preview
+                  </Button>
+                  <Button onClick={savePrescription} disabled={saving} className="h-11 shadow-lg bg-primary hover:bg-primary/90">
+                    {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                    Save & Complete
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </div>
         )}
       </div>
+
+      {/* Overlays */}
+      {showDigitalRx && (
+        <DigitalPrescription
+          patient={patient}
+          visit={selectedVisit}
+          onSave={(data) => {
+            setPrescriptionImage(data);
+            setShowDigitalRx(false);
+          }}
+          onClose={() => setShowDigitalRx(false)}
+        />
+      )}
+
+      {/* Preview Dialog */}
+      <Dialog open={showPreview} onOpenChange={setShowPreview}>
+        <DialogContent className="max-w-[800px] p-0 overflow-hidden bg-slate-100">
+          <DialogHeader className="bg-white p-4 border-b flex flex-row items-center justify-between">
+            <DialogTitle>Prescription Preview</DialogTitle>
+            <Button variant="outline" size="sm" onClick={() => window.print()} className="gap-2">
+              <Printer className="w-4 h-4" /> Print
+            </Button>
+          </DialogHeader>
+          <div className="p-4 md:p-8 overflow-auto max-h-[85vh] flex justify-center">
+            <PrescriptionTemplate
+              patient={patient}
+              visit={selectedVisit}
+              handwrittenImage={prescriptionImage}
+              diagnosis={diagnosis}
+              medicines={medicines.filter(m => m.name.trim())}
+              advice={advice}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

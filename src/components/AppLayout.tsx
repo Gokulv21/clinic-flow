@@ -15,7 +15,7 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { label: 'Dashboard', path: '/', icon: <Home className="w-5 h-5" />, roles: ['doctor', 'nurse', 'printer'] },
+  { label: 'Dashboard', path: '/', icon: <Home className="w-5 h-5" />, roles: ['doctor'] },
   { label: 'Patient Entry', path: '/nurse', icon: <ClipboardPlus className="w-5 h-5" />, roles: ['nurse', 'doctor'] },
   { label: 'Consultation', path: '/consultation', icon: <Stethoscope className="w-5 h-5" />, roles: ['doctor'] },
   { label: 'Print Queue', path: '/print', icon: <Printer className="w-5 h-5" />, roles: ['printer', 'doctor'] },

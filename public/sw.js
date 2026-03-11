@@ -9,8 +9,16 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  // Bypass service worker for Supabase/External API calls
+  if (event.request.url.includes('supabase.co')) {
+    return;
+  }
+
   event.respondWith(
-    fetch(event.request).catch(() => caches.match(event.request))
+    fetch(event.request)
+      .catch(() => caches.match(event.request))
+      .then((response) => response || fetch(event.request)) // Fallback to network if cache misses
+      .catch(() => new Response('Network error occurred', { status: 408, headers: { 'Content-Type': 'text/plain' } }))
   );
 });
 

@@ -195,23 +195,47 @@ export default function NurseEntry() {
                 <CardDescription>Search by name or phone number</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex gap-2">
-                  <Input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Name or phone..." onKeyDown={e => e.key === 'Enter' && searchPatients()} />
-                  <Button onClick={searchPatients} variant="secondary">Search</Button>
-                </div>
-                <div className="space-y-2 max-h-64 overflow-auto">
-                  {searchResults.map(p => (
-                    <button
-                      key={p.id}
-                      onClick={() => selectOldPatient(p)}
-                      className="w-full text-left p-3 rounded-lg border border-border hover:bg-secondary transition-colors"
-                    >
-                      <div className="font-medium">{p.name}</div>
-                      <div className="text-sm text-muted-foreground">{p.phone} · {p.age}y · {p.sex}</div>
-                    </button>
-                  ))}
-                  {searchResults.length === 0 && searchQuery && (
-                    <p className="text-center text-muted-foreground py-4">No patients found</p>
+                <div className="relative">
+                  <div className="flex gap-2">
+                    <Input
+                      value={searchQuery}
+                      onChange={e => {
+                        setSearchQuery(e.target.value);
+                        if (e.target.value.trim()) {
+                          // Simple real-time search
+                          supabase
+                            .from('patients')
+                            .select('*')
+                            .or(`phone.ilike.%${e.target.value}%,name.ilike.%${e.target.value}%`)
+                            .limit(10)
+                            .then(({ data }) => setSearchResults(data || []));
+                        } else {
+                          setSearchResults([]);
+                        }
+                      }}
+                      placeholder="Type name or phone to search..."
+                    />
+                    <Button onClick={searchPatients} variant="secondary">
+                      <Search className="w-4 h-4 ml-[-4px]" />
+                    </Button>
+                  </div>
+
+                  {searchQuery && (
+                    <div className="absolute z-10 top-full left-0 right-14 mt-1 bg-white border border-border rounded-md shadow-lg overflow-hidden max-h-64 overflow-y-auto">
+                      {searchResults.map(p => (
+                        <button
+                          key={p.id}
+                          onClick={() => selectOldPatient(p)}
+                          className="w-full text-left p-3 hover:bg-slate-100 transition-colors border-b last:border-b-0"
+                        >
+                          <div className="font-medium text-slate-800">{p.name}</div>
+                          <div className="text-xs text-slate-500">{p.phone} · {p.age}y · {p.sex}</div>
+                        </button>
+                      ))}
+                      {searchResults.length === 0 && (
+                        <div className="p-3 text-sm text-slate-500 text-center">No patients found.</div>
+                      )}
+                    </div>
                   )}
                 </div>
               </CardContent>
@@ -233,12 +257,43 @@ export default function NurseEntry() {
                 <Input type="number" step="0.1" value={vitals.weight} onChange={e => setVitals(v => ({ ...v, weight: e.target.value }))} />
               </div>
               <div className="space-y-2">
-                <Label>Blood Pressure</Label>
-                <Input value={vitals.blood_pressure} onChange={e => setVitals(v => ({ ...v, blood_pressure: e.target.value }))} placeholder="120/80" />
+                <Label>Blood Pressure (SBP / DBP)</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    placeholder="Sys"
+                    value={vitals.blood_pressure.split('/')[0] || ''}
+                    onChange={e => {
+                      const sbp = e.target.value;
+                      const dbp = vitals.blood_pressure.split('/')[1] || '';
+                      setVitals(v => ({ ...v, blood_pressure: `${sbp}/${dbp}`.replace(/^\/|\/$/g, '') }));
+                      if (sbp.length >= 3) {
+                        document.getElementById('dbp-input')?.focus();
+                      }
+                    }}
+                    maxLength={3}
+                    className="text-center"
+                  />
+                  <span className="text-muted-foreground font-bold">/</span>
+                  <Input
+                    id="dbp-input"
+                    placeholder="Dia"
+                    value={vitals.blood_pressure.split('/')[1] || ''}
+                    onChange={e => {
+                      const sbp = vitals.blood_pressure.split('/')[0] || '';
+                      const dbp = e.target.value;
+                      setVitals(v => ({ ...v, blood_pressure: `${sbp}/${dbp}`.replace(/^\/|\/$/g, '') }));
+                      if (dbp.length >= 3) {
+                        document.getElementById('pulse-input')?.focus();
+                      }
+                    }}
+                    maxLength={3}
+                    className="text-center"
+                  />
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>Pulse Rate (bpm)</Label>
-                <Input type="number" value={vitals.pulse_rate} onChange={e => setVitals(v => ({ ...v, pulse_rate: e.target.value }))} />
+                <Input id="pulse-input" type="number" value={vitals.pulse_rate} onChange={e => setVitals(v => ({ ...v, pulse_rate: e.target.value }))} />
               </div>
               <div className="space-y-2">
                 <Label>SpO2 (%)</Label>

@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Printer, CheckCircle, Clock } from 'lucide-react';
 import { toast } from 'sonner';
+import PrescriptionTemplate from '@/components/PrescriptionTemplate';
 
 export default function PrintQueue() {
   const [prescriptions, setPrescriptions] = useState<any[]>([]);
@@ -27,6 +28,18 @@ export default function PrintQueue() {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
+  const [printData, setPrintData] = useState<any>(null);
+
+  useEffect(() => {
+    if (printData) {
+      setTimeout(() => {
+        window.print();
+        markPrinted(printData.id);
+        setPrintData(null);
+      }, 500); // Wait for the image/component to render
+    }
+  }, [printData]);
+
   const markPrinted = async (id: string) => {
     const { error } = await supabase.from('prescriptions').update({ is_printed: true }).eq('id', id);
     if (error) toast.error('Failed to update');
@@ -34,35 +47,7 @@ export default function PrintQueue() {
   };
 
   const printPrescription = (rx: any) => {
-    const meds = (rx.medicines as any[]) || [];
-    const w = window.open('', '_blank');
-    if (!w) return;
-    w.document.write(`
-      <html><head><title>Prescription</title>
-      <style>
-        body { font-family: Arial, sans-serif; padding: 40px; max-width: 800px; margin: auto; }
-        h1 { color: #0284c7; border-bottom: 2px solid #0284c7; padding-bottom: 10px; }
-        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background: #f0f9ff; }
-        .vitals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 15px 0; }
-        .vital-box { background: #f8fafc; padding: 8px; border-radius: 6px; text-align: center; }
-        @media print { body { padding: 20px; } }
-      </style></head><body>
-      <h1>Prescription</h1>
-      <p><strong>Patient:</strong> ${rx.patients?.name} | <strong>Age:</strong> ${rx.patients?.age}y | <strong>Sex:</strong> ${rx.patients?.sex}</p>
-      <p><strong>Date:</strong> ${new Date(rx.created_at).toLocaleDateString()} | <strong>Token:</strong> #${rx.visits?.token_number}</p>
-      ${rx.diagnosis ? `<p><strong>Diagnosis:</strong> ${rx.diagnosis}</p>` : ''}
-      ${meds.length > 0 ? `
-        <table><thead><tr><th>Medicine</th><th>Dosage</th><th>Frequency</th><th>Duration</th></tr></thead>
-        <tbody>${meds.map((m: any) => `<tr><td>${m.name}</td><td>${m.dosage}</td><td>${m.frequency}</td><td>${m.duration}</td></tr>`).join('')}</tbody></table>
-      ` : ''}
-      ${rx.advice_image ? `<p><strong>Advice:</strong> ${rx.advice_image}</p>` : ''}
-      <script>window.print();</script>
-      </body></html>
-    `);
-    w.document.close();
-    markPrinted(rx.id);
+    setPrintData(rx);
   };
 
   const unprinted = prescriptions.filter(p => !p.is_printed);
@@ -70,12 +55,27 @@ export default function PrintQueue() {
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
-      <div>
+
+      {/* Hidden print container */}
+      {printData && (
+        <div className="hidden print:block absolute inset-0 bg-white z-[9999] print:m-0 print:p-0">
+          <PrescriptionTemplate
+            patient={printData.patients}
+            visit={printData.visits}
+            diagnosis={printData.diagnosis}
+            medicines={printData.medicines}
+            handwrittenImage={printData.advice_image || null}
+            isPrint={true}
+          />
+        </div>
+      )}
+
+      <div className="print:hidden">
         <h1 className="text-2xl font-heading font-bold">Print Queue</h1>
         <p className="text-muted-foreground">{unprinted.length} prescriptions waiting to be printed</p>
       </div>
 
-      <Tabs defaultValue="unprinted">
+      <Tabs defaultValue="unprinted" className="print:hidden">
         <TabsList>
           <TabsTrigger value="unprinted" className="gap-2">
             <Clock className="w-4 h-4" />Unprinted ({unprinted.length})
@@ -120,7 +120,12 @@ export default function PrintQueue() {
                     Token #{rx.visits?.token_number} · {new Date(rx.created_at).toLocaleTimeString()}
                   </p>
                 </div>
-                <Badge variant="secondary" className="gap-1"><CheckCircle className="w-3 h-3" />Printed</Badge>
+                <div className="flex flex-col items-end gap-2">
+                  <Badge variant="secondary" className="gap-1"><CheckCircle className="w-3 h-3" />Printed</Badge>
+                  <Button onClick={() => printPrescription(rx)} variant="outline" size="sm" className="gap-1">
+                    <Printer className="w-3 h-3" /> Re-Print
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           ))}

@@ -77,40 +77,59 @@ export default function UserManagement() {
     <div className="p-6 max-w-3xl mx-auto space-y-6">
       <h1 className="text-2xl font-heading font-bold">User Management</h1>
 
-      <Card>
+      <Card className="border-primary/20 bg-muted/30">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><UserPlus className="w-5 h-5" />Create Staff Account</CardTitle>
-          <CardDescription>New users can only sign in — public signup is disabled</CardDescription>
+          <CardTitle className="flex items-center gap-2 text-primary">
+            <UserPlus className="w-5 h-5" />Register Staff Account
+          </CardTitle>
+          <CardDescription>Only Administrators can create accounts for clinic staff.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2 space-y-2">
-              <Label>Full Name</Label>
-              <Input value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Dr. John Smith" />
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="md:col-span-2 space-y-2">
+              <Label className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Full Name</Label>
+              <Input
+                value={fullName}
+                onChange={e => setFullName(e.target.value)}
+                placeholder="Dr. John Smith"
+                className="h-11 border-primary/10 shadow-sm"
+              />
             </div>
             <div className="space-y-2">
-              <Label>Email</Label>
-              <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="staff@clinic.com" />
+              <Label className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Username (Email)</Label>
+              <Input
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="staff@clinic.com"
+                className="h-11 border-primary/10 shadow-sm"
+              />
             </div>
             <div className="space-y-2">
-              <Label>Password</Label>
-              <Input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Min 6 characters" />
+              <Label className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Initial Password</Label>
+              <Input
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="Min 6 characters"
+                className="h-11 border-primary/10 shadow-sm"
+              />
             </div>
-            <div className="space-y-2">
-              <Label>Role</Label>
+            <div className="md:col-span-2 space-y-2">
+              <Label className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Assigned Role</Label>
               <Select value={role} onValueChange={setRole}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-11 border-primary/10 shadow-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="doctor">Doctor (Admin)</SelectItem>
-                  <SelectItem value="nurse">Nurse (Front Desk)</SelectItem>
+                  <SelectItem value="doctor">Doctor (Full Access)</SelectItem>
+                  <SelectItem value="nurse">Nurse (Patient Entry Only)</SelectItem>
                   <SelectItem value="printer">Printer Staff</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
-          <Button onClick={createUser} disabled={creating}>
+          <Button onClick={createUser} disabled={creating} className="w-full md:w-auto px-8 h-11 font-semibold shadow-lg shadow-primary/10 transition-transform active:scale-[0.98]">
             {creating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <UserPlus className="w-4 h-4 mr-2" />}
-            Create User
+            Register Staff
           </Button>
         </CardContent>
       </Card>
