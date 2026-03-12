@@ -36,10 +36,12 @@ export default function UserManagement() {
     }
     setCreating(true);
     try {
-      // Sign up user via edge function or admin API
-      // For now, use supabase.auth.signUp — but this logs in as new user
-      // Better approach: use an edge function with admin client
-      // For MVP, we'll use signUp and handle it
+      // Keep track of the current admin session so we know who is logged in
+      const { data: { session: adminSession } } = await supabase.auth.getSession();
+
+      // Sign up user via supabase.auth.signUp 
+      // WARNING: In Supabase v2, if email confirmation is OFF, signUp() automatically 
+      // mutates the local session to the NEW user.
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
@@ -48,12 +50,30 @@ export default function UserManagement() {
       if (error) throw error;
       if (!data.user) throw new Error('User creation failed');
 
-      // Assign role
+      // Assign role (can still do this because we have the explicit user ID)
       const { error: roleError } = await supabase.from('user_roles').insert({
         user_id: data.user.id,
         role: role as AppRole,
       });
       if (roleError) throw roleError;
+
+      // If the admin's session was overwritten by the new user's session
+      // (because email confirmations are disabled), we must log the new user out 
+      // so they don't get the "Access Pending" screen, and tell the admin to re-login.
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+
+      if (currentSession?.user?.id === data.user.id) {
+        // We got auto-logged in as the NEW user!
+        await supabase.auth.signOut();
+        toast.success(`User ${fullName} created successfully!`, { duration: 5000 });
+        toast.info(`Security Notice: You have been signed out. Please log back in.`, { duration: 8000 });
+
+        // Force reload to dump the state and go to login
+        setTimeout(() => {
+          window.location.href = '/clinic-flow/login';
+        }, 1500);
+        return;
+      }
 
       toast.success(`User ${fullName} created with role: ${role}`);
       setEmail('');

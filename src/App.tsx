@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { BrowserRouter, Route, Routes, Navigate, useLocation } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -33,7 +34,10 @@ function ProtectedRoute({ children, allowedRoles }: { children: ReactNode; allow
         <div className="space-y-4 max-w-sm">
           <h1 className="text-xl font-bold">Access Pending</h1>
           <p className="text-muted-foreground text-sm">Your account is created, but no role has been assigned. Please contact the administrator.</p>
-          <Button variant="outline" onClick={() => window.location.href = '/login'}>Back to Login</Button>
+          <Button variant="outline" onClick={async () => {
+            await supabase.auth.signOut();
+            window.location.href = '/clinic-flow/login';
+          }}>Back to Login</Button>
         </div>
       </div>
     );
