@@ -21,6 +21,7 @@ const navItems: NavItem[] = [
   { label: 'Print Queue', path: '/print', icon: <Printer className="w-5 h-5" />, roles: ['printer', 'doctor'] },
   { label: 'Patients', path: '/patients', icon: <Users className="w-5 h-5" />, roles: ['doctor'] },
   { label: 'Analytics', path: '/analytics', icon: <BarChart3 className="w-5 h-5" />, roles: ['doctor'] },
+  { label: 'Profile', path: '/profile', icon: <Users className="w-5 h-5" />, roles: ['doctor'] },
   { label: 'User Mgmt', path: '/users', icon: <Users className="w-5 h-5" />, roles: ['doctor'] },
 ];
 
