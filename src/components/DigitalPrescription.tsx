@@ -31,7 +31,6 @@ export default function DigitalPrescription({ patient, visit, onSave, onClose }:
         }
     }, []);
 
-    // ── Redraw all stored paths onto the canvas
     const redrawAll = useCallback((pathsToRender: { x: number; y: number }[][]) => {
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -39,14 +38,22 @@ export default function DigitalPrescription({ patient, visit, onSave, onClose }:
         if (!ctx) return;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.strokeStyle = '#1a1a1a';
-        ctx.lineWidth = 2.5;
+        ctx.lineWidth = Math.max(1.5, canvas.width * 0.0035);
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         pathsToRender.forEach(path => {
-            if (path.length < 2) return;
+            if (path.length < 2) {
+                if (path.length === 1) {
+                    ctx.beginPath();
+                    ctx.arc(path[0].x * canvas.width, path[0].y * canvas.height, Math.max(1, canvas.width * 0.002), 0, Math.PI * 2);
+                    ctx.fillStyle = '#1a1a1a';
+                    ctx.fill();
+                }
+                return;
+            }
             ctx.beginPath();
-            ctx.moveTo(path[0].x, path[0].y);
-            for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x, path[i].y);
+            ctx.moveTo(path[0].x * canvas.width, path[0].y * canvas.height);
+            for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x * canvas.width, path[i].y * canvas.height);
             ctx.stroke();
         });
     }, []);
@@ -60,14 +67,14 @@ export default function DigitalPrescription({ patient, visit, onSave, onClose }:
         return () => clearTimeout(id);
     }, [isEnlarged, fitCanvas, redrawAll, paths]);
 
-    // ── Get the precise canvas coordinates from a pointer/touch/mouse event
+    // ── Get normalized canvas coordinates [0..1]
     const getCanvasPos = (e: React.PointerEvent) => {
         const canvas = canvasRef.current;
         if (!canvas) return { x: 0, y: 0 };
         const rect = canvas.getBoundingClientRect();
         return {
-            x: (e.clientX - rect.left),
-            y: (e.clientY - rect.top),
+            x: (e.clientX - rect.left) / rect.width,
+            y: (e.clientY - rect.top) / rect.height,
         };
     };
 
@@ -81,9 +88,9 @@ export default function DigitalPrescription({ patient, visit, onSave, onClose }:
         // Draw a dot for a single tap
         const canvas = canvasRef.current;
         const ctx = canvas?.getContext('2d');
-        if (ctx) {
+        if (ctx && canvas) {
             ctx.beginPath();
-            ctx.arc(pos.x, pos.y, 1.2, 0, Math.PI * 2);
+            ctx.arc(pos.x * canvas.width, pos.y * canvas.height, Math.max(1, canvas.width * 0.002), 0, Math.PI * 2);
             ctx.fillStyle = '#1a1a1a';
             ctx.fill();
         }
@@ -96,15 +103,15 @@ export default function DigitalPrescription({ patient, visit, onSave, onClose }:
 
         const canvas = canvasRef.current;
         const ctx = canvas?.getContext('2d');
-        if (ctx && path.length > 0) {
+        if (ctx && canvas && path.length > 0) {
             const last = path[path.length - 1];
             ctx.beginPath();
             ctx.strokeStyle = '#1a1a1a';
-            ctx.lineWidth = 2.5;
+            ctx.lineWidth = Math.max(1.5, canvas.width * 0.0035);
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
-            ctx.moveTo(last.x, last.y);
-            ctx.lineTo(pos.x, pos.y);
+            ctx.moveTo(last.x * canvas.width, last.y * canvas.height);
+            ctx.lineTo(pos.x * canvas.width, pos.y * canvas.height);
             ctx.stroke();
         }
         currentPathRef.current = [...path, pos];
