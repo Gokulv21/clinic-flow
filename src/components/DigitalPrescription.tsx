@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Maximize2, Minimize2, Trash2, Save, Undo, X } from 'lucide-react';
+import { Maximize2, Minimize2, Trash2, Save, Undo, X, Eraser, PenTool, Circle } from 'lucide-react';
 import PrescriptionTemplate from './PrescriptionTemplate';
 
 interface DigitalPrescriptionProps {
@@ -14,9 +14,19 @@ export default function DigitalPrescription({ patient, visit, onSave, onClose }:
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [isEnlarged, setIsEnlarged] = useState(false);
-    const [paths, setPaths] = useState<{ x: number; y: number }[][]>([]);
+
+    // Drawing State
+    const [penColor, setPenColor] = useState('#1e293b');
+    const [penSize, setPenSize] = useState(3);
+    const [isEraser, setIsEraser] = useState(false);
+
+    // Paths now store their style metadata
+    type PathPoint = { x: number; y: number };
+    type DrawnPath = { points: PathPoint[]; color: string; size: number; isEraser: boolean };
+    const [paths, setPaths] = useState<DrawnPath[]>([]);
+
     const isDrawingRef = useRef(false);
-    const currentPathRef = useRef<{ x: number; y: number }[]>([]);
+    const currentPathRef = useRef<PathPoint[]>([]);
 
     // ── Fit canvas pixel dimensions to its CSS display size (NO scaling trick)
     const fitCanvas = useCallback(() => {
@@ -31,31 +41,49 @@ export default function DigitalPrescription({ patient, visit, onSave, onClose }:
         }
     }, []);
 
-    const redrawAll = useCallback((pathsToRender: { x: number; y: number }[][]) => {
+    const redrawAll = useCallback((pathsToRender: DrawnPath[]) => {
         const canvas = canvasRef.current;
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
+
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.strokeStyle = '#1a1a1a';
-        ctx.lineWidth = Math.max(1.5, canvas.width * 0.0035);
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
+
         pathsToRender.forEach(path => {
-            if (path.length < 2) {
-                if (path.length === 1) {
+            const { points, color, size, isEraser } = path;
+            const pts = points;
+
+            ctx.strokeStyle = isEraser ? '#ffffff' : color;
+            // Base thickness on canvas width but scaled by the user's chosen penSize
+            ctx.lineWidth = Math.max(1.5, canvas.width * 0.001 * size);
+
+            if (isEraser) {
+                ctx.globalCompositeOperation = 'destination-out';
+                ctx.lineWidth = ctx.lineWidth * 3; // make eraser wider
+            } else {
+                ctx.globalCompositeOperation = 'source-over';
+            }
+
+            if (pts.length < 2) {
+                if (pts.length === 1) {
                     ctx.beginPath();
-                    ctx.arc(path[0].x * canvas.width, path[0].y * canvas.height, Math.max(1, canvas.width * 0.002), 0, Math.PI * 2);
-                    ctx.fillStyle = '#1a1a1a';
+                    // Dot radius matches the line width stroke
+                    ctx.arc(pts[0].x * canvas.width, pts[0].y * canvas.height, ctx.lineWidth / 2, 0, Math.PI * 2);
+                    ctx.fillStyle = ctx.strokeStyle;
                     ctx.fill();
                 }
                 return;
             }
             ctx.beginPath();
-            ctx.moveTo(path[0].x * canvas.width, path[0].y * canvas.height);
-            for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x * canvas.width, path[i].y * canvas.height);
+            ctx.moveTo(pts[0].x * canvas.width, pts[0].y * canvas.height);
+            for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x * canvas.width, pts[i].y * canvas.height);
             ctx.stroke();
         });
+
+        // Reset composite operation to default
+        ctx.globalCompositeOperation = 'source-over';
     }, []);
 
     // Fit on mount and when enlarged state changes
@@ -79,7 +107,6 @@ export default function DigitalPrescription({ patient, visit, onSave, onClose }:
     };
 
     const onPointerDown = (e: React.PointerEvent) => {
-        // Capture the pointer so we keep getting events even if the finger leaves the element
         (e.target as HTMLElement).setPointerCapture(e.pointerId);
         isDrawingRef.current = true;
         const pos = getCanvasPos(e);
@@ -90,9 +117,12 @@ export default function DigitalPrescription({ patient, visit, onSave, onClose }:
         const ctx = canvas?.getContext('2d');
         if (ctx && canvas) {
             ctx.beginPath();
-            ctx.arc(pos.x * canvas.width, pos.y * canvas.height, Math.max(1, canvas.width * 0.002), 0, Math.PI * 2);
-            ctx.fillStyle = '#1a1a1a';
+            const lineWidth = Math.max(1.5, canvas.width * 0.001 * penSize) * (isEraser ? 3 : 1);
+            ctx.globalCompositeOperation = isEraser ? 'destination-out' : 'source-over';
+            ctx.fillStyle = isEraser ? '#ffffff' : penColor;
+            ctx.arc(pos.x * canvas.width, pos.y * canvas.height, lineWidth / 2, 0, Math.PI * 2);
             ctx.fill();
+            ctx.globalCompositeOperation = 'source-over';
         }
     };
 
@@ -106,21 +136,28 @@ export default function DigitalPrescription({ patient, visit, onSave, onClose }:
         if (ctx && canvas && path.length > 0) {
             const last = path[path.length - 1];
             ctx.beginPath();
-            ctx.strokeStyle = '#1a1a1a';
-            ctx.lineWidth = Math.max(1.5, canvas.width * 0.0035);
+            ctx.globalCompositeOperation = isEraser ? 'destination-out' : 'source-over';
+            ctx.strokeStyle = isEraser ? '#ffffff' : penColor;
+            ctx.lineWidth = Math.max(1.5, canvas.width * 0.001 * penSize) * (isEraser ? 3 : 1);
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
             ctx.moveTo(last.x * canvas.width, last.y * canvas.height);
             ctx.lineTo(pos.x * canvas.width, pos.y * canvas.height);
             ctx.stroke();
+            ctx.globalCompositeOperation = 'source-over';
         }
         currentPathRef.current = [...path, pos];
     };
 
     const onPointerUp = () => {
-        if (currentPathRef.current.length > 1) {
-            const newPaths = [...paths, currentPathRef.current];
-            setPaths(newPaths);
+        if (currentPathRef.current.length > 1 || currentPathRef.current.length === 1) { // Save dots too
+            const newPath = {
+                points: currentPathRef.current,
+                color: penColor,
+                size: penSize,
+                isEraser: isEraser
+            };
+            setPaths(prev => [...prev, newPath]);
         }
         currentPathRef.current = [];
         isDrawingRef.current = false;
@@ -157,29 +194,70 @@ export default function DigitalPrescription({ patient, visit, onSave, onClose }:
             padding: isEnlarged ? 0 : '8px',
         }}>
             {/* ── Toolbar */}
-            <div style={{
-                background: '#f8fafc',
-                borderBottom: '1px solid #e2e8f0',
-                padding: '8px 12px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                flexShrink: 0,
-                gap: 8,
-            }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div className="bg-white border-b px-4 py-3 flex items-center justify-between shrink-0 drop-shadow-sm sticky top-0 z-50 rounded-t-lg">
+                <div className="flex items-center gap-2">
                     <Button variant="ghost" size="icon" onClick={onClose}><X className="w-5 h-5" /></Button>
-                    <span style={{ fontWeight: 700, fontSize: 14, color: '#334155' }}>
-                        {patient?.name} — Digital Prescription
-                    </span>
+                    <h2 className="font-heading font-bold text-lg hidden sm:block ml-2">Digital Prescription</h2>
+
+                    <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg ml-4">
+                        <Button variant="ghost" size="sm" onClick={handleUndo} disabled={paths.length === 0} className="h-8">
+                            <Undo className="w-4 h-4 mr-1 md:mr-2" />
+                            <span className="hidden md:inline">Undo</span>
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={handleClear} disabled={paths.length === 0} className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50">
+                            <Trash2 className="w-4 h-4 mr-1 md:mr-2" />
+                            <span className="hidden md:inline">Clear</span>
+                        </Button>
+                    </div>
+
+                    {/* ── DRAWING CONTROLS ── */}
+                    <div className="hidden md:flex items-center gap-3 bg-slate-100 p-1 rounded-lg ml-2">
+                        {/* Eraser Toggle */}
+                        <Button
+                            variant={isEraser ? "secondary" : "ghost"}
+                            size="sm"
+                            onClick={() => setIsEraser(!isEraser)}
+                            className={`h-8 w-8 p-0 ${isEraser ? 'bg-white shadow-sm ring-1 ring-slate-200' : ''}`}
+                            title="Toggle Eraser"
+                        >
+                            <Eraser className={`w-4 h-4 ${isEraser ? 'text-blue-600' : 'text-slate-600'}`} />
+                        </Button>
+
+                        <div className="w-px h-5 bg-slate-300 mx-1"></div>
+
+                        {/* Color Picker (disabled if eraser) */}
+                        <div className="flex items-center gap-1" style={{ opacity: isEraser ? 0.5 : 1, pointerEvents: isEraser ? 'none' : 'auto' }}>
+                            <PenTool className="w-4 h-4 text-slate-500 mr-1" />
+                            <input
+                                type="color"
+                                value={penColor}
+                                onChange={(e) => setPenColor(e.target.value)}
+                                className="w-6 h-6 p-0 border-0 rounded cursor-pointer [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-none [&::-webkit-color-swatch]:rounded-md ring-1 ring-slate-200"
+                                title="Pen Color"
+                            />
+                        </div>
+
+                        {/* Pen Size Slider */}
+                        <div className="flex items-center gap-2 ml-2 px-2 min-w-[120px]">
+                            <Circle className="w-2 h-2 text-slate-400 fill-current" />
+                            <input
+                                type="range"
+                                min="1"
+                                max="15"
+                                value={penSize}
+                                onChange={(e) => setPenSize(parseInt(e.target.value))}
+                                className="w-16 h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                                title={`Pen Size: ${penSize}`}
+                            />
+                            <Circle className="w-4 h-4 text-slate-400 fill-current" />
+                        </div>
+                    </div>
                 </div>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    <Button variant="outline" size="sm" onClick={handleUndo} disabled={paths.length === 0}>
-                        <Undo className="w-4 h-4 mr-1" /> Undo
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={handleClear} style={{ color: 'red' }}>
-                        <Trash2 className="w-4 h-4 mr-1" /> Clear
-                    </Button>
+
+                <div className="flex items-center gap-2">
+                    <span style={{ fontWeight: 700, fontSize: 14, color: '#334155' }} className="hidden lg:block mr-4">
+                        {patient?.name}
+                    </span>
                     <Button variant="outline" size="sm" onClick={() => setIsEnlarged(e => !e)}>
                         {isEnlarged ? <Minimize2 className="w-4 h-4 mr-1" /> : <Maximize2 className="w-4 h-4 mr-1" />}
                         {isEnlarged ? 'Shrink' : 'Enlarge'}
@@ -193,19 +271,15 @@ export default function DigitalPrescription({ patient, visit, onSave, onClose }:
             {/* ── Scrollable paper area */}
             <div style={{
                 flex: 1,
-                overflowY: 'auto',
                 overflowX: 'auto',
-                background: '#94a3b8',
+                overflowY: 'auto',
+                background: '#e2e8f0',
                 display: 'flex',
                 justifyContent: 'center',
                 padding: '16px',
+                borderBottomLeftRadius: isEnlarged ? 0 : '8px',
+                borderBottomRightRadius: isEnlarged ? 0 : '8px',
             }}>
-                {/* 
-                    The paper: 
-                    - Min width 320px, max 700px
-                    - Uses a natural aspect ratio matching A4 (1/√2 ≈ 0.707)
-                    - The template image IS the paper; canvas is on top
-                */}
                 <div
                     ref={containerRef}
                     style={{
@@ -216,16 +290,13 @@ export default function DigitalPrescription({ patient, visit, onSave, onClose }:
                         flexShrink: 0,
                         boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
                         cursor: 'crosshair',
-                        // Prevent scroll interference while drawing
                         touchAction: 'none',
                     }}
                 >
-                    {/* Template background */}
                     <div style={{ position: 'absolute', inset: 0 }}>
                         <PrescriptionTemplate patient={patient} visit={visit} handwrittenImage={null} />
                     </div>
 
-                    {/* Drawing canvas — on top of everything */}
                     <canvas
                         ref={canvasRef}
                         style={{

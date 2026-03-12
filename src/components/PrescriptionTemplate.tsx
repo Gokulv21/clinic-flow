@@ -260,15 +260,19 @@ export default function PrescriptionTemplate({
                     {/* RIGHT — Vitals sidebar */}
                     <div style={{
                         width: '27%', flexShrink: 0,
-                        background: 'linear-gradient(180deg, #f4f9ff 0%, #eef5fb 100%)',
+                        backgroundColor: '#f4f9ff',
+                        boxShadow: 'inset 0 0 0 1000px #f4f9ff', /* Force print! */
                         display: 'flex', flexDirection: 'column', overflow: 'hidden',
+                        WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact', colorAdjust: 'exact' as any,
                     }}>
                         <div style={{
-                            background: 'linear-gradient(135deg, #1a3a5c, #1b6ca8)',
+                            backgroundColor: '#1a3a5c',
+                            boxShadow: 'inset 0 0 0 1000px #1a3a5c', /* Force print! */
                             color: '#fff', fontWeight: 700,
                             letterSpacing: '0.08em', textTransform: 'uppercase',
                             fontSize: '0.75em', textAlign: 'center',
                             padding: '0.5em 0', flexShrink: 0,
+                            WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact', colorAdjust: 'exact' as any,
                         }}>
                             Clinical Vitals
                         </div>
@@ -279,7 +283,9 @@ export default function PrescriptionTemplate({
                                 height: '3em',           /* compact fixed row height */
                                 flexShrink: 0,
                                 borderBottom: `1px solid ${i % 2 === 0 ? '#cde0f0' : '#d8e8f5'}`,
-                                background: i % 2 === 0 ? 'rgba(255,255,255,0.85)' : 'rgba(232,245,255,0.55)',
+                                backgroundColor: i % 2 === 0 ? '#ffffff' : '#eef6fc',
+                                boxShadow: `inset 0 0 0 100px ${i % 2 === 0 ? '#ffffff' : '#eef6fc'}`, /* Force print! */
+                                WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact', colorAdjust: 'exact' as any,
                             }}>
                                 <div style={{
                                     width: '45%', padding: '0 0.55em',

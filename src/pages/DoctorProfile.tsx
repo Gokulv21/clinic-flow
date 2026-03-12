@@ -1,12 +1,21 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
+
+// Add type matching the actual useAuth profile payload to fix lints
+type AuthProfile = {
+    id: string;
+    email?: string;
+    full_name?: string;
+};
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Users, Calendar, Activity, Clock } from 'lucide-react';
 import { startOfDay, endOfDay } from 'date-fns';
 
 export default function DoctorProfile() {
-    const { profile } = useAuth();
+    const { profile: rawProfile } = useAuth();
+    const profile = rawProfile as AuthProfile | null;
+
     const [totalPatients, setTotalPatients] = useState<number>(0);
     const [todayPatients, setTodayPatients] = useState<number>(0);
     const [recentVisits, setRecentVisits] = useState<any[]>([]);
@@ -14,7 +23,10 @@ export default function DoctorProfile() {
 
     useEffect(() => {
         async function fetchDoctorStats() {
-            if (!profile?.id) return;
+            if (!profile?.id) {
+                setLoading(false);
+                return;
+            }
 
             try {
                 // 1. Get TOTAL distinct patients seen by this doctor
