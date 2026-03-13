@@ -159,7 +159,16 @@ export default function NurseEntry() {
                   </div>
                   <div className="space-y-2">
                     <Label>Age *</Label>
-                    <Input type="number" value={patient.age} onChange={e => setPatient(p => ({ ...p, age: e.target.value }))} placeholder="Age" />
+                    <Input 
+                      type="number" 
+                      value={patient.age} 
+                      onChange={e => {
+                        const val = parseInt(e.target.value);
+                        if (val > 120) return;
+                        setPatient(p => ({ ...p, age: e.target.value }));
+                      }} 
+                      placeholder="Age" 
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label>Sex *</Label>
@@ -174,7 +183,14 @@ export default function NurseEntry() {
                   </div>
                   <div className="space-y-2">
                     <Label>Phone *</Label>
-                    <Input value={patient.phone} onChange={e => setPatient(p => ({ ...p, phone: e.target.value }))} placeholder="Phone number" />
+                    <Input 
+                      value={patient.phone} 
+                      onChange={e => {
+                        const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                        setPatient(p => ({ ...p, phone: val }));
+                      }} 
+                      placeholder="Phone number" 
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label>Address</Label>
@@ -254,58 +270,114 @@ export default function NurseEntry() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Weight (kg)</Label>
-                <Input type="number" step="0.1" value={vitals.weight} onChange={e => setVitals(v => ({ ...v, weight: e.target.value }))} />
+                <Input 
+                  type="number" 
+                  step="0.1" 
+                  min="0" 
+                  max="300"
+                  value={vitals.weight} 
+                  onChange={e => {
+                    const val = parseFloat(e.target.value);
+                    if (val > 300) return;
+                    setVitals(v => ({ ...v, weight: e.target.value }));
+                  }} 
+                />
               </div>
               <div className="space-y-2">
                 <Label>Blood Pressure (SBP / DBP)</Label>
                 <div className="flex items-center gap-2">
                   <Input
                     placeholder="Sys"
+                    inputMode="numeric"
                     value={vitals.blood_pressure.split('/')[0] || ''}
                     onChange={e => {
-                      const sbp = e.target.value;
+                      const sbp = e.target.value.replace(/\D/g, '').slice(0, 3);
+                      if (parseInt(sbp) > 300) return;
                       const dbp = vitals.blood_pressure.split('/')[1] || '';
                       setVitals(v => ({ ...v, blood_pressure: `${sbp}/${dbp}`.replace(/^\/|\/$/g, '') }));
                       if (sbp.length >= 3) {
                         document.getElementById('dbp-input')?.focus();
                       }
                     }}
-                    maxLength={3}
                     className="text-center"
                   />
                   <span className="text-muted-foreground font-bold">/</span>
                   <Input
                     id="dbp-input"
                     placeholder="Dia"
+                    inputMode="numeric"
                     value={vitals.blood_pressure.split('/')[1] || ''}
                     onChange={e => {
                       const sbp = vitals.blood_pressure.split('/')[0] || '';
-                      const dbp = e.target.value;
+                      const dbp = e.target.value.replace(/\D/g, '').slice(0, 3);
+                      if (parseInt(dbp) > 300) return;
                       setVitals(v => ({ ...v, blood_pressure: `${sbp}/${dbp}`.replace(/^\/|\/$/g, '') }));
                       if (dbp.length >= 3) {
                         document.getElementById('pulse-input')?.focus();
                       }
                     }}
-                    maxLength={3}
                     className="text-center"
                   />
                 </div>
               </div>
-              <div className="space-y-2">
+               <div className="space-y-2">
                 <Label>Pulse Rate (bpm)</Label>
-                <Input id="pulse-input" type="number" value={vitals.pulse_rate} onChange={e => setVitals(v => ({ ...v, pulse_rate: e.target.value }))} />
+                <Input 
+                  id="pulse-input" 
+                  type="number" 
+                  min="0"
+                  max="250"
+                  value={vitals.pulse_rate} 
+                  onChange={e => {
+                    const val = parseInt(e.target.value);
+                    if (val > 250) return;
+                    setVitals(v => ({ ...v, pulse_rate: e.target.value }));
+                  }} 
+                />
               </div>
               <div className="space-y-2">
                 <Label>SpO2 (%)</Label>
-                <Input type="number" step="0.1" value={vitals.spo2} onChange={e => setVitals(v => ({ ...v, spo2: e.target.value }))} />
+                <Input 
+                  type="number" 
+                  step="0.1" 
+                  min="0"
+                  max="100"
+                  value={vitals.spo2} 
+                  onChange={e => {
+                    const val = parseFloat(e.target.value);
+                    if (val > 100) return;
+                    setVitals(v => ({ ...v, spo2: e.target.value }));
+                  }} 
+                />
               </div>
               <div className="space-y-2">
                 <Label>Temperature (°F)</Label>
-                <Input type="number" step="0.1" value={vitals.temperature} onChange={e => setVitals(v => ({ ...v, temperature: e.target.value }))} />
+                <Input 
+                  type="number" 
+                  step="0.1" 
+                  min="90"
+                  max="110"
+                  value={vitals.temperature} 
+                  onChange={e => {
+                    const val = parseFloat(e.target.value);
+                    if (val > 110) return;
+                    setVitals(v => ({ ...v, temperature: e.target.value }));
+                  }} 
+                />
               </div>
               <div className="space-y-2">
                 <Label>CBG (mg/dL)</Label>
-                <Input type="number" value={vitals.cbg} onChange={e => setVitals(v => ({ ...v, cbg: e.target.value }))} />
+                <Input 
+                  type="number" 
+                  min="0"
+                  max="600"
+                  value={vitals.cbg} 
+                  onChange={e => {
+                    const val = parseInt(e.target.value);
+                    if (val > 600) return;
+                    setVitals(v => ({ ...v, cbg: e.target.value }));
+                  }} 
+                />
               </div>
             </div>
             <div className="flex gap-3">

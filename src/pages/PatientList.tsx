@@ -108,8 +108,28 @@ export default function PatientList() {
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div><Label>Name</Label><Input value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} /></div>
-                <div><Label>Age</Label><Input type="number" value={editForm.age} onChange={e => setEditForm(f => ({ ...f, age: e.target.value }))} /></div>
-                <div><Label>Phone</Label><Input value={editForm.phone} onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))} /></div>
+                <div>
+                  <Label>Age</Label>
+                  <Input 
+                    type="number" 
+                    value={editForm.age} 
+                    onChange={e => {
+                      const val = parseInt(e.target.value);
+                      if (val > 120) return;
+                      setEditForm(f => ({ ...f, age: e.target.value }));
+                    }} 
+                  />
+                </div>
+                <div>
+                  <Label>Phone</Label>
+                  <Input 
+                    value={editForm.phone} 
+                    onChange={e => {
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      setEditForm(f => ({ ...f, phone: val }));
+                    }} 
+                  />
+                </div>
                 <div><Label>Address</Label><Input value={editForm.address} onChange={e => setEditForm(f => ({ ...f, address: e.target.value }))} /></div>
               </div>
               <Button onClick={saveEdit}>Save Changes</Button>
