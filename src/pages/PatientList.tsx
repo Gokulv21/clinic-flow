@@ -19,9 +19,15 @@ export default function PatientList() {
   const fetchPatients = async () => {
     let query = supabase.from('patients').select('*').order('created_at', { ascending: false });
     if (search.trim()) {
-      query = query.or(`name.ilike.%${search}%,phone.ilike.%${search}%`);
+      // Check if search looks like a UUID for ID search
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(search.trim());
+      if (isUuid) {
+        query = query.or(`id.eq.${search.trim()},name.ilike.%${search}%,phone.ilike.%${search}%`);
+      } else {
+        query = query.or(`name.ilike.%${search}%,phone.ilike.%${search}%`);
+      }
     }
-    const { data } = await query.limit(50);
+    const { data } = await query; // Removed limit(50) to show all
     setPatients(data || []);
   };
 
@@ -63,7 +69,7 @@ export default function PatientList() {
 
       <div className="relative">
         <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-        <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name or phone..." className="pl-10" />
+        <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name, phone or ID..." className="pl-10" />
       </div>
 
       <div className="grid gap-3">
@@ -77,6 +83,7 @@ export default function PatientList() {
                 <div>
                   <p className="font-medium">{p.name}</p>
                   <p className="text-sm text-muted-foreground">{p.phone} · {p.age}y · {p.sex}</p>
+                  <p className="text-[10px] text-muted-foreground/50 font-mono mt-0.5">ID: {p.id}</p>
                 </div>
               </div>
               <History className="w-4 h-4 text-muted-foreground" />

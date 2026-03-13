@@ -8,11 +8,12 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { User, Clock, CheckCircle, Plus, Trash2, Save, Loader2, PenTool, Eye, Menu, Printer } from 'lucide-react';
+import { User, Clock, CheckCircle, Plus, Trash2, Save, Loader2, PenTool, Eye, Menu, Printer, ArrowLeft } from 'lucide-react';
 import DigitalPrescription from '@/components/DigitalPrescription';
 import PrescriptionTemplate from '@/components/PrescriptionTemplate';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { printPrescription } from '@/lib/printPrescription';
 
 interface Medicine {
   name: string;
@@ -125,9 +126,12 @@ export default function DoctorConsultation() {
 
   const queuePanel = (
     <div className="h-full flex flex-col bg-card">
-      <div className="p-4 border-b border-border bg-card sticky top-0 z-10">
-        <h2 className="font-heading font-bold text-lg">Patient Queue</h2>
-        <p className="text-sm text-muted-foreground">{queue.length} patients today</p>
+      <div className="p-4 border-b border-border bg-card sticky top-0 z-10 flex items-center justify-between">
+        <div>
+          <h2 className="font-heading font-bold text-lg">Patient Queue</h2>
+          <p className="text-sm text-muted-foreground">{queue.length} patients today</p>
+        </div>
+        {/* Mobile-only refresh or count indicator if needed */}
       </div>
       <div className="flex-1 overflow-auto">
         {queue.map(visit => (
@@ -141,15 +145,15 @@ export default function DoctorConsultation() {
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                   <span className="font-heading font-bold text-primary text-sm">#{visit.token_number}</span>
                 </div>
-                <div>
-                  <p className="font-medium text-sm">{visit.patients?.name}</p>
+                <div className="min-w-0">
+                  <p className="font-medium text-sm truncate">{visit.patients?.name}</p>
                   <p className="text-xs text-muted-foreground">{visit.patients?.age}y · {visit.patients?.sex}</p>
                 </div>
               </div>
-              <Badge variant="outline" className={cn("text-xs", statusColor(visit.status))}>
+              <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0 h-5 shrink-0 ml-2", statusColor(visit.status))}>
                 {visit.status === 'waiting' ? 'Wait' : visit.status === 'in_consultation' ? 'Active' : 'Done'}
               </Badge>
             </div>
@@ -166,43 +170,52 @@ export default function DoctorConsultation() {
   );
 
   return (
-    <div className="flex flex-col md:flex-row h-[calc(100vh-64px)] md:h-[calc(100vh-0px)]">
-      {/* Mobile Queue Toggle */}
-      <div className="md:hidden flex items-center justify-between p-4 bg-card border-b border-border sticky top-0 z-20">
-        <div className="flex items-center gap-2">
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon"><Menu className="w-6 h-6" /></Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="p-0 w-80">
-              {queuePanel}
-            </SheetContent>
-          </Sheet>
-          <span className="font-bold underline decoration-primary decoration-2 underline-offset-4">QUEUE</span>
-        </div>
-        {selectedVisit && (
-          <Badge variant="outline" className="font-bold text-primary border-primary/20">
-            Current: #{selectedVisit.token_number}
-          </Badge>
-        )}
-      </div>
+    <div className="flex flex-col md:flex-row h-[calc(100vh-64px)] md:h-[calc(100vh-0px)] overflow-hidden">
+      {/* 
+          MOBILE UI REFACTOR: WhatsApp-style Master-Detail 
+          - On mobile: If NO selectedVisit, show queue list.
+          - On mobile: If selectedVisit, show consultation details.
+          - On desktop: Always show both (sidebar + main).
+      */}
 
-      {/* Desktop Queue Panel */}
-      <div className="hidden md:block w-80 border-r border-border shrink-0">
+      {/* Queue List (Sidebar on desktop, full screen on mobile when no patient selected) */}
+      <div className={cn(
+        "w-full md:w-80 border-r border-border shrink-0 h-full",
+        selectedVisit ? "hidden md:block" : "block"
+      )}>
         {queuePanel}
       </div>
 
-      {/* Main Content Area */}
-      <div className="flex-1 overflow-auto p-4 md:p-6 bg-slate-50/30">
+      {/* Consultation Details (Main content) */}
+      <div className={cn(
+        "flex-1 overflow-auto bg-slate-50/30 h-full",
+        !selectedVisit ? "hidden md:block" : "block"
+      )}>
         {!selectedVisit ? (
           <div className="flex items-center justify-center h-full text-muted-foreground">
-            <div className="text-center">
+            <div className="text-center p-6">
               <User className="w-16 h-16 mx-auto mb-4 opacity-10" />
               <p className="text-lg font-medium opacity-50">Select a patient for consultation</p>
+              <p className="text-sm opacity-40 mt-1">Tap a patient from the queue to start</p>
             </div>
           </div>
         ) : (
-          <div className="max-w-3xl mx-auto space-y-6 animate-slide-in">
+          <div className="max-w-3xl mx-auto p-4 md:p-6 space-y-6 animate-slide-in pb-20">
+            {/* Mobile-only Header with Back Button */}
+            <div className="md:hidden flex items-center justify-between mb-4 bg-white/80 backdrop-blur sticky top-[-1rem] z-20 py-2 -mx-4 px-4 border-b border-border shadow-sm">
+              <div className="flex items-center gap-3">
+                <Button variant="ghost" size="icon" onClick={() => setSelectedVisit(null)} className="-ml-2">
+                  <ArrowLeft className="w-5 h-5 text-primary" />
+                </Button>
+                <div>
+                  <h3 className="font-bold text-sm leading-tight">Consultation</h3>
+                  <p className="text-xs text-muted-foreground">Token #{selectedVisit.token_number} · {patient?.name}</p>
+                </div>
+              </div>
+              <Badge variant="outline" className={cn("text-[10px]", statusColor(selectedVisit.status))}>
+                {selectedVisit.status === 'waiting' ? 'Wait' : selectedVisit.status === 'in_consultation' ? 'Active' : 'Done'}
+              </Badge>
+            </div>
             {/* Patient Info */}
             <Card>
               <CardHeader>
@@ -354,7 +367,7 @@ export default function DoctorConsultation() {
         <DialogContent className="max-w-[800px] p-0 overflow-hidden bg-slate-100">
           <DialogHeader className="bg-white p-4 border-b flex flex-row items-center justify-between">
             <DialogTitle>Prescription Preview</DialogTitle>
-            <Button variant="outline" size="sm" onClick={() => window.print()} className="gap-2">
+            <Button variant="outline" size="sm" onClick={() => printPrescription()} className="gap-2">
               <Printer className="w-4 h-4" /> Print
             </Button>
           </DialogHeader>

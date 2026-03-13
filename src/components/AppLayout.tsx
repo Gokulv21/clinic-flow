@@ -3,9 +3,10 @@ import { useAuth, AppRole } from '@/lib/auth';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import {
-  Stethoscope, ClipboardPlus, Printer, BarChart3, Users, LogOut, Home
+  Stethoscope, ClipboardPlus, Printer, BarChart3, Users, LogOut, Home, Menu
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 
 interface NavItem {
   label: string;
@@ -74,20 +75,69 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       </aside>
 
       {/* Mobile bottom nav */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border flex md:hidden">
-        {visibleItems.slice(0, 5).map(item => (
+      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border flex md:hidden h-16">
+        {visibleItems.slice(0, 4).map(item => (
           <button
             key={item.path}
             onClick={() => navigate(item.path)}
             className={cn(
-              "flex-1 flex flex-col items-center gap-1 py-2 text-xs text-muted-foreground",
+              "flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-muted-foreground",
               location.pathname === item.path && "text-primary font-medium"
             )}
           >
             {item.icon}
-            <span className="truncate">{item.label}</span>
+            <span className="truncate w-full text-center px-1">{item.label}</span>
           </button>
         ))}
+        
+        {/* More Menu for Mobile */}
+        <Sheet>
+          <SheetTrigger asChild>
+            <button className="flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-muted-foreground">
+              <Menu className="w-5 h-5" />
+              <span>More</span>
+            </button>
+          </SheetTrigger>
+          <SheetContent side="bottom" className="p-0 rounded-t-xl max-h-[70vh] overflow-hidden flex flex-col">
+            <div className="p-4 border-b">
+              <h3 className="font-heading font-bold">Menu</h3>
+            </div>
+            <div className="flex-1 overflow-auto p-2 grid grid-cols-3 gap-2">
+              {visibleItems.map(item => (
+                <button
+                  key={item.path}
+                  onClick={() => {
+                    navigate(item.path);
+                    // Sheet closes automatically on navigation if it's not a SPA, 
+                    // but here we might need to close it if we stay on same page or depends on implementation.
+                    // Usually SheetTrigger is wrapped in a way that it works.
+                  }}
+                  className={cn(
+                    "flex flex-col items-center justify-center gap-2 p-4 rounded-xl text-xs transition-colors hover:bg-secondary",
+                    location.pathname === item.path ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground"
+                  )}
+                >
+                  <div className={cn(
+                    "w-10 h-10 rounded-lg flex items-center justify-center",
+                    location.pathname === item.path ? "bg-primary/20" : "bg-muted"
+                  )}>
+                    {item.icon}
+                  </div>
+                  <span className="text-center">{item.label}</span>
+                </button>
+              ))}
+              <button
+                onClick={signOut}
+                className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl text-xs text-destructive hover:bg-destructive/10 transition-colors"
+              >
+                <div className="w-10 h-10 rounded-lg bg-destructive/10 flex items-center justify-center">
+                  <LogOut className="w-5 h-5" />
+                </div>
+                <span>Sign Out</span>
+              </button>
+            </div>
+          </SheetContent>
+        </Sheet>
       </nav>
 
       {/* Main content */}

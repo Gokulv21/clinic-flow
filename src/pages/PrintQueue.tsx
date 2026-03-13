@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Printer, CheckCircle, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import PrescriptionTemplate from '@/components/PrescriptionTemplate';
+import { printPrescription as renderAndPrintPrescription } from '@/lib/printPrescription';
 
 export default function PrintQueue() {
   const [prescriptions, setPrescriptions] = useState<any[]>([]);
@@ -33,7 +34,7 @@ export default function PrintQueue() {
   useEffect(() => {
     if (printData) {
       setTimeout(() => {
-        window.print();
+        renderAndPrintPrescription();
         markPrinted(printData.id);
         setPrintData(null);
       }, 500); // Wait for the image/component to render
@@ -58,7 +59,7 @@ export default function PrintQueue() {
 
       {/* Hidden print container */}
       {printData && (
-        <div className="hidden print:block absolute inset-0 bg-white z-[9999] print:m-0 print:p-0">
+        <div className="fixed inset-0 opacity-0 pointer-events-none z-[-1]">
           <PrescriptionTemplate
             patient={printData.patients}
             visit={printData.visits}

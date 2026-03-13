@@ -195,11 +195,11 @@ export default function DigitalPrescription({ patient, visit, onSave, onClose }:
         }}>
             {/* ── Toolbar */}
             <div className="bg-white border-b px-4 py-3 flex items-center justify-between shrink-0 drop-shadow-sm sticky top-0 z-50 rounded-t-lg">
-                <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="icon" onClick={onClose}><X className="w-5 h-5" /></Button>
-                    <h2 className="font-heading font-bold text-lg hidden sm:block ml-2">Digital Prescription</h2>
+                <div className="flex items-center gap-1.5 min-w-0">
+                    <Button variant="ghost" size="icon" onClick={onClose} className="shrink-0"><X className="w-5 h-5" /></Button>
+                    <h2 className="font-heading font-bold text-lg hidden lg:block ml-1 truncate shrink-0">Digital Prescription</h2>
 
-                    <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg ml-4">
+                    <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg shrink-0">
                         <Button variant="ghost" size="sm" onClick={handleUndo} disabled={paths.length === 0} className="h-8">
                             <Undo className="w-4 h-4 mr-1 md:mr-2" />
                             <span className="hidden md:inline">Undo</span>
@@ -211,7 +211,7 @@ export default function DigitalPrescription({ patient, visit, onSave, onClose }:
                     </div>
 
                     {/* ── DRAWING CONTROLS ── */}
-                    <div className="hidden md:flex items-center gap-3 bg-slate-100 p-1 rounded-lg ml-2">
+                    <div className="flex items-center gap-1.5 sm:gap-3 bg-slate-100 p-0.5 sm:p-1 rounded-lg shrink-0">
                         {/* Eraser Toggle */}
                         <Button
                             variant={isEraser ? "secondary" : "ghost"}
@@ -223,47 +223,45 @@ export default function DigitalPrescription({ patient, visit, onSave, onClose }:
                             <Eraser className={`w-4 h-4 ${isEraser ? 'text-blue-600' : 'text-slate-600'}`} />
                         </Button>
 
-                        <div className="w-px h-5 bg-slate-300 mx-1"></div>
+                        <div className="hidden sm:block w-px h-5 bg-slate-300 mx-0.5"></div>
 
                         {/* Color Picker (disabled if eraser) */}
-                        <div className="flex items-center gap-1" style={{ opacity: isEraser ? 0.5 : 1, pointerEvents: isEraser ? 'none' : 'auto' }}>
-                            <PenTool className="w-4 h-4 text-slate-500 mr-1" />
+                        <div className="flex items-center gap-1 shrink-0" style={{ opacity: isEraser ? 0.5 : 1, pointerEvents: isEraser ? 'none' : 'auto' }}>
+                            <PenTool className="hidden sm:block w-4 h-4 text-slate-500 mr-1" />
                             <input
                                 type="color"
+                                shadow-sm
                                 value={penColor}
                                 onChange={(e) => setPenColor(e.target.value)}
-                                className="w-6 h-6 p-0 border-0 rounded cursor-pointer [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-none [&::-webkit-color-swatch]:rounded-md ring-1 ring-slate-200"
+                                className="w-7 h-7 sm:w-6 sm:h-6 p-0 border-0 rounded-md cursor-pointer [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-none [&::-webkit-color-swatch]:rounded-md ring-1 ring-slate-200"
                                 title="Pen Color"
                             />
                         </div>
 
-                        {/* Pen Size Slider */}
-                        <div className="flex items-center gap-2 ml-2 px-2 min-w-[120px]">
-                            <Circle className="w-2 h-2 text-slate-400 fill-current" />
+                        {/* Pen Size Slider - Hidden on tiny screens, show on small+ */}
+                        <div className="hidden xs:flex items-center gap-1.5 sm:gap-2 ml-1 px-1 sm:px-2 min-w-[60px] sm:min-w-[120px]">
+                            <Circle className="w-1.5 h-1.5 sm:w-2 sm:h-2 text-slate-400 fill-current" />
                             <input
                                 type="range"
                                 min="1"
                                 max="15"
                                 value={penSize}
                                 onChange={(e) => setPenSize(parseInt(e.target.value))}
-                                className="w-16 h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                                className="w-12 sm:w-16 h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                                 title={`Pen Size: ${penSize}`}
                             />
-                            <Circle className="w-4 h-4 text-slate-400 fill-current" />
+                            <Circle className="w-3 h-3 sm:w-4 sm:h-4 text-slate-400 fill-current" />
                         </div>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                    <span style={{ fontWeight: 700, fontSize: 14, color: '#334155' }} className="hidden lg:block mr-4">
-                        {patient?.name}
-                    </span>
-                    <Button variant="outline" size="sm" onClick={() => setIsEnlarged(e => !e)}>
-                        {isEnlarged ? <Minimize2 className="w-4 h-4 mr-1" /> : <Maximize2 className="w-4 h-4 mr-1" />}
-                        {isEnlarged ? 'Shrink' : 'Enlarge'}
+                <div className="flex items-center gap-1.5 shrink-0">
+                    <Button variant="outline" size="sm" onClick={() => setIsEnlarged(e => !e)} className="h-9 px-2 sm:px-3">
+                        {isEnlarged ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                        <span className="hidden xs:inline ml-1.5">{isEnlarged ? 'Shrink' : 'Enlarge'}</span>
                     </Button>
-                    <Button size="sm" onClick={handleSave} style={{ background: '#0284c7', color: 'white' }}>
-                        <Save className="w-4 h-4 mr-1" /> Save
+                    <Button size="sm" onClick={handleSave} className="h-9 px-3 sm:px-4 shadow-sm" style={{ background: '#0284c7', color: 'white' }}>
+                        <Save className="w-4 h-4 mr-1.5" /> <span className="hidden xs:inline">Save</span>
                     </Button>
                 </div>
             </div>
