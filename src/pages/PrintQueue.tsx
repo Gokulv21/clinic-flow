@@ -15,7 +15,7 @@ export default function PrintQueue() {
   const fetchPrescriptions = async () => {
     const { data } = await supabase
       .from('prescriptions')
-      .select('*, patients(name, age, sex, phone), visits(token_number, created_at)')
+      .select('*, patients(*), visits(*)')
       .order('created_at', { ascending: false });
     setPrescriptions(data || []);
   };

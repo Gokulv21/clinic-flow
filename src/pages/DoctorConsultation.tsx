@@ -33,6 +33,7 @@ export default function DoctorConsultation() {
   const [saving, setSaving] = useState(false);
   const [showDigitalRx, setShowDigitalRx] = useState(false);
   const [prescriptionImage, setPrescriptionImage] = useState<string | null>(null);
+  const [prescriptionPaths, setPrescriptionPaths] = useState<any[]>([]);
   const [showPreview, setShowPreview] = useState(false);
 
   const fetchQueue = async () => {
@@ -62,6 +63,7 @@ export default function DoctorConsultation() {
     setMedicines([{ name: '', dosage: '', frequency: '', duration: '' }]);
     setAdvice('');
     setPrescriptionImage(null);
+    setPrescriptionPaths([]);
 
     // Update status to in_consultation
     if (visit.status === 'waiting') {
@@ -110,6 +112,7 @@ export default function DoctorConsultation() {
       setSelectedVisit(null);
       setPatient(null);
       setPrescriptionImage(null);
+      setPrescriptionPaths([]);
       fetchQueue();
     } catch (err: any) {
       toast.error(err.message);
@@ -354,8 +357,10 @@ export default function DoctorConsultation() {
         <DigitalPrescription
           patient={patient}
           visit={selectedVisit}
-          onSave={(data) => {
+          initialPaths={prescriptionPaths}
+          onSave={(data, paths) => {
             setPrescriptionImage(data);
+            setPrescriptionPaths(paths);
             setShowDigitalRx(false);
           }}
           onClose={() => setShowDigitalRx(false)}

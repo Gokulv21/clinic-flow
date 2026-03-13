@@ -6,11 +6,12 @@ import PrescriptionTemplate from './PrescriptionTemplate';
 interface DigitalPrescriptionProps {
     patient: any;
     visit: any;
-    onSave: (imageData: string | null) => void;
+    initialPaths?: any[];
+    onSave: (imageData: string | null, paths: any[]) => void;
     onClose: () => void;
 }
 
-export default function DigitalPrescription({ patient, visit, onSave, onClose }: DigitalPrescriptionProps) {
+export default function DigitalPrescription({ patient, visit, initialPaths = [], onSave, onClose }: DigitalPrescriptionProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [isEnlarged, setIsEnlarged] = useState(false);
@@ -23,7 +24,7 @@ export default function DigitalPrescription({ patient, visit, onSave, onClose }:
     // Paths now store their style metadata
     type PathPoint = { x: number; y: number };
     type DrawnPath = { points: PathPoint[]; color: string; size: number; isEraser: boolean };
-    const [paths, setPaths] = useState<DrawnPath[]>([]);
+    const [paths, setPaths] = useState<DrawnPath[]>(initialPaths);
 
     const isDrawingRef = useRef(false);
     const currentPathRef = useRef<PathPoint[]>([]);
@@ -179,10 +180,10 @@ export default function DigitalPrescription({ patient, visit, onSave, onClose }:
     const handleSave = () => {
         const canvas = canvasRef.current;
         if (!canvas || paths.length === 0) {
-            onSave(null);
+            onSave(null, []);
             return;
         }
-        onSave(canvas.toDataURL('image/png', 1.0));
+        onSave(canvas.toDataURL('image/png', 1.0), paths);
     };
 
     return (
