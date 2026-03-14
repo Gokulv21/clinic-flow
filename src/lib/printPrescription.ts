@@ -1,38 +1,42 @@
 /**
  * printPrescription
  * ─────────────────
- * Renders the prescription in a hidden iframe and prints it.
- *
- * Key design decisions:
- *  1. iframe instead of window.print() — avoids visibility:hidden tricks and
- *     container-query font-size zero-size bugs in browser print engines.
- *  2. Handwriting overlay as an injected <img> tag.
+ * Renders multiple prescription pages in a hidden iframe and prints them.
  */
 export function printPrescription(): void {
-    const el = document.getElementById('prescription-template');
-    if (!el) {
-        console.error('[printPrescription] #prescription-template not found');
+    // ── Get the container holding all pages ──────────────────────────
+    const container = document.querySelector('.print-container');
+    if (!container) {
+        console.error('[printPrescription] .print-container not found');
         return;
     }
 
-    // ── Capture handwriting data URL BEFORE stripping the img ─────────
-    const hwImg = el.querySelector('img[alt="handwriting"]') as HTMLImageElement | null;
-    const hwSrc = hwImg?.src ?? '';
-
-    // ── Get template HTML with typed data and structure ────────────────
-    let html = el.outerHTML;
-
-    // ── Inject handwriting as a standard <img> tag ─────────────────────
-    // If handwriting exists, we append it directly to the HTML string.
-    // This is robust: simple <img> tags with absolute positioning work
-    // flawlessly in all print engines, avoiding background-image issues.
-    if (hwSrc) {
-        // Remove the old img tag from the HTML string so we don't duplicate
-        html = html.replace(/<img[^>]+alt="handwriting"[^>]*>/i, '');
-        // Append a fresh, clean img tag just inside the closing </div>
-        const imgTag = `<img src="${hwSrc}" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:fill;z-index:99;pointer-events:none;" alt="handwriting">`;
-        html = html.replace(/<\/div>\s*$/i, `${imgTag}</div>`);
+    // Capture pages
+    const pages = container.querySelectorAll('.single-page-prescription');
+    if (pages.length === 0) {
+        console.error('[printPrescription] No .single-page-prescription found');
+        return;
     }
+
+    let finalHtml = '';
+
+    // Process each page
+    pages.forEach((pageEl, idx) => {
+        let html = pageEl.outerHTML;
+        
+        // Find handwriting img if exists
+        const hwImg = pageEl.querySelector('img[alt^="handwriting"]') as HTMLImageElement | null;
+        if (hwImg) {
+            const hwSrc = hwImg.src;
+            // Remove old img tag from HTML string
+            html = html.replace(/<img[^>]+alt="handwriting[^>]*"[^>]*>/i, '');
+            // Append clean img tag
+            const imgTag = `<img src="${hwSrc}" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:fill;z-index:99;pointer-events:none;" alt="handwriting">`;
+            html = html.replace(/<\/div>\s*$/i, `${imgTag}</div>`);
+        }
+        
+        finalHtml += html;
+    });
 
     // ── Create hidden iframe ───────────────────────────────────────────
     const iframe = document.createElement('iframe');
@@ -53,21 +57,20 @@ export function printPrescription(): void {
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { background: #fff; }
 
-/* ── Template container ─────────────────────────────────────────── */
-#prescription-template {
+/* ── Page container ─────────────────────────────────────────────── */
+.single-page-prescription {
     width: 210mm !important;
     height: 297mm !important;
     position: relative !important;
     overflow: hidden !important;
     box-shadow: none !important;
     aspect-ratio: unset !important;
-    /* container-type: inline-size is already in the inline style,
-       enabling cqw units for children */
+    container-type: inline-size !important;
 }
 
-/* ── Inner wrapper: override cqw font with absolute mm value ────── */
+/* ── Inner wrapper ─────────────────────────────────────────────── */
 #rx-inner {
-    font-size: 3.15mm !important;   /* = 1.5% × 210mm */
+    font-size: 3.5mm !important; 
     position: absolute !important;
     inset: 0 !important;
     overflow: hidden !important;
@@ -81,21 +84,19 @@ html, body { background: #fff; }
         print-color-adjust: exact !important;
     }
     html, body { margin: 0; padding: 0; }
-    #prescription-template {
-        width: 210mm !important;
-        height: 297mm !important;
-        position: relative !important;
-        overflow: hidden !important;
-    }
-    #rx-inner { font-size: 3.15mm !important; }
+    .print-container { width: 210mm; }
 }
 </style>
 </head>
-<body>${html}</body>
+<body>
+    <div class="print-container">
+        ${finalHtml}
+    </div>
+</body>
 </html>`);
     doc.close();
 
-    // ── Print after allowing fonts + pseudo-element to render ─────────
+    // ── Print after allowing fonts + images to render ─────────
     const doprint = () => {
         iframe.contentWindow?.focus();
         iframe.contentWindow?.print();
@@ -103,12 +104,12 @@ html, body { background: #fff; }
             try { document.body.removeChild(iframe); } catch (_) { /* already removed */ }
         };
         iframe.contentWindow?.addEventListener('afterprint', cleanup, { once: true });
-        setTimeout(cleanup, 15_000); // fallback
+        setTimeout(cleanup, 20_000); // fallback
     };
 
     if (doc.readyState === 'complete') {
-        setTimeout(doprint, 700);
+        setTimeout(doprint, 1000);
     } else {
-        doc.addEventListener('DOMContentLoaded', () => setTimeout(doprint, 700));
+        doc.addEventListener('DOMContentLoaded', () => setTimeout(doprint, 1000));
     }
 }

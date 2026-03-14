@@ -91,7 +91,7 @@ export default function PrintQueue() {
             <Card key={rx.id} className="animate-fade-in">
               <CardContent className="py-4 flex items-center justify-between">
                 <div>
-                  <p className="font-medium">{rx.patients?.name}</p>
+                  <p className="font-medium">{(rx.patients?.title ? rx.patients.title + ' ' : '') + rx.patients?.name}</p>
                   <p className="text-sm text-muted-foreground">
                     Token #{rx.visits?.token_number} · {new Date(rx.created_at).toLocaleTimeString()}
                     {rx.diagnosis ? ` · ${rx.diagnosis}` : ''}
@@ -116,7 +116,7 @@ export default function PrintQueue() {
             <Card key={rx.id} className="opacity-70">
               <CardContent className="py-4 flex items-center justify-between">
                 <div>
-                  <p className="font-medium">{rx.patients?.name}</p>
+                  <p className="font-medium">{(rx.patients?.title ? rx.patients.title + ' ' : '') + rx.patients?.name}</p>
                   <p className="text-sm text-muted-foreground">
                     Token #{rx.visits?.token_number} · {new Date(rx.created_at).toLocaleTimeString()}
                   </p>

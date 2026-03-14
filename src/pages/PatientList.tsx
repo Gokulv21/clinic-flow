@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Search, User, History, Edit } from 'lucide-react';
@@ -14,7 +15,7 @@ export default function PatientList() {
   const [selectedPatient, setSelectedPatient] = useState<any>(null);
   const [visits, setVisits] = useState<any[]>([]);
   const [editing, setEditing] = useState(false);
-  const [editForm, setEditForm] = useState({ name: '', age: '', phone: '', address: '' });
+  const [editForm, setEditForm] = useState({ title: '', name: '', age: '', phone: '', address: '' });
 
   const fetchPatients = async () => {
     let query = supabase.from('patients').select('*').order('created_at', { ascending: false });
@@ -27,7 +28,7 @@ export default function PatientList() {
         query = query.or(`name.ilike.%${search}%,phone.ilike.%${search}%`);
       }
     }
-    const { data } = await query; // Removed limit(50) to show all
+    const { data } = await query;
     setPatients(data || []);
   };
 
@@ -35,7 +36,7 @@ export default function PatientList() {
 
   const viewPatient = async (p: any) => {
     setSelectedPatient(p);
-    setEditForm({ name: p.name, age: String(p.age), phone: p.phone, address: p.address || '' });
+    setEditForm({ title: p.title || '', name: p.name, age: String(p.age), phone: p.phone, address: p.address || '' });
     const { data } = await supabase
       .from('visits')
       .select('*, prescriptions(*)')
@@ -47,8 +48,9 @@ export default function PatientList() {
   const saveEdit = async () => {
     if (!selectedPatient) return;
     const { error } = await supabase.from('patients').update({
+      title: editForm.title,
       name: editForm.name,
-      age: parseInt(editForm.age),
+      age: parseFloat(editForm.age),
       phone: editForm.phone,
       address: editForm.address || null,
     }).eq('id', selectedPatient.id);
@@ -81,7 +83,7 @@ export default function PatientList() {
                   <User className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <p className="font-medium">{p.name}</p>
+                  <p className="font-medium">{(p.title ? p.title + ' ' : '') + p.name}</p>
                   <p className="text-sm text-muted-foreground">{p.phone} · {p.age}y · {p.sex}</p>
                   <p className="text-[10px] text-muted-foreground/50 font-mono mt-0.5">ID: {p.id}</p>
                 </div>
@@ -97,7 +99,7 @@ export default function PatientList() {
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
-              <span>{selectedPatient?.name}</span>
+              <span>{(selectedPatient?.title ? selectedPatient.title + ' ' : '') + selectedPatient?.name}</span>
               <Button size="sm" variant="outline" onClick={() => setEditing(!editing)}>
                 <Edit className="w-4 h-4 mr-1" />{editing ? 'Cancel' : 'Edit'}
               </Button>
@@ -107,14 +109,32 @@ export default function PatientList() {
           {editing ? (
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
-                <div><Label>Name</Label><Input value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} /></div>
+                <div className="col-span-2 grid grid-cols-4 gap-3">
+                  <div className="col-span-1">
+                    <Label>Title</Label>
+                    <Select value={editForm.title} onValueChange={v => setEditForm(f => ({ ...f, title: v }))}>
+                      <SelectTrigger><SelectValue placeholder="Title" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Mr.">Mr.</SelectItem>
+                        <SelectItem value="Miss">Miss</SelectItem>
+                        <SelectItem value="Mrs.">Mrs.</SelectItem>
+                        <SelectItem value="Baby">Baby</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="col-span-3">
+                    <Label>Name</Label>
+                    <Input value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
+                  </div>
+                </div>
                 <div>
                   <Label>Age</Label>
                   <Input 
                     type="number" 
+                    step="0.1"
                     value={editForm.age} 
                     onChange={e => {
-                      const val = parseInt(e.target.value);
+                      const val = parseFloat(e.target.value);
                       if (val > 120) return;
                       setEditForm(f => ({ ...f, age: e.target.value }));
                     }} 
@@ -130,17 +150,18 @@ export default function PatientList() {
                     }} 
                   />
                 </div>
-                <div><Label>Address</Label><Input value={editForm.address} onChange={e => setEditForm(f => ({ ...f, address: e.target.value }))} /></div>
+                <div className="col-span-2"><Label>Address</Label><Input value={editForm.address} onChange={e => setEditForm(f => ({ ...f, address: e.target.value }))} /></div>
               </div>
               <Button onClick={saveEdit}>Save Changes</Button>
             </div>
           ) : (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-2 text-sm">
+                <div><span className="text-muted-foreground">Title:</span> {selectedPatient?.title || '—'}</div>
                 <div><span className="text-muted-foreground">Age:</span> {selectedPatient?.age}y</div>
                 <div><span className="text-muted-foreground">Sex:</span> {selectedPatient?.sex}</div>
                 <div><span className="text-muted-foreground">Phone:</span> {selectedPatient?.phone}</div>
-                <div><span className="text-muted-foreground">Address:</span> {selectedPatient?.address || '—'}</div>
+                <div className="col-span-2"><span className="text-muted-foreground">Address:</span> {selectedPatient?.address || '—'}</div>
               </div>
 
               <h3 className="font-heading font-bold mt-4">Visit History ({visits.length})</h3>

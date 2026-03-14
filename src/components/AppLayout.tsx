@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { useAuth, AppRole } from '@/lib/auth';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -28,109 +28,154 @@ const navItems: NavItem[] = [
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const { profile, roles, signOut } = useAuth();
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
   const visibleItems = navItems.filter(item => item.roles.some(r => roles.includes(r)));
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex bg-background">
       {/* Sidebar */}
-      <aside className="w-64 gradient-sidebar flex flex-col shrink-0 hidden md:flex">
-        <div className="p-6 border-b border-sidebar-border">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-sidebar-primary flex items-center justify-center">
+      <aside 
+        className={cn(
+          "gradient-sidebar flex flex-col shrink-0 hidden md:flex h-screen sticky top-0 transition-all duration-300 ease-in-out group z-50",
+          isCollapsed ? "w-20 hover:w-64" : "w-64"
+        )}
+      >
+        <div className="p-4 border-b border-sidebar-border relative min-h-[85px] flex items-center mb-2">
+          <div className="flex items-center gap-3 overflow-hidden w-full transition-all">
+            <div className="w-10 h-10 rounded-xl bg-sidebar-primary flex items-center justify-center shrink-0">
               <Stethoscope className="w-5 h-5 text-sidebar-primary-foreground" />
             </div>
-            <div>
-              <h2 className="font-heading font-bold text-sidebar-foreground text-sm">Clinic Manager</h2>
-              <p className="text-xs text-sidebar-foreground/60">{profile?.full_name}</p>
+            <div className={cn(
+              "transition-all duration-300 whitespace-nowrap",
+              isCollapsed ? "opacity-0 group-hover:opacity-100" : "opacity-100"
+            )}>
+              <h2 className="font-heading font-bold text-sidebar-foreground text-sm uppercase tracking-wider">Clinic Manager</h2>
+              <p className="text-[10px] text-sidebar-foreground/60 truncate max-w-[140px] uppercase font-medium">{profile?.full_name}</p>
             </div>
           </div>
+          
+          <button
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className={cn(
+              "absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-sidebar-primary text-sidebar-primary-foreground flex items-center justify-center shadow-lg transition-transform hover:scale-110 z-50",
+              isCollapsed && "translate-x-0"
+            )}
+          >
+            <Menu className="w-3.5 h-3.5" />
+          </button>
         </div>
-        <nav className="flex-1 p-3 space-y-1">
+
+        <nav className="flex-1 p-3 space-y-2 overflow-y-auto overflow-x-hidden scrollbar-hide">
           {visibleItems.map(item => (
             <button
               key={item.path}
               onClick={() => navigate(item.path)}
               className={cn(
-                "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent",
-                location.pathname === item.path && "bg-sidebar-accent text-sidebar-foreground font-medium"
+                "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent relative group/item",
+                location.pathname === item.path && "bg-sidebar-accent text-sidebar-foreground font-semibold shadow-inner"
               )}
             >
-              {item.icon}
-              {item.label}
+              <div className="shrink-0 w-6 flex justify-center">{item.icon}</div>
+              <span className={cn(
+                "transition-all duration-300 whitespace-nowrap",
+                isCollapsed ? "opacity-0 group-hover:opacity-100" : "opacity-100"
+              )}>
+                {item.label}
+              </span>
+              
+              {/* Tooltip-like indicator when collapsed */}
+              {isCollapsed && (
+                <div className="absolute left-full ml-4 px-2 py-1 bg-popover text-popover-foreground text-xs rounded opacity-0 pointer-events-none group-hover/item:opacity-0 hidden">
+                  {item.label}
+                </div>
+              )}
             </button>
           ))}
         </nav>
-        <div className="p-3 border-t border-sidebar-border">
+
+        <div className="p-3 border-t border-sidebar-border mt-auto">
           <button
             onClick={signOut}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-sidebar-foreground/60 hover:text-white hover:bg-destructive/20 transition-all overflow-hidden"
           >
-            <LogOut className="w-5 h-5" />
-            Sign Out
+            <div className="shrink-0 w-6 flex justify-center">
+              <LogOut className="w-5 h-5" />
+            </div>
+            <span className={cn(
+              "transition-all duration-300 whitespace-nowrap",
+              isCollapsed ? "opacity-0 group-hover:opacity-100" : "opacity-100"
+            )}>
+              Sign Out
+            </span>
           </button>
         </div>
       </aside>
 
       {/* Mobile bottom nav */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border flex md:hidden h-16">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border flex md:hidden h-16 shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
         {visibleItems.slice(0, 4).map(item => (
           <button
             key={item.path}
             onClick={() => navigate(item.path)}
             className={cn(
-              "flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-muted-foreground",
-              location.pathname === item.path && "text-primary font-medium"
+              "flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-muted-foreground transition-colors",
+              location.pathname === item.path && "text-primary font-bold"
             )}
           >
-            {item.icon}
-            <span className="truncate w-full text-center px-1">{item.label}</span>
+            <div className={cn(
+              "p-1 rounded-md transition-colors",
+              location.pathname === item.path && "bg-primary/10"
+            )}>
+              {item.icon}
+            </div>
+            <span className="truncate w-full text-center px-1 font-medium">{item.label}</span>
           </button>
         ))}
         
         {/* More Menu for Mobile */}
         <Sheet>
           <SheetTrigger asChild>
-            <button className="flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-muted-foreground">
-              <Menu className="w-5 h-5" />
-              <span>More</span>
+            <button className="flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-muted-foreground group">
+              <div className="p-1 rounded-md group-hover:bg-secondary transition-colors">
+                <Menu className="w-5 h-5" />
+              </div>
+              <span className="font-medium">More</span>
             </button>
           </SheetTrigger>
-          <SheetContent side="bottom" className="p-0 rounded-t-xl max-h-[70vh] overflow-hidden flex flex-col">
-            <div className="p-4 border-b">
-              <h3 className="font-heading font-bold">Menu</h3>
+          <SheetContent side="bottom" className="p-0 rounded-t-3xl max-h-[85vh] overflow-hidden flex flex-col border-t-0 shadow-2xl">
+            <div className="p-5 border-b flex items-center justify-between">
+              <h3 className="font-heading font-bold text-xl">Quick Menu</h3>
+              <div className="text-xs text-muted-foreground bg-secondary px-2 py-1 rounded-full">{profile?.full_name}</div>
             </div>
-            <div className="flex-1 overflow-auto p-2 grid grid-cols-3 gap-2">
+            <div className="flex-1 overflow-auto p-4 grid grid-cols-3 gap-3">
               {visibleItems.map(item => (
                 <button
                   key={item.path}
                   onClick={() => {
                     navigate(item.path);
-                    // Sheet closes automatically on navigation if it's not a SPA, 
-                    // but here we might need to close it if we stay on same page or depends on implementation.
-                    // Usually SheetTrigger is wrapped in a way that it works.
                   }}
                   className={cn(
-                    "flex flex-col items-center justify-center gap-2 p-4 rounded-xl text-xs transition-colors hover:bg-secondary",
-                    location.pathname === item.path ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground"
+                    "flex flex-col items-center justify-center gap-2 p-3 rounded-2xl text-xs transition-all active:scale-95",
+                    location.pathname === item.path ? "bg-primary/10 text-primary font-bold" : "text-muted-foreground hover:bg-secondary"
                   )}
                 >
                   <div className={cn(
-                    "w-10 h-10 rounded-lg flex items-center justify-center",
-                    location.pathname === item.path ? "bg-primary/20" : "bg-muted"
+                    "w-12 h-12 rounded-xl flex items-center justify-center shadow-sm transition-transform",
+                    location.pathname === item.path ? "bg-primary text-white scale-110" : "bg-muted"
                   )}>
                     {item.icon}
                   </div>
-                  <span className="text-center">{item.label}</span>
+                  <span className="text-center truncate w-full">{item.label}</span>
                 </button>
               ))}
               <button
                 onClick={signOut}
-                className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl text-xs text-destructive hover:bg-destructive/10 transition-colors"
+                className="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl text-xs text-destructive hover:bg-destructive/10 transition-all active:scale-95"
               >
-                <div className="w-10 h-10 rounded-lg bg-destructive/10 flex items-center justify-center">
+                <div className="w-12 h-12 rounded-xl bg-destructive/10 flex items-center justify-center shadow-sm">
                   <LogOut className="w-5 h-5" />
                 </div>
                 <span>Sign Out</span>
@@ -141,9 +186,11 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       </nav>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto pb-16 md:pb-0">
-        {children}
+      <main className="flex-1 overflow-auto pb-20 md:pb-0 bg-slate-50/50">
+        <div className="min-h-full">
+          {children}
+        </div>
       </main>
     </div>
   );
-}
+}

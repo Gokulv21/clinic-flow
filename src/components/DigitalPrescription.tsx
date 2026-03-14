@@ -1,48 +1,69 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Maximize2, Minimize2, Trash2, Save, Undo, X, Eraser, PenTool, Circle } from 'lucide-react';
+import { Maximize2, Minimize2, Trash2, Save, Undo, X, Eraser, PenTool, Circle, Plus, ChevronLeft, ChevronRight, Tablet } from 'lucide-react';
 import PrescriptionTemplate from './PrescriptionTemplate';
 
 interface DigitalPrescriptionProps {
     patient: any;
     visit: any;
-    initialPaths?: any[];
-    onSave: (imageData: string | null, paths: any[]) => void;
+    initialPaths?: any[]; // For backward compatibility or if we only have one page
+    initialPages?: any[][]; // Better for multi-page
+    onSave: (imageData: string | string[] | null, pages: any[][]) => void;
     onClose: () => void;
 }
 
-export default function DigitalPrescription({ patient, visit, initialPaths = [], onSave, onClose }: DigitalPrescriptionProps) {
+export default function DigitalPrescription({ patient, visit, initialPaths = [], initialPages, onSave, onClose }: DigitalPrescriptionProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
     const [isEnlarged, setIsEnlarged] = useState(false);
+    const [scale, setScale] = useState(1);
 
     // Drawing State
     const [penColor, setPenColor] = useState('#1e293b');
     const [penSize, setPenSize] = useState(3);
     const [isEraser, setIsEraser] = useState(false);
+    
+    // NEW: Precision Mode (Pen Only)
+    const [precisionMode, setPrecisionMode] = useState(false);
 
-    // Paths now store their style metadata
+    // Multi-page State
     type PathPoint = { x: number; y: number };
     type DrawnPath = { points: PathPoint[]; color: string; size: number; isEraser: boolean };
-    const [paths, setPaths] = useState<DrawnPath[]>(initialPaths);
+    
+    // Improved initialization: check if initialPaths is already structured as pages (array of arrays)
+    const getInitialPages = () => {
+        if (initialPages) return initialPages;
+        if (Array.isArray(initialPaths) && initialPaths.length > 0 && Array.isArray(initialPaths[0])) {
+            return initialPaths as DrawnPath[][];
+        }
+        return [initialPaths] as DrawnPath[][];
+    };
+
+    const [pages, setPages] = useState<DrawnPath[][]>(getInitialPages());
+    const [currentPageIndex, setCurrentPageIndex] = useState(0);
 
     const isDrawingRef = useRef(false);
     const currentPathRef = useRef<PathPoint[]>([]);
 
-    // ── Fit canvas pixel dimensions to its CSS display size (NO scaling trick)
+    // Pinch-to-zoom state
+    const lastTouchDistanceRef = useRef<number | null>(null);
+
+    // ── Fit canvas pixel dimensions
     const fitCanvas = useCallback(() => {
         const canvas = canvasRef.current;
         const container = containerRef.current;
         if (!canvas || !container) return;
-        const rect = container.getBoundingClientRect();
-        // Only resize if dimensions actually changed to avoid clearing needlessly
-        if (canvas.width !== Math.floor(rect.width) || canvas.height !== Math.floor(rect.height)) {
-            canvas.width = Math.floor(rect.width);
-            canvas.height = Math.floor(rect.height);
+        const targetWidth = 1240;
+        const targetHeight = Math.floor(targetWidth * 1.414);
+        
+        if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+            canvas.width = targetWidth;
+            canvas.height = targetHeight;
         }
     }, []);
 
-    const redrawAll = useCallback((pathsToRender: DrawnPath[]) => {
+    const redrawPage = useCallback((pathsToRender: DrawnPath[]) => {
         const canvas = canvasRef.current;
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
@@ -57,12 +78,11 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
             const pts = points;
 
             ctx.strokeStyle = isEraser ? '#ffffff' : color;
-            // Base thickness on canvas width but scaled by the user's chosen penSize
             ctx.lineWidth = Math.max(1.5, canvas.width * 0.001 * size);
 
             if (isEraser) {
                 ctx.globalCompositeOperation = 'destination-out';
-                ctx.lineWidth = ctx.lineWidth * 3; // make eraser wider
+                ctx.lineWidth = ctx.lineWidth * 3;
             } else {
                 ctx.globalCompositeOperation = 'source-over';
             }
@@ -70,7 +90,6 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
             if (pts.length < 2) {
                 if (pts.length === 1) {
                     ctx.beginPath();
-                    // Dot radius matches the line width stroke
                     ctx.arc(pts[0].x * canvas.width, pts[0].y * canvas.height, ctx.lineWidth / 2, 0, Math.PI * 2);
                     ctx.fillStyle = ctx.strokeStyle;
                     ctx.fill();
@@ -83,55 +102,131 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
             ctx.stroke();
         });
 
-        // Reset composite operation to default
         ctx.globalCompositeOperation = 'source-over';
     }, []);
 
-    // Fit on mount and when enlarged state changes
     useEffect(() => {
         const id = setTimeout(() => {
             fitCanvas();
-            redrawAll(paths);
+            redrawPage(pages[currentPageIndex] || []);
         }, 50);
         return () => clearTimeout(id);
-    }, [isEnlarged, fitCanvas, redrawAll, paths]);
+    }, [currentPageIndex, isEnlarged, fitCanvas, redrawPage, pages]);
 
-    // ── Get normalized canvas coordinates [0..1]
-    const getCanvasPos = (e: React.PointerEvent) => {
+    // ── Advanced Pointer Tracking
+    const activePointersRef = useRef(new Map<number, { x: number, y: number, screenX: number, screenY: number, type: string }>());
+    const lastPenTapRef = useRef<number>(0);
+    const isPenActiveRef = useRef(false);
+
+    // ── Writing Restriction Check (Only first page has bounds)
+    const isInWritingArea = (pos: { x: number, y: number }) => {
+        if (currentPageIndex > 0) return true; // Contination pages are full white
+        const HEADER_BOUND = 0.22;
+        const FOOTER_BOUND = 0.91;
+        const SIDEBAR_BOUND = 0.73;
+        return pos.y >= HEADER_BOUND && pos.y <= FOOTER_BOUND && pos.x <= SIDEBAR_BOUND;
+    };
+
+    const getCanvasPos = (clientX: number, clientY: number) => {
         const canvas = canvasRef.current;
         if (!canvas) return { x: 0, y: 0 };
         const rect = canvas.getBoundingClientRect();
         return {
-            x: (e.clientX - rect.left) / rect.width,
-            y: (e.clientY - rect.top) / rect.height,
+            x: (clientX - rect.left) / rect.width,
+            y: (clientY - rect.top) / rect.height,
         };
     };
 
     const onPointerDown = (e: React.PointerEvent) => {
-        (e.target as HTMLElement).setPointerCapture(e.pointerId);
-        isDrawingRef.current = true;
-        const pos = getCanvasPos(e);
-        currentPathRef.current = [pos];
+        const pos = getCanvasPos(e.clientX, e.clientY);
+        activePointersRef.current.set(e.pointerId, { ...pos, screenX: e.clientX, screenY: e.clientY, type: e.pointerType });
 
-        // Draw a dot for a single tap
-        const canvas = canvasRef.current;
-        const ctx = canvas?.getContext('2d');
-        if (ctx && canvas) {
-            ctx.beginPath();
-            const lineWidth = Math.max(1.5, canvas.width * 0.001 * penSize) * (isEraser ? 3 : 1);
-            ctx.globalCompositeOperation = isEraser ? 'destination-out' : 'source-over';
-            ctx.fillStyle = isEraser ? '#ffffff' : penColor;
-            ctx.arc(pos.x * canvas.width, pos.y * canvas.height, lineWidth / 2, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.globalCompositeOperation = 'source-over';
+        // Double-Tap Detection (Pencil barrel sim)
+        if (e.pointerType === 'pen') {
+            const now = Date.now();
+            if (now - lastPenTapRef.current < 350) {
+                setIsEraser(!isEraser);
+                lastPenTapRef.current = 0; // Reset
+                return; // Don't start drawing on double tap
+            }
+            lastPenTapRef.current = now;
+            isPenActiveRef.current = true;
+        }
+
+        // PALM REJECTION: If a pen is already active on screen, ignore new touch downs
+        if (isPenActiveRef.current && e.pointerType === 'touch') {
+            return;
+        }
+
+        // START DRAWING: Only if not zooming (1 pointer)
+        if (activePointersRef.current.size === 1) {
+            // Respect precision mode
+            if (precisionMode && e.pointerType !== 'pen') return;
+            
+            if (!isInWritingArea(pos)) return;
+
+            (e.target as HTMLElement).setPointerCapture(e.pointerId);
+            isDrawingRef.current = true;
+            currentPathRef.current = [pos];
+
+            const canvas = canvasRef.current;
+            const ctx = canvas?.getContext('2d');
+            if (ctx && canvas) {
+                ctx.beginPath();
+                const pressure = (e as any).pressure || 0.5;
+                const pSize = isEraser ? penSize * 4 : penSize;
+                const lineWidth = Math.max(1, canvas.width * 0.001 * pSize * (pressure * 1.5));
+                
+                ctx.globalCompositeOperation = isEraser ? 'destination-out' : 'source-over';
+                ctx.fillStyle = isEraser ? '#ffffff' : penColor;
+                ctx.arc(pos.x * canvas.width, pos.y * canvas.height, lineWidth / 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        } else {
+            // Multiple pointers -> Stop any active drawing to avoid stray marks during zoom
+            onPointerUp();
         }
     };
 
     const onPointerMove = (e: React.PointerEvent) => {
-        if (!isDrawingRef.current) return;
-        const pos = getCanvasPos(e);
-        const path = currentPathRef.current;
+        const pos = getCanvasPos(e.clientX, e.clientY);
+        const touchCount = activePointersRef.current.size;
 
+        // Update tracking
+        if (activePointersRef.current.has(e.pointerId)) {
+            activePointersRef.current.set(e.pointerId, { 
+                ...pos, 
+                screenX: e.clientX, 
+                screenY: e.clientY, 
+                type: e.pointerType 
+            });
+        }
+
+        // Pinch-to-Zoom logic (Multi-touch)
+        if (touchCount >= 2) {
+            const pts = Array.from(activePointersRef.current.values());
+            // Use Screen Coords for stable distance calculation
+            const dist = Math.hypot(pts[0].screenX - pts[1].screenX, pts[0].screenY - pts[1].screenY);
+            if (lastTouchDistanceRef.current !== null) {
+                const delta = dist / lastTouchDistanceRef.current;
+                // Sensitivity adjustment
+                setScale(s => Math.min(Math.max(s * delta, 0.5), 4));
+            }
+            lastTouchDistanceRef.current = dist;
+            return;
+        }
+
+        if (!isDrawingRef.current) return;
+        
+        // Strict Palm Rejection: If pen is active, ignore this touch move
+        if (isPenActiveRef.current && e.pointerType === 'touch') return;
+
+        if (!isInWritingArea(pos)) {
+            onPointerUp();
+            return;
+        }
+
+        const path = currentPathRef.current;
         const canvas = canvasRef.current;
         const ctx = canvas?.getContext('2d');
         if (ctx && canvas && path.length > 0) {
@@ -139,7 +234,11 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
             ctx.beginPath();
             ctx.globalCompositeOperation = isEraser ? 'destination-out' : 'source-over';
             ctx.strokeStyle = isEraser ? '#ffffff' : penColor;
-            ctx.lineWidth = Math.max(1.5, canvas.width * 0.001 * penSize) * (isEraser ? 3 : 1);
+            
+            const pressure = (e as any).pressure || 0.5;
+            const pSize = isEraser ? penSize * 4 : penSize;
+            ctx.lineWidth = Math.max(1, canvas.width * 0.001 * pSize * (pressure * 1.5));
+            
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
             ctx.moveTo(last.x * canvas.width, last.y * canvas.height);
@@ -150,135 +249,185 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
         currentPathRef.current = [...path, pos];
     };
 
-    const onPointerUp = () => {
-        if (currentPathRef.current.length > 1 || currentPathRef.current.length === 1) { // Save dots too
+    const onPointerUp = (e?: React.PointerEvent) => {
+        if (e) {
+            activePointersRef.current.delete(e.pointerId);
+            if (e.pointerType === 'pen') isPenActiveRef.current = false;
+        } else {
+            activePointersRef.current.clear();
+            isPenActiveRef.current = false;
+        }
+
+        if (activePointersRef.current.size === 0) {
+            lastTouchDistanceRef.current = null;
+        }
+
+        if (isDrawingRef.current && (currentPathRef.current.length > 0)) {
             const newPath = {
                 points: currentPathRef.current,
                 color: penColor,
                 size: penSize,
                 isEraser: isEraser
             };
-            setPaths(prev => [...prev, newPath]);
+            const updatedPages = [...pages];
+            updatedPages[currentPageIndex] = [...(updatedPages[currentPageIndex] || []), newPath];
+            setPages(updatedPages);
         }
         currentPathRef.current = [];
         isDrawingRef.current = false;
     };
 
     const handleUndo = () => {
-        const newPaths = paths.slice(0, -1);
-        setPaths(newPaths);
-        redrawAll(newPaths);
+        const updatedPages = [...pages];
+        updatedPages[currentPageIndex] = updatedPages[currentPageIndex].slice(0, -1);
+        setPages(updatedPages);
+        redrawPage(updatedPages[currentPageIndex]);
     };
 
     const handleClear = () => {
-        setPaths([]);
+        const updatedPages = [...pages];
+        updatedPages[currentPageIndex] = [];
+        setPages(updatedPages);
         const canvas = canvasRef.current;
         const ctx = canvas?.getContext('2d');
         if (ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height);
     };
 
-    const handleSave = () => {
+    // ── PAGE MANAGEMENT
+    const addPage = () => {
+        setPages([...pages, []]);
+        setCurrentPageIndex(pages.length);
+    };
+
+    const deleteCurrentPage = () => {
+        if (pages.length <= 1) return;
+        const newPages = pages.filter((_, i) => i !== currentPageIndex);
+        setPages(newPages);
+        setCurrentPageIndex(Math.max(0, currentPageIndex - 1));
+    };
+
+    const handleSave = async () => {
         const canvas = canvasRef.current;
-        if (!canvas || paths.length === 0) {
-            onSave(null, []);
-            return;
+        if (!canvas) return;
+
+        // Render each page to image
+        const images: string[] = [];
+        for (let i = 0; i < pages.length; i++) {
+            redrawPage(pages[i]);
+            images.push(canvas.toDataURL('image/png', 1.0));
         }
-        onSave(canvas.toDataURL('image/png', 1.0), paths);
+
+        // Return to current page state for UI
+        redrawPage(pages[currentPageIndex]);
+        onSave(images.length > 1 ? images : images[0], pages);
+    };
+
+    const handleWheel = (e: React.WheelEvent) => {
+        if (e.ctrlKey) {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? 0.9 : 1.1;
+            setScale(s => Math.min(Math.max(s * delta, 0.5), 4));
+        }
     };
 
     return (
-        <div style={{
-            position: 'fixed', inset: 0, zIndex: 50,
-            background: 'rgba(0,0,0,0.6)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex', flexDirection: 'column',
-            padding: isEnlarged ? 0 : '8px',
-        }}>
+        <div 
+            style={{
+                position: 'fixed', inset: 0, zIndex: 100,
+                background: 'rgba(0,0,0,0.8)',
+                backdropFilter: 'blur(8px)',
+                display: 'flex', flexDirection: 'column',
+                padding: isEnlarged ? 0 : '12px',
+            }}
+            onWheel={handleWheel}
+        >
             {/* ── Toolbar */}
-            <div className="bg-white border-b px-4 py-3 flex items-center justify-between shrink-0 drop-shadow-sm sticky top-0 z-50 rounded-t-lg">
-                <div className="flex items-center gap-1.5 min-w-0">
+            <div className="bg-white border-b px-4 py-3 flex items-center justify-between shrink-0 drop-shadow-md sticky top-0 z-50 rounded-t-xl">
+                <div className="flex items-center gap-2 min-w-0">
                     <Button variant="ghost" size="icon" onClick={onClose} className="shrink-0"><X className="w-5 h-5" /></Button>
-                    <h2 className="font-heading font-bold text-lg hidden lg:block ml-1 truncate shrink-0">Digital Prescription</h2>
-
+                    
                     <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg shrink-0">
-                        <Button variant="ghost" size="sm" onClick={handleUndo} disabled={paths.length === 0} className="h-8">
-                            <Undo className="w-4 h-4 mr-1 md:mr-2" />
-                            <span className="hidden md:inline">Undo</span>
+                        <Button variant="ghost" size="sm" onClick={handleUndo} disabled={pages[currentPageIndex]?.length === 0} className="h-8">
+                            <Undo className="w-4 h-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={handleClear} disabled={paths.length === 0} className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50">
-                            <Trash2 className="w-4 h-4 mr-1 md:mr-2" />
-                            <span className="hidden md:inline">Clear</span>
+                        <Button variant="ghost" size="sm" onClick={handleClear} disabled={pages[currentPageIndex]?.length === 0} className="h-8 text-red-600">
+                            <Trash2 className="w-4 h-4" />
                         </Button>
                     </div>
 
-                    {/* ── DRAWING CONTROLS ── */}
-                    <div className="flex items-center gap-1.5 sm:gap-3 bg-slate-100 p-0.5 sm:p-1 rounded-lg shrink-0">
-                        {/* Eraser Toggle */}
+                    <div className="flex items-center gap-1.5 bg-slate-100 p-0.5 rounded-lg shrink-0">
                         <Button
                             variant={isEraser ? "secondary" : "ghost"}
                             size="sm"
                             onClick={() => setIsEraser(!isEraser)}
                             className={`h-8 w-8 p-0 ${isEraser ? 'bg-white shadow-sm ring-1 ring-slate-200' : ''}`}
-                            title="Toggle Eraser"
                         >
                             <Eraser className={`w-4 h-4 ${isEraser ? 'text-blue-600' : 'text-slate-600'}`} />
                         </Button>
-
-                        <div className="hidden sm:block w-px h-5 bg-slate-300 mx-0.5"></div>
-
-                        {/* Color Picker (disabled if eraser) */}
-                        <div className="flex items-center gap-1 shrink-0" style={{ opacity: isEraser ? 0.5 : 1, pointerEvents: isEraser ? 'none' : 'auto' }}>
-                            <PenTool className="hidden sm:block w-4 h-4 text-slate-500 mr-1" />
+                        {!isEraser && (
                             <input
                                 type="color"
-                                shadow-sm
                                 value={penColor}
                                 onChange={(e) => setPenColor(e.target.value)}
-                                className="w-7 h-7 sm:w-6 sm:h-6 p-0 border-0 rounded-md cursor-pointer [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-none [&::-webkit-color-swatch]:rounded-md ring-1 ring-slate-200"
-                                title="Pen Color"
+                                className="w-7 h-7 p-0 border-0 rounded-md cursor-pointer ring-1 ring-slate-200"
                             />
-                        </div>
-
-                        {/* Pen Size Slider - Hidden on tiny screens, show on small+ */}
-                        <div className="hidden xs:flex items-center gap-1.5 sm:gap-2 ml-1 px-1 sm:px-2 min-w-[60px] sm:min-w-[120px]">
-                            <Circle className="w-1.5 h-1.5 sm:w-2 sm:h-2 text-slate-400 fill-current" />
+                        )}
+                        <div className="hidden xs:flex items-center gap-1.5 ml-1 px-1">
                             <input
                                 type="range"
                                 min="1"
                                 max="15"
                                 value={penSize}
                                 onChange={(e) => setPenSize(parseInt(e.target.value))}
-                                className="w-12 sm:w-16 h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                                title={`Pen Size: ${penSize}`}
+                                className="w-12 h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                             />
-                            <Circle className="w-3 h-3 sm:w-4 sm:h-4 text-slate-400 fill-current" />
                         </div>
                     </div>
+
+                    {/* Precision Mode Toggle */}
+                    <Button 
+                        variant={precisionMode ? "default" : "outline"} 
+                        size="sm" 
+                        onClick={() => setPrecisionMode(!precisionMode)}
+                        className={cn("h-8 gap-2 ml-1", precisionMode ? "bg-blue-600" : "text-slate-500")}
+                    >
+                        <Tablet className="w-4 h-4" />
+                        <span className="hidden sm:inline">{precisionMode ? 'Pen Only' : 'Finger On'}</span>
+                    </Button>
                 </div>
 
-                <div className="flex items-center gap-1.5 shrink-0">
-                    <Button variant="outline" size="sm" onClick={() => setIsEnlarged(e => !e)} className="h-9 px-2 sm:px-3">
-                        {isEnlarged ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-                        <span className="hidden xs:inline ml-1.5">{isEnlarged ? 'Shrink' : 'Enlarge'}</span>
-                    </Button>
-                    <Button size="sm" onClick={handleSave} className="h-9 px-3 sm:px-4 shadow-sm" style={{ background: '#0284c7', color: 'white' }}>
-                        <Save className="w-4 h-4 mr-1.5" /> <span className="hidden xs:inline">Save</span>
+                <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-1 bg-slate-100 px-2 py-1 rounded-md">
+                         <span className="text-[10px] font-bold text-slate-500">{Math.round(scale * 100)}%</span>
+                         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setScale(1)}>
+                            <Undo className="w-2.5 h-2.5" />
+                         </Button>
+                    </div>
+                    <Button size="sm" onClick={handleSave} className="h-9 px-4 bg-sky-600 hover:bg-sky-700 text-white shadow-lg">
+                        <Save className="w-4 h-4 mr-2" /> Save
                     </Button>
                 </div>
             </div>
 
-            {/* ── Scrollable paper area */}
-            <div style={{
-                flex: 1,
-                overflowX: 'auto',
-                overflowY: 'auto',
-                background: '#e2e8f0',
-                display: 'flex',
-                justifyContent: 'center',
-                padding: '16px',
-                borderBottomLeftRadius: isEnlarged ? 0 : '8px',
-                borderBottomRightRadius: isEnlarged ? 0 : '8px',
-            }}>
+            {/* ── Main Canvas Area */}
+            <div 
+                ref={scrollContainerRef}
+                style={{
+                    flex: 1,
+                    overflow: 'auto',
+                    background: '#0f172a',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    touchAction: 'none',
+                    userSelect: 'none',
+                }}
+                onTouchEnd={() => {
+                    activePointersRef.current.clear();
+                    isPenActiveRef.current = false;
+                    lastTouchDistanceRef.current = null;
+                }}
+            >
                 <div
                     ref={containerRef}
                     style={{
@@ -287,33 +436,91 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                         aspectRatio: '1 / 1.414',
                         position: 'relative',
                         flexShrink: 0,
-                        boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-                        cursor: 'crosshair',
-                        touchAction: 'none',
+                        boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+                        transform: `scale(${scale})`,
+                        transformOrigin: 'top center',
+                        transition: lastTouchDistanceRef.current ? 'none' : 'transform 0.15s cubic-bezier(0,0,0.2,1)',
                     }}
                 >
                     <div style={{ position: 'absolute', inset: 0 }}>
-                        <PrescriptionTemplate patient={patient} visit={visit} handwrittenImage={null} />
+                        <PrescriptionTemplate 
+                            patient={patient} 
+                            visit={visit} 
+                            handwrittenImage={null} 
+                            // Only show template on first page
+                        />
+                        {/* Background for continuation pages */}
+                        {currentPageIndex > 0 && (
+                            <div style={{ position: 'absolute', inset: 0, background: '#fff' }} />
+                        )}
+                        {/* Branding for continuation pages */}
+                        {currentPageIndex > 0 && (
+                             <div style={{ 
+                                position: 'absolute', top: '2em', right: '3em', 
+                                color: '#cbd5e1', fontSize: '1.5cqw', fontWeight: 800,
+                                zIndex: 5
+                            }}>
+                                GV CLINIC — PAGE {currentPageIndex + 1}
+                            </div>
+                        )}
                     </div>
 
                     <canvas
                         ref={canvasRef}
                         style={{
-                            position: 'absolute',
-                            inset: 0,
-                            width: '100%',
-                            height: '100%',
-                            zIndex: 20,
-                            cursor: 'crosshair',
-                            touchAction: 'none',
+                            position: 'absolute', inset: 0,
+                            width: '100%', height: '100%',
+                            zIndex: 20, cursor: 'crosshair', touchAction: 'none',
                         }}
                         onPointerDown={onPointerDown}
                         onPointerMove={onPointerMove}
                         onPointerUp={onPointerUp}
+                        onPointerLeave={onPointerUp}
                         onPointerCancel={onPointerUp}
                     />
                 </div>
             </div>
+
+            {/* ── Pagination Bottom Bar */}
+            <div className="bg-white/90 backdrop-blur border-t px-6 py-4 flex items-center justify-between shrink-0 rounded-b-xl shadow-2xl">
+                <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+                        <Button 
+                            variant="ghost" size="sm" 
+                            disabled={currentPageIndex === 0}
+                            onClick={() => setCurrentPageIndex(p => p - 1)}
+                            className="h-8 w-8 p-0"
+                        >
+                            <ChevronLeft className="w-4 h-4" />
+                        </Button>
+                        <span className="px-3 text-sm font-bold text-slate-700">
+                            Page {currentPageIndex + 1} of {pages.length}
+                        </span>
+                        <Button 
+                            variant="ghost" size="sm" 
+                            disabled={currentPageIndex === pages.length - 1}
+                            onClick={() => setCurrentPageIndex(p => p + 1)}
+                            className="h-8 w-8 p-0"
+                        >
+                            <ChevronRight className="w-4 h-4" />
+                        </Button>
+                    </div>
+                    {pages.length > 1 && (
+                        <Button variant="ghost" size="sm" onClick={deleteCurrentPage} className="text-red-500 hover:text-red-700 h-8">
+                             Delete Page
+                        </Button>
+                    )}
+                </div>
+
+                <Button onClick={addPage} className="bg-primary text-white h-9 px-5 gap-2 rounded-full shadow-lg">
+                    <Plus className="w-4 h-4" /> Add Page
+                </Button>
+            </div>
         </div>
     );
+}
+
+// Helper for conditional classes if not already imported
+function cn(...classes: any[]) {
+    return classes.filter(Boolean).join(' ');
 }

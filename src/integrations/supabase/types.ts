@@ -23,6 +23,7 @@ export type Database = {
           name: string
           phone: string
           sex: string
+          title: string | null
           updated_at: string
         }
         Insert: {
@@ -33,6 +34,7 @@ export type Database = {
           name: string
           phone: string
           sex: string
+          title?: string | null
           updated_at?: string
         }
         Update: {
@@ -43,6 +45,7 @@ export type Database = {
           name?: string
           phone?: string
           sex?: string
+          title?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -57,6 +60,7 @@ export type Database = {
           medicines: Json
           patient_id: string
           pdf_url: string | null
+          raw_paths: Json
           signature_image: string | null
           updated_at: string
           visit_id: string
@@ -70,6 +74,7 @@ export type Database = {
           medicines?: Json
           patient_id: string
           pdf_url?: string | null
+          raw_paths?: Json
           signature_image?: string | null
           updated_at?: string
           visit_id: string
@@ -83,6 +88,7 @@ export type Database = {
           medicines?: Json
           patient_id?: string
           pdf_url?: string | null
+          raw_paths?: Json
           signature_image?: string | null
           updated_at?: string
           visit_id?: string

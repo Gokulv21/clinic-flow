@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { UserPlus, Search, Loader2, CheckCircle } from 'lucide-react';
 
 interface PatientForm {
+  title: string;
   name: string;
   age: string;
   sex: string;
@@ -26,7 +27,7 @@ interface VitalsForm {
   cbg: string;
 }
 
-const initialPatient: PatientForm = { name: '', age: '', sex: '', phone: '', address: '' };
+const initialPatient: PatientForm = { title: '', name: '', age: '', sex: '', phone: '', address: '' };
 const initialVitals: VitalsForm = { weight: '', blood_pressure: '', pulse_rate: '', spo2: '', temperature: '', cbg: '' };
 
 export default function NurseEntry() {
@@ -52,12 +53,19 @@ export default function NurseEntry() {
 
   const selectOldPatient = (p: any) => {
     setSelectedPatientId(p.id);
-    setPatient({ name: p.name, age: String(p.age), sex: p.sex, phone: p.phone, address: p.address || '' });
+    setPatient({ 
+      title: p.title || '', 
+      name: p.name, 
+      age: String(p.age), 
+      sex: p.sex, 
+      phone: p.phone, 
+      address: p.address || '' 
+    });
     setStep('vitals');
   };
 
   const handleNewPatientNext = () => {
-    if (!patient.name || !patient.age || !patient.sex || !patient.phone) {
+    if (!patient.name || !patient.age || !patient.sex || !patient.phone || !patient.title) {
       toast.error('Please fill all required fields');
       return;
     }
@@ -72,7 +80,14 @@ export default function NurseEntry() {
       if (!patientId) {
         const { data: newPatient, error } = await supabase
           .from('patients')
-          .insert({ name: patient.name, age: parseInt(patient.age), sex: patient.sex, phone: patient.phone, address: patient.address || null })
+          .insert({ 
+            title: patient.title,
+            name: patient.name, 
+            age: parseFloat(patient.age), 
+            sex: patient.sex, 
+            phone: patient.phone, 
+            address: patient.address || null 
+          })
           .select()
           .single();
         if (error) throw error;
@@ -115,6 +130,18 @@ export default function NurseEntry() {
     setSearchResults([]);
   };
 
+  const autoSetTitle = (age: string, sex: string) => {
+    if (!age || !sex) return;
+    const ageVal = parseFloat(age);
+    if (ageVal < 2) {
+      setPatient(p => ({ ...p, title: 'Baby' }));
+    } else if (sex === 'Male') {
+      setPatient(p => ({ ...p, title: 'Mr.' }));
+    } else if (sex === 'Female') {
+      setPatient(p => ({ ...p, title: 'Miss' }));
+    }
+  };
+
   if (step === 'done') {
     return (
       <div className="p-6 flex items-center justify-center min-h-[80vh]">
@@ -123,7 +150,7 @@ export default function NurseEntry() {
             <CheckCircle className="w-16 h-16 text-success mx-auto" />
             <h2 className="text-2xl font-heading font-bold">Patient Queued!</h2>
             <div className="text-6xl font-heading font-bold text-primary">#{tokenNumber}</div>
-            <p className="text-muted-foreground">{patient.name} has been added to the consultation queue</p>
+            <p className="text-muted-foreground">{patient.title} {patient.name} has been added to the consultation queue</p>
             <Button onClick={reset} className="w-full mt-4">Add Another Patient</Button>
           </CardContent>
         </Card>
@@ -153,7 +180,19 @@ export default function NurseEntry() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2 space-y-2">
+                  <div className="space-y-2">
+                    <Label>Title *</Label>
+                    <Select value={patient.title} onValueChange={v => setPatient(p => ({ ...p, title: v }))}>
+                      <SelectTrigger><SelectValue placeholder="Title" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Mr.">Mr.</SelectItem>
+                        <SelectItem value="Miss">Miss</SelectItem>
+                        <SelectItem value="Mrs.">Mrs.</SelectItem>
+                        <SelectItem value="Baby">Baby</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
                     <Label>Name *</Label>
                     <Input value={patient.name} onChange={e => setPatient(p => ({ ...p, name: e.target.value }))} placeholder="Patient name" />
                   </div>
@@ -161,18 +200,26 @@ export default function NurseEntry() {
                     <Label>Age *</Label>
                     <Input 
                       type="number" 
+                      step="0.1"
                       value={patient.age} 
                       onChange={e => {
-                        const val = parseInt(e.target.value);
+                        const val = parseFloat(e.target.value);
                         if (val > 120) return;
                         setPatient(p => ({ ...p, age: e.target.value }));
+                        autoSetTitle(e.target.value, patient.sex);
                       }} 
                       placeholder="Age" 
                     />
                   </div>
                   <div className="space-y-2">
                     <Label>Sex *</Label>
-                    <Select value={patient.sex} onValueChange={v => setPatient(p => ({ ...p, sex: v }))}>
+                    <Select 
+                      value={patient.sex} 
+                      onValueChange={v => {
+                        setPatient(p => ({ ...p, sex: v }));
+                        autoSetTitle(patient.age, v);
+                      }}
+                    >
                       <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="Male">Male</SelectItem>
