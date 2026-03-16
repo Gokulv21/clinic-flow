@@ -68,7 +68,7 @@ export default function PrescriptionTemplate({
                     className="single-page-prescription"
                     style={{
                         width: isPrint ? '210mm' : '100%',
-                        height: isPrint ? '297mm' : undefined,
+                        height: isPrint ? '296mm' : undefined,
                         aspectRatio: isPrint ? undefined : `${EXPORT_W} / ${EXPORT_H}`,
                         containerType: 'inline-size' as any,
                         position: 'relative',
@@ -165,25 +165,24 @@ function PageOne({ patient, visit, today, time, diagnosis, medicines, advice, ha
                 position: 'relative', overflow: 'hidden', flexShrink: 0,
                 borderBottom: '1px solid #e2e8f0',
             }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1.2em' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.8em' }}>
                     {/* Exact Logo with Theme-Matching Filter */}
-                    <img 
+                    <img
                         src={prescriptionLogo}
-                        alt="Clinic Logo" 
-                        style={{ 
-                            height: '5em', 
-                            width: 'auto', 
+                        alt="Clinic Logo"
+                        style={{
+                            height: '5.8em',
+                            width: 'auto',
                             objectFit: 'contain',
                             flexShrink: 0,
+                            display: 'block',
                             // This filter approximates #0f172a (Slate 900) for a black logo
                             filter: 'brightness(0) saturate(100%) invert(8%) sepia(21%) saturate(2853%) hue-rotate(191deg) brightness(91%) contrast(94%)'
-                        }} 
+                        }}
                     />
-                    
-                    <div style={{ borderLeft: '2px solid #e2e8f0', height: '5.5em', alignSelf: 'center' }} />
 
                     <div>
-                        <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '2.5em', lineHeight: 1, letterSpacing: '0.01em' }}>
+                        <div style={{ fontWeight: 800, color: '#c21b1eff', fontSize: '2em', lineHeight: 1, letterSpacing: '0.01em' }}>
                             Dr. V. Aravind
                         </div>
                         <div style={{ color: '#475569', fontSize: '0.9em', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', marginTop: '0.3em' }}>
@@ -198,14 +197,17 @@ function PageOne({ patient, visit, today, time, diagnosis, medicines, advice, ha
                     </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontWeight: 900, color: '#1e293b', fontSize: '3.2em', letterSpacing: '0.04em', lineHeight: 1 }}>
+                    <div style={{ fontWeight: 900, color: '#205213ff', fontSize: '3.2em', letterSpacing: '0.04em', lineHeight: 1 }}>
                         GV Clinic
                     </div>
-                    <div style={{ color: '#475569', fontSize: '0.8em', marginTop: '0.4em', letterSpacing: '0.2em', fontWeight: 500 }}>
+                    <div style={{ color: '#475569', fontSize: '0.8em', marginTop: '0.4em', letterSpacing: '0.2em', fontWeight: 800 }}>
                         24/7 Emergency · ECG · Lab
                     </div>
                     <div style={{ color: '#64748b', fontSize: '0.75em', marginTop: '0.2em', letterSpacing: '0.02em', fontWeight: 500 }}>
                         742, SSR Complex, Saththanur – 606 706
+                    </div>
+                    <div style={{ color: '#64748b', fontSize: '0.75em', marginTop: '0.2em', letterSpacing: '0.02em', fontWeight: 500, textAlign: 'center' }}>
+                        +91-9488017536
                     </div>
                 </div>
             </div>
@@ -220,7 +222,7 @@ function PageOne({ patient, visit, today, time, diagnosis, medicines, advice, ha
                 padding: '0.8em 2em', gap: '1.2em', flexShrink: 0,
             }}>
                 {[
-                    { label: 'Patient Name', value: (patient?.title ? patient.title + ' ' : '') + (patient?.name ?? '—'), color: '#0369a1' },
+                    { label: 'Patient Name', value: (patient?.title ? patient.title + ' ' : '') + (patient?.name ?? '—'), color: '#0f172a' },
                     { label: 'Age / Sex', value: patient ? `${patient.age ?? '—'} / ${patient.sex?.charAt(0) ?? '—'}` : '—' },
                     { label: 'Date', value: today },
                     { label: 'Time', value: time },
@@ -270,8 +272,6 @@ function PageOne({ patient, visit, today, time, diagnosis, medicines, advice, ha
 
             {/* ── FOOTER ──────────────────────────────────────── */}
             <div style={{ background: '#fff', borderTop: '2px solid #0f172a', padding: '1em 2em', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, gap: '1em' }}>
-                <span style={{ color: '#1e293b', fontSize: '1em', fontWeight: 800 }}>📞 +91 9488017536</span>
-                <span style={{ color: '#e2e8f0' }}>|</span>
                 <span style={{ color: '#475569', fontSize: '1em', fontWeight: 700, letterSpacing: '0.02em', textAlign: 'center' }}>
                     அடுத்த முறை வரும்போது இந்த மருந்துச்சீட்டை கொண்டு வரவும்
                 </span>

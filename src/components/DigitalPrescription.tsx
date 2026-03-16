@@ -16,6 +16,7 @@ interface DigitalPrescriptionProps {
 
 export default function DigitalPrescription({ patient, visit, initialPaths = [], initialPages, onSave, onClose }: DigitalPrescriptionProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const staticCanvasRef = useRef<HTMLCanvasElement | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const [isEnlarged, setIsEnlarged] = useState(false);
@@ -69,7 +70,48 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
         }
     }, []);
 
-    const redrawPage = useCallback((pathsToRender: DrawnPath[]) => {
+    const renderPath = (ctx: CanvasRenderingContext2D, path: DrawnPath, canvasWidth: number, canvasHeight: number) => {
+        const { points, color, size, isEraser } = path;
+        ctx.fillStyle = isEraser ? '#ffffff' : color;
+        ctx.globalCompositeOperation = isEraser ? 'destination-out' : 'source-over';
+
+        const stroke = getStroke(points.map(p => [p.x * canvasWidth, p.y * canvasHeight, (p as any).pressure || 0.5]), {
+            size: isEraser ? size * 5 : size * 2,
+            thinning: 0.5,
+            smoothing: 0.5,
+            streamline: 0.5,
+        });
+
+        if (stroke.length === 0) return;
+
+        ctx.beginPath();
+        ctx.moveTo(stroke[0][0], stroke[0][1]);
+        for (let i = 1; i < stroke.length; i++) {
+            ctx.lineTo(stroke[i][0], stroke[i][1]);
+        }
+        ctx.fill();
+    };
+
+    const redrawStatic = useCallback((pathsToRender: DrawnPath[]) => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        
+        if (!staticCanvasRef.current) {
+            staticCanvasRef.current = document.createElement('canvas');
+        }
+        
+        const sc = staticCanvasRef.current;
+        sc.width = canvas.width;
+        sc.height = canvas.height;
+        const sctx = sc.getContext('2d');
+        if (!sctx) return;
+
+        sctx.clearRect(0, 0, sc.width, sc.height);
+        pathsToRender.forEach(path => renderPath(sctx, path, sc.width, sc.height));
+        isDirtyRef.current = true;
+    }, []);
+
+    const redrawPage = useCallback(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
@@ -77,54 +119,19 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        // Draw completed paths
-        pathsToRender.forEach(path => {
-            const { points, color, size, isEraser } = path;
-            
-            ctx.fillStyle = isEraser ? '#ffffff' : color;
-            if (isEraser) {
-                ctx.globalCompositeOperation = 'destination-out';
-            } else {
-                ctx.globalCompositeOperation = 'source-over';
-            }
-
-            const stroke = getStroke(points.map(p => [p.x * canvas.width, p.y * canvas.height, (p as any).pressure || 0.5]), {
-                size: isEraser ? size * 5 : size * 2,
-                thinning: 0.5,
-                smoothing: 0.5,
-                streamline: 0.5,
-            });
-
-            if (stroke.length === 0) return;
-
-            ctx.beginPath();
-            ctx.moveTo(stroke[0][0], stroke[0][1]);
-            for (let i = 1; i < stroke.length; i++) {
-                ctx.lineTo(stroke[i][0], stroke[i][1]);
-            }
-            ctx.fill();
-        });
+        // Draw static layer
+        if (staticCanvasRef.current) {
+            ctx.drawImage(staticCanvasRef.current, 0, 0);
+        }
 
         // Draw current path in progress
         if (isDrawingRef.current && currentPathRef.current.length > 0) {
-            ctx.fillStyle = isEraser ? '#ffffff' : penColor;
-            ctx.globalCompositeOperation = isEraser ? 'destination-out' : 'source-over';
-
-            const stroke = getStroke(currentPathRef.current.map(p => [p.x * canvas.width, p.y * canvas.height, p.pressure]), {
-                size: isEraser ? penSize * 5 : penSize * 2,
-                thinning: 0.5,
-                smoothing: 0.5,
-                streamline: 0.5,
-            });
-
-            if (stroke.length > 0) {
-                ctx.beginPath();
-                ctx.moveTo(stroke[0][0], stroke[0][1]);
-                for (let i = 1; i < stroke.length; i++) {
-                    ctx.lineTo(stroke[i][0], stroke[i][1]);
-                }
-                ctx.fill();
-            }
+            renderPath(ctx, {
+                points: currentPathRef.current,
+                color: penColor,
+                size: penSize,
+                isEraser: isEraser
+            }, canvas.width, canvas.height);
         }
 
         ctx.globalCompositeOperation = 'source-over';
@@ -134,10 +141,10 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
     // ── Animation Loop
     const animate = useCallback((time: number) => {
         if (isDirtyRef.current) {
-            redrawPage(pages[currentPageIndex] || []);
+            redrawPage();
         }
         requestRef.current = requestAnimationFrame(animate);
-    }, [currentPageIndex, pages, redrawPage]);
+    }, [redrawPage]);
 
     useEffect(() => {
         requestRef.current = requestAnimationFrame(animate);
@@ -147,12 +154,10 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
     }, [animate]);
 
     useEffect(() => {
-        const id = setTimeout(() => {
-            fitCanvas();
-            redrawPage(pages[currentPageIndex] || []);
-        }, 50);
-        return () => clearTimeout(id);
-    }, [currentPageIndex, isEnlarged, fitCanvas, redrawPage, pages]);
+        fitCanvas();
+        redrawStatic(pages[currentPageIndex] || []);
+        redrawPage();
+    }, [currentPageIndex, isEnlarged, fitCanvas, redrawStatic, redrawPage, pages]);
 
     // ── Advanced Pointer Tracking
     const activePointersRef = useRef(new Map<number, { x: number, y: number, screenX: number, screenY: number, type: string }>());
@@ -213,9 +218,12 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
         // Double-Tap Detection (Pencil barrel sim)
         if (e.pointerType === 'pen') {
             const now = Date.now();
-            if (now - lastPenTapRef.current < 350) {
-                setIsEraser(!isEraser);
-                lastPenTapRef.current = 0; // Reset
+            const timeDiff = now - lastPenTapRef.current;
+            
+            // Check for double tap
+            if (timeDiff > 20 && timeDiff < 450) {
+                setIsEraser(prev => !prev);
+                lastPenTapRef.current = 0; 
                 isDrawingRef.current = false;
                 onPointerUp();
                 return;
@@ -246,20 +254,8 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
             onPointerUp();
         }
     };
-
     const onPointerMove = (e: React.PointerEvent) => {
-        const pos = getCanvasPos(e.clientX, e.clientY);
         const touchCount = activePointersRef.current.size;
-
-        // Update tracking
-        if (activePointersRef.current.has(e.pointerId)) {
-            activePointersRef.current.set(e.pointerId, { 
-                ...pos, 
-                screenX: e.clientX, 
-                screenY: e.clientY, 
-                type: e.pointerType 
-            });
-        }
 
         // Multi-touch gestures are handled by @use-gesture, but we still track for palm rejection
         if (touchCount >= 2) {
@@ -271,13 +267,19 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
         // Strict Palm Rejection: If pen is active, ignore this touch move
         if (isPenActiveRef.current && e.pointerType === 'touch') return;
 
-        if (!isInWritingArea(pos)) {
-            onPointerUp();
-            return;
-        }
-
         const pressure = (e as any).pressure || 0.5;
-        currentPathRef.current = [...currentPathRef.current, { ...pos, pressure }];
+        
+        // High-frequency optimization: Use coalesced events to get all intermediate points
+        // This is critical for high-speed pencil movements
+        const coalescedEvents = (e.nativeEvent as any).getCoalescedEvents ? (e.nativeEvent as any).getCoalescedEvents() : [e.nativeEvent];
+        
+        for (const ce of coalescedEvents) {
+            const cPos = getCanvasPos(ce.clientX, ce.clientY);
+            if (isInWritingArea(cPos)) {
+                currentPathRef.current.push({ ...cPos, pressure: ce.pressure || 0.5 });
+            }
+        }
+        
         isDirtyRef.current = true;
     };
 
@@ -296,13 +298,17 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
 
         if (isDrawingRef.current && (currentPathRef.current.length > 0)) {
             const newPath = {
-                points: currentPathRef.current,
+                points: [...currentPathRef.current], // Snapshot the points
                 color: penColor,
                 size: penSize,
                 isEraser: isEraser
             };
             const updatedPages = [...pages];
             updatedPages[currentPageIndex] = [...(updatedPages[currentPageIndex] || []), newPath];
+            
+            // Immediate update for snappiness
+            redrawStatic(updatedPages[currentPageIndex]);
+            
             setPages(updatedPages);
             
             // Add to history
@@ -321,6 +327,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
             const nextStep = historyStep - 1;
             setHistoryStep(nextStep);
             setPages(history[nextStep]);
+            redrawStatic(history[nextStep][currentPageIndex] || []);
             isDirtyRef.current = true;
         }
     };
@@ -330,6 +337,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
             const nextStep = historyStep + 1;
             setHistoryStep(nextStep);
             setPages(history[nextStep]);
+            redrawStatic(history[nextStep][currentPageIndex] || []);
             isDirtyRef.current = true;
         }
     };
@@ -367,12 +375,14 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
         // Render each page to image
         const images: string[] = [];
         for (let i = 0; i < pages.length; i++) {
-            redrawPage(pages[i]);
+            redrawStatic(pages[i]);
+            redrawPage();
             images.push(canvas.toDataURL('image/png', 1.0));
         }
 
         // Return to current page state for UI
-        redrawPage(pages[currentPageIndex]);
+        redrawStatic(pages[currentPageIndex]);
+        redrawPage();
         onSave(images.length > 1 ? images : images[0], pages);
     };
 

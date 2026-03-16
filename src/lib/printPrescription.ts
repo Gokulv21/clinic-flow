@@ -60,12 +60,14 @@ html, body { background: #fff; }
 /* ── Page container ─────────────────────────────────────────────── */
 .single-page-prescription {
     width: 210mm !important;
-    height: 297mm !important;
+    height: 296mm !important; /* Slightly reduced to prevent overflow spills */
     position: relative !important;
     overflow: hidden !important;
     box-shadow: none !important;
     aspect-ratio: unset !important;
     container-type: inline-size !important;
+    page-break-after: always !important;
+    break-after: page !important;
 }
 
 /* ── Inner wrapper ─────────────────────────────────────────────── */
@@ -77,14 +79,31 @@ html, body { background: #fff; }
 }
 
 /* ── Print ──────────────────────────────────────────────────────── */
-@page { margin: 0; size: A4 portrait; }
+@page { 
+    margin: 0; 
+    size: A4 portrait; 
+}
+
 @media print {
+    /* Hide everything that isn't the print container */
+    body > *:not(.print-container) {
+        display: none !important;
+    }
+    
     * {
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
     }
-    html, body { margin: 0; padding: 0; }
-    .print-container { width: 210mm; }
+    html, body { 
+        margin: 0; 
+        padding: 0; 
+        background: #fff !important;
+    }
+    .print-container { 
+        width: 210mm !important; 
+        margin: 0 !important;
+        padding: 0 !important;
+    }
 }
 </style>
 </head>
