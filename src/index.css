@@ -105,33 +105,35 @@
   }
 }
 
-/* ── Global Print Shield ────────────────────────────────────────── */
+/* ── Global Print Shield ─────────────────────────────────────────── */
 @media print {
-  /* Forcibly hide all main UI components */
-  #root, 
-  [role="dialog"] > div,
-  .sidebar, 
-  .no-print,
-  button,
-  nav {
+  /* Hide main UI siblings of the print container */
+  #root > *:not(.print-container) {
     display: none !important;
   }
 
-  /* Only allow the print container to remain visible */
-  .print-container, 
-  .print-container * {
-    display: block !important;
-    visibility: visible !important;
+  /* Hide other non-essential UI */
+  nav, aside, .sidebar, .no-print, button {
+    display: none !important;
   }
 
-  /* Reset body for a clean print */
-  body {
+  /* Ensure the print container and its contents are always visible */
+  .print-container {
+    display: flex !important;
+    visibility: visible !important;
+    position: relative !important;
+  }
+
+  /* Reset body/html for a clean background */
+  html, body {
     margin: 0 !important;
     padding: 0 !important;
     background: #fff !important;
+    height: auto !important;
+    width: 100% !important;
   }
 
-  /* Ensure colors are rendered */
+  /* Force exact color printing */
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;

@@ -60,7 +60,7 @@ html, body { background: #fff; }
 /* ── Page container ─────────────────────────────────────────────── */
 .single-page-prescription {
     width: 210mm !important;
-    height: 296mm !important; /* Slightly reduced to prevent overflow spills */
+    height: 296mm !important; 
     position: relative !important;
     overflow: hidden !important;
     box-shadow: none !important;
@@ -68,6 +68,8 @@ html, body { background: #fff; }
     container-type: inline-size !important;
     page-break-after: always !important;
     break-after: page !important;
+    margin: 0 auto !important; /* Center on larger paper */
+    background: white !important;
 }
 
 /* ── Inner wrapper ─────────────────────────────────────────────── */
@@ -81,7 +83,7 @@ html, body { background: #fff; }
 /* ── Print ──────────────────────────────────────────────────────── */
 @page { 
     margin: 0; 
-    size: A4 portrait; 
+    /* Removed hardcoded size to allow browser-selected formats */
 }
 
 @media print {
@@ -98,11 +100,16 @@ html, body { background: #fff; }
         margin: 0; 
         padding: 0; 
         background: #fff !important;
+        width: 100% !important;
+        height: auto !important;
     }
     .print-container { 
-        width: 210mm !important; 
+        width: 100% !important; 
         margin: 0 !important;
         padding: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
     }
 }
 </style>

@@ -22,10 +22,10 @@ interface PrescriptionTemplateProps {
     isPrint?: boolean;
 }
 
-export default function PrescriptionTemplate({
+const PrescriptionTemplate = React.memo(({
     patient, visit, handwrittenImage,
     diagnosis, medicines = [], advice, isPrint = false,
-}: PrescriptionTemplateProps) {
+}: PrescriptionTemplateProps) => {
 
     const today = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
     const time = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
@@ -120,7 +120,7 @@ export default function PrescriptionTemplate({
             ))}
         </div>
     );
-}
+});
 
 interface PageOneProps {
     patient: any;
@@ -280,3 +280,5 @@ function PageOne({ patient, visit, today, time, diagnosis, medicines, advice, ha
         </div>
     );
 }
+
+export default PrescriptionTemplate;

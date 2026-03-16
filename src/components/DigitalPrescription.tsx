@@ -175,7 +175,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
         fitCanvas();
         redrawStatic(pages[currentPageIndex] || []);
         redrawPage();
-    }, [currentPageIndex, isEnlarged, fitCanvas, redrawStatic, redrawPage, pages]);
+    }, [currentPageIndex, isEnlarged, fitCanvas, redrawStatic, redrawPage]);
 
     // ── Advanced Pointer Tracking
     const activePointersRef = useRef(new Map<number, { x: number, y: number, screenX: number, screenY: number, type: string }>());
@@ -376,6 +376,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
         setHistory(newHistory);
         setHistoryStep(newHistory.length - 1);
         
+        redrawStatic([]); // Manual redraw for clear
         isDirtyRef.current = true;
     };
 
@@ -430,9 +431,9 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
             onWheel={handleWheel}
         >
             {/* ── Toolbar */}
-            <div className="bg-white border-b px-4 py-3 flex items-center justify-between shrink-0 drop-shadow-md sticky top-0 z-50 rounded-t-xl">
-                <div className="flex items-center gap-2 min-w-0">
-                    <Button variant="ghost" size="icon" onClick={onClose} className="shrink-0"><X className="w-5 h-5" /></Button>
+            <div className="bg-white border-b px-2 py-2 md:px-4 md:py-3 flex flex-wrap items-center justify-between gap-y-2 shrink-0 drop-shadow-md sticky top-0 z-50 rounded-t-xl">
+                <div className="flex items-center gap-1 md:gap-2 min-w-0 flex-wrap">
+                    <Button variant="ghost" size="icon" onClick={onClose} className="shrink-0 h-8 w-8 md:h-10 md:w-10"><X className="w-5 h-5" /></Button>
                     
                     <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg shrink-0">
                         <Button variant="ghost" size="sm" onClick={handleUndo} disabled={historyStep === 0} className="h-8">
@@ -446,42 +447,44 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                         </Button>
                     </div>
 
-                    <div className="flex items-center gap-1.5 bg-slate-100 p-0.5 rounded-lg shrink-0">
-                        <Button
-                            variant={!isEraser ? "secondary" : "ghost"}
-                            size="sm"
-                            onClick={() => setIsEraser(false)}
-                            className={`h-8 w-8 p-0 ${!isEraser ? 'bg-white shadow-sm ring-1 ring-slate-200' : ''}`}
-                        >
-                            <PenTool className={`w-4 h-4 ${!isEraser ? 'text-blue-600' : 'text-slate-600'}`} />
-                        </Button>
-                        <Button
-                            variant={isEraser ? "secondary" : "ghost"}
-                            size="sm"
-                            onClick={() => setIsEraser(true)}
-                            className={`h-8 w-8 p-0 ${isEraser ? 'bg-white shadow-sm ring-1 ring-slate-200' : ''}`}
-                        >
-                            <Eraser className={`w-4 h-4 ${isEraser ? 'text-blue-600' : 'text-slate-600'}`} />
-                        </Button>
+                    <div className="flex items-center gap-1 md:gap-1.5 bg-slate-100 p-0.5 rounded-lg flex-wrap sm:flex-nowrap">
+                        <div className="flex items-center gap-1">
+                            <Button
+                                variant={!isEraser ? "secondary" : "ghost"}
+                                size="sm"
+                                onClick={() => setIsEraser(false)}
+                                className={`h-8 w-8 p-0 ${!isEraser ? 'bg-white shadow-sm ring-1 ring-slate-200' : ''}`}
+                            >
+                                <PenTool className={`w-4 h-4 ${!isEraser ? 'text-blue-600' : 'text-slate-600'}`} />
+                            </Button>
+                            <Button
+                                variant={isEraser ? "secondary" : "ghost"}
+                                size="sm"
+                                onClick={() => setIsEraser(true)}
+                                className={`h-8 w-8 p-0 ${isEraser ? 'bg-white shadow-sm ring-1 ring-slate-200' : ''}`}
+                            >
+                                <Eraser className={`w-4 h-4 ${isEraser ? 'text-blue-600' : 'text-slate-600'}`} />
+                            </Button>
+                            
+                            {!isEraser && (
+                                <input
+                                    type="color"
+                                    value={penColor}
+                                    onChange={(e) => setPenColor(e.target.value)}
+                                    className="w-7 h-7 p-0 border-0 rounded-md cursor-pointer ring-1 ring-slate-200"
+                                />
+                            )}
+                        </div>
                         
-                        {!isEraser && (
-                            <input
-                                type="color"
-                                value={penColor}
-                                onChange={(e) => setPenColor(e.target.value)}
-                                className="w-7 h-7 p-0 border-0 rounded-md cursor-pointer ring-1 ring-slate-200"
-                            />
-                        )}
-                        
-                        <div className="flex items-center gap-2 px-2 ml-1 border-l border-slate-200">
-                             <span className="text-[10px] font-bold text-slate-400 w-4">{isEraser ? penSize : penSize}</span>
+                        <div className="flex items-center gap-2 px-2 border-l border-slate-200 h-6">
+                             <span className="text-[10px] font-bold text-slate-400 w-4">{penSize}</span>
                              <input
                                 type="range"
                                 min="1"
                                 max="20"
                                 value={penSize}
                                 onChange={(e) => setPenSize(parseInt(e.target.value))}
-                                className="w-16 h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                                className="w-12 md:w-16 h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                             />
                         </div>
                     </div>
@@ -491,22 +494,22 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                         variant={precisionMode ? "default" : "outline"} 
                         size="sm" 
                         onClick={() => setPrecisionMode(!precisionMode)}
-                        className={cn("h-8 gap-2 ml-1", precisionMode ? "bg-blue-600 text-white" : "text-slate-500")}
+                        className={cn("h-8 gap-1 md:gap-2 px-2", precisionMode ? "bg-blue-600 text-white" : "text-slate-500")}
                     >
                         <Tablet className="w-4 h-4" />
-                        <span className="hidden sm:inline">{precisionMode ? 'Pen Only' : 'Finger On'}</span>
+                        <span className="text-xs md:text-sm">{precisionMode ? 'Pen Only' : 'Finger On'}</span>
                     </Button>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
-                    <div className="flex items-center gap-1 bg-slate-100 px-2 py-1 rounded-md">
+                <div className="flex items-center gap-2 ml-auto pl-2">
+                    <div className="hidden sm:flex items-center gap-1 bg-slate-100 px-2 py-1 rounded-md">
                          <span className="text-[10px] font-bold text-slate-500">{Math.round(canvasTransform.scale * 100)}%</span>
                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCanvasTransform({ x: 0, y: 0, scale: 1 })}>
                             <Settings2 className="w-2.5 h-2.5" />
                          </Button>
                     </div>
-                    <Button size="sm" onClick={handleSave} className="h-9 px-4 bg-sky-600 hover:bg-sky-700 text-white shadow-lg">
-                        <Save className="w-4 h-4 mr-2" /> Save
+                    <Button size="sm" onClick={handleSave} className="h-8 md:h-9 px-3 md:px-4 bg-sky-600 hover:bg-sky-700 text-white shadow-lg shrink-0">
+                        <Save className="w-4 h-4 mr-1 md:mr-2" /> <span className="text-xs md:text-sm">Save</span>
                     </Button>
                 </div>
             </div>
