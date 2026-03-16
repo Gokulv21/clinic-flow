@@ -286,7 +286,7 @@ export default function DoctorConsultation() {
                   <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
                     {[
                       { label: 'Weight', value: selectedVisit.weight, unit: 'kg' },
-                      { label: 'BP', value: selectedVisit.blood_pressure, unit: '' },
+                      { label: 'BP', value: selectedVisit.blood_pressure, unit: 'mmHg' },
                       { label: 'Pulse', value: selectedVisit.pulse_rate, unit: 'bpm' },
                       { label: 'SpO2', value: selectedVisit.spo2, unit: '%' },
                       { label: 'Temp', value: selectedVisit.temperature, unit: '°F' },

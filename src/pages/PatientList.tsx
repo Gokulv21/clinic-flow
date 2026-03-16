@@ -6,8 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Search, User, History, Edit } from 'lucide-react';
+import { Search, User, History, Edit, Printer, Eye } from 'lucide-react';
 import { toast } from 'sonner';
+import PrescriptionTemplate from '@/components/PrescriptionTemplate';
+import { printPrescription } from '@/lib/printPrescription';
 
 export default function PatientList() {
   const [patients, setPatients] = useState<any[]>([]);
@@ -16,6 +18,7 @@ export default function PatientList() {
   const [visits, setVisits] = useState<any[]>([]);
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({ title: '', name: '', age: '', phone: '', address: '' });
+  const [viewingRx, setViewingRx] = useState<any>(null);
 
   const fetchPatients = async () => {
     let query = supabase.from('patients').select('*').order('created_at', { ascending: false });
@@ -169,9 +172,20 @@ export default function PatientList() {
                 {visits.map(v => (
                   <Card key={v.id}>
                     <CardContent className="py-3">
-                      <div className="flex justify-between text-sm">
-                        <span className="font-medium">{new Date(v.created_at).toLocaleDateString()}</span>
-                        <span className="text-muted-foreground">Token #{v.token_number}</span>
+                      <div className="flex justify-between items-start text-sm">
+                        <div>
+                          <span className="font-medium">{new Date(v.created_at).toLocaleDateString()}</span>
+                          <span className="text-muted-foreground ml-2">Token #{v.token_number}</span>
+                        </div>
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="h-8 text-primary hover:text-primary hover:bg-primary/5"
+                          onClick={() => setViewingRx(v)}
+                        >
+                          <Eye className="w-3.5 h-3.5 mr-1.5" />
+                          Prescription
+                        </Button>
                       </div>
                       {v.diagnosis && <p className="text-sm mt-1">Dx: {v.diagnosis}</p>}
                       <div className="grid grid-cols-3 gap-2 mt-2 text-xs text-muted-foreground">
@@ -192,6 +206,29 @@ export default function PatientList() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Prescription Preview Dialog */}
+      <Dialog open={!!viewingRx} onOpenChange={open => !open && setViewingRx(null)}>
+        <DialogContent className="max-w-[800px] p-0 overflow-hidden bg-slate-100">
+          <div className="bg-white p-4 border-b flex items-center justify-between sticky top-0 z-10">
+            <h3 className="font-bold">Prescription History</h3>
+            <Button size="sm" onClick={() => printPrescription()} className="gap-2">
+              <Printer className="w-4 h-4" /> Print
+            </Button>
+          </div>
+          <div className="p-4 md:p-8 overflow-auto max-h-[75vh] flex justify-center">
+            {viewingRx && (
+              <PrescriptionTemplate
+                patient={selectedPatient}
+                visit={viewingRx}
+                handwrittenImage={viewingRx.prescriptions?.[0]?.advice_image}
+                diagnosis={viewingRx.prescriptions?.[0]?.diagnosis || viewingRx.diagnosis}
+                medicines={viewingRx.prescriptions?.[0]?.medicines || []}
+              />
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

@@ -1,7 +1,16 @@
-import React from 'react';
+import React, { useRef, useEffect, useState } from 'react';
+import { supabase } from "@/integrations/supabase/client";
+import { format } from "date-fns";
+import prescriptionLogo from '@/assets/prescriptionLogo.png';
 
 const EXPORT_W = 1240;
 const EXPORT_H = 1754;
+
+interface VitalSign {
+    label: string;
+    value: any;
+    unit: string;
+}
 
 interface PrescriptionTemplateProps {
     patient?: any;
@@ -24,7 +33,7 @@ export default function PrescriptionTemplate({
     const vitals = [
         { label: 'Reg. No', value: visit?.token_number, unit: '' },
         { label: 'Weight', value: visit?.weight, unit: ' kg' },
-        { label: 'BP', value: visit?.blood_pressure, unit: '' },
+        { label: 'BP', value: visit?.blood_pressure, unit: ' mmHg' },
         { label: 'Pulse', value: visit?.pulse_rate, unit: ' /min' },
         { label: 'SpO₂', value: visit?.spo2, unit: ' %' },
         { label: 'Temp', value: visit?.temperature, unit: ' °F' },
@@ -32,7 +41,7 @@ export default function PrescriptionTemplate({
     ];
 
     const hasTyped = !!(diagnosis || (medicines && medicines.length > 0) || advice);
-    
+
     // Multi-page parsing logic: handles both raw arrays and JSON-stringified arrays from the DB
     let images: (string | null)[] = [];
     if (Array.isArray(handwrittenImage)) {
@@ -71,22 +80,22 @@ export default function PrescriptionTemplate({
                     }}
                 >
                     {idx === 0 ? (
-                        <PageOne 
-                            patient={patient} 
-                            visit={visit} 
-                            today={today} 
-                            time={time} 
-                            diagnosis={diagnosis} 
-                            medicines={medicines} 
-                            advice={advice} 
-                            hasTyped={hasTyped} 
+                        <PageOne
+                            patient={patient}
+                            visit={visit}
+                            today={today}
+                            time={time}
+                            diagnosis={diagnosis}
+                            medicines={medicines}
+                            advice={advice}
+                            hasTyped={hasTyped}
                             vitals={vitals}
                         />
                     ) : (
                         <div style={{ position: 'absolute', inset: 0, background: '#fff' }}>
-                            <div style={{ 
-                                position: 'absolute', top: '2em', right: '3em', 
-                                color: '#b0cde8', fontSize: '1.4cqw', fontWeight: 800 
+                            <div style={{
+                                position: 'absolute', top: '2em', right: '3em',
+                                color: '#b0cde8', fontSize: '1.4cqw', fontWeight: 800
                             }}>
                                 GV Clinic — Continuation Page {idx + 1}
                             </div>
@@ -150,44 +159,58 @@ function PageOne({ patient, visit, today, time, diagnosis, medicines, advice, ha
 
             {/* ── HEADER ─────────────────────────────────────── */}
             <div style={{
-                background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%)',
-                padding: '1.6em 2em',
+                background: '#fff',
+                padding: '1.4em 2em',
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 position: 'relative', overflow: 'hidden', flexShrink: 0,
+                borderBottom: '1px solid #e2e8f0',
             }}>
-                {[28, 18].map((s, i) => (
-                    <div key={i} style={{
-                        position: 'absolute', right: `${-s * 0.35}%`, top: '50%',
-                        transform: 'translateY(-50%)', width: `${s}%`, aspectRatio: '1',
-                        borderRadius: '50%', border: '2px solid rgba(255,255,255,0.05)',
-                        pointerEvents: 'none',
-                    }} />
-                ))}
-                <div>
-                    <div style={{ fontWeight: 800, color: '#fff', fontSize: '2.6em', lineHeight: 1, letterSpacing: '-0.02em' }}>
-                        Dr. V. Aravind
-                    </div>
-                    <div style={{ color: '#94a3b8', fontSize: '0.9em', fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', marginTop: '0.4em' }}>
-                        MBBS · General Physician
-                    </div>
-                    <div style={{ color: '#64748b', fontSize: '0.8em', marginTop: '0.2em', fontWeight: 500 }}>
-                        பொதுநல மருத்துவர் · Reg. No: 152590
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1.2em' }}>
+                    {/* Exact Logo with Theme-Matching Filter */}
+                    <img 
+                        src={prescriptionLogo}
+                        alt="Clinic Logo" 
+                        style={{ 
+                            height: '5em', 
+                            width: 'auto', 
+                            objectFit: 'contain',
+                            flexShrink: 0,
+                            // This filter approximates #0f172a (Slate 900) for a black logo
+                            filter: 'brightness(0) saturate(100%) invert(8%) sepia(21%) saturate(2853%) hue-rotate(191deg) brightness(91%) contrast(94%)'
+                        }} 
+                    />
+                    
+                    <div style={{ borderLeft: '2px solid #e2e8f0', height: '5.5em', alignSelf: 'center' }} />
+
+                    <div>
+                        <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '2.5em', lineHeight: 1, letterSpacing: '0.01em' }}>
+                            Dr. V. Aravind
+                        </div>
+                        <div style={{ color: '#475569', fontSize: '0.9em', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', marginTop: '0.3em' }}>
+                            MBBS., CCEBDM., (PHFI)
+                        </div>
+                        <div style={{ color: '#475569', fontSize: '0.85em', fontWeight: 500, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                            Reg. No: 152590
+                        </div>
+                        <div style={{ color: '#64748b', fontSize: '0.8em', fontWeight: 600, marginTop: '0.1em' }}>
+                            பொதுநலம் மற்றும் சர்க்கரை நோய் நிபுணர்
+                        </div>
                     </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontWeight: 700, color: '#fff', fontSize: '2.2em', letterSpacing: '0.04em', lineHeight: 1 }}>
+                    <div style={{ fontWeight: 900, color: '#1e293b', fontSize: '3.2em', letterSpacing: '0.04em', lineHeight: 1 }}>
                         GV Clinic
                     </div>
-                    <div style={{ color: '#94a3b8', fontSize: '0.8em', marginTop: '0.4em', fontWeight: 500 }}>
-                        742, SSR Complex, Saththanur – 606 706
+                    <div style={{ color: '#475569', fontSize: '0.8em', marginTop: '0.4em', letterSpacing: '0.2em', fontWeight: 500 }}>
+                        24/7 Emergency · ECG · Lab
                     </div>
                     <div style={{ color: '#64748b', fontSize: '0.75em', marginTop: '0.2em', letterSpacing: '0.02em', fontWeight: 500 }}>
-                        24/7 Emergency · ECG · Lab
+                        742, SSR Complex, Saththanur – 606 706
                     </div>
                 </div>
             </div>
 
-            <div style={{ height: '0.4em', flexShrink: 0, background: 'linear-gradient(90deg, #334155 0%, #475569 50%, #64748b 100%)' }} />
+            <div style={{ height: '2px', flexShrink: 0, backgroundColor: '#0f172a' }} />
 
             {/* ── PATIENT BAR ─────────────────────────────────── */}
             <div style={{
@@ -197,14 +220,14 @@ function PageOne({ patient, visit, today, time, diagnosis, medicines, advice, ha
                 padding: '0.8em 2em', gap: '1.2em', flexShrink: 0,
             }}>
                 {[
-                    { label: 'Patient Name', value: (patient?.title ? patient.title + ' ' : '') + (patient?.name ?? '—') },
+                    { label: 'Patient Name', value: (patient?.title ? patient.title + ' ' : '') + (patient?.name ?? '—'), color: '#0369a1' },
                     { label: 'Age / Sex', value: patient ? `${patient.age ?? '—'} / ${patient.sex?.charAt(0) ?? '—'}` : '—' },
                     { label: 'Date', value: today },
                     { label: 'Time', value: time },
-                ].map(({ label, value }) => (
+                ].map(({ label, value, color }) => (
                     <div key={label} style={{ overflow: 'hidden', minWidth: 0 }}>
                         <div style={{ fontSize: '0.75em', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</div>
-                        <div style={{ fontSize: '1.15em', fontWeight: 700, color: '#0f172a', marginTop: '0.2em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <div style={{ fontSize: '1.15em', fontWeight: 800, color: color || '#0f172a', marginTop: '0.2em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {value}
                         </div>
                     </div>
@@ -231,13 +254,13 @@ function PageOne({ patient, visit, today, time, diagnosis, medicines, advice, ha
                     <div style={{ position: 'absolute', top: '5em', left: '1.5em', right: '1.5em', bottom: 0, backgroundImage: 'radial-gradient(circle, #cbd5e1 0.8px, transparent 0.8px)', backgroundSize: '1.8em 1.8em', pointerEvents: 'none', zIndex: 0, opacity: 0.4 }} />
                 </div>
 
-                {/* RIGHT — Vitals sidebar */}
-                <div style={{ width: '28%', flexShrink: 0, backgroundColor: '#f8fafc', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                    <div style={{ backgroundColor: '#0f172a', color: '#fff', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', fontSize: '0.85em', textAlign: 'center', padding: '0.8em 0', flexShrink: 0 }}>Clinical Vitals</div>
+                {/* RIGHT — Vitals sidebar (Compact/Opulent) */}
+                <div style={{ width: '24%', flexShrink: 0, backgroundColor: '#fff', display: 'flex', flexDirection: 'column', overflow: 'hidden', borderLeft: '1px solid #e2e8f0' }}>
+                    <div style={{ color: '#0f172a', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', fontSize: '0.85em', textAlign: 'center', padding: '1em 0', borderBottom: '2px solid #0f172a', flexShrink: 0 }}>Clinical Vitals</div>
                     {vitals.map(({ label, value, unit }, i) => (
-                        <div key={label} style={{ display: 'flex', alignItems: 'stretch', height: '3.5em', flexShrink: 0, borderBottom: `1px solid #e2e8f0`, backgroundColor: i % 2 === 0 ? '#ffffff' : '#f1f5f9' }}>
-                            <div style={{ width: '45%', padding: '0 0.8em', fontWeight: 700, color: '#475569', fontSize: '0.85em', borderRight: '1px solid #e2e8f0', display: 'flex', alignItems: 'center' }}>{label}</div>
-                            <div style={{ flex: 1, padding: '0 0.7em', fontSize: '1.1em', fontWeight: 800, color: value != null && value !== '' ? '#0f172a' : '#cbd5e1', display: 'flex', alignItems: 'center' }}>
+                        <div key={label} style={{ display: 'flex', alignItems: 'stretch', height: '3.2em', flexShrink: 0, borderBottom: `1px solid #f1f5f9` }}>
+                            <div style={{ width: '50%', padding: '0 1em', fontWeight: 700, color: '#64748b', fontSize: '0.8em', borderRight: '1px solid #f1f5f9', display: 'flex', alignItems: 'center' }}>{label}</div>
+                            <div style={{ flex: 1, padding: '0 0.8em', fontSize: '1.05em', fontWeight: 800, color: value != null && value !== '' ? '#0f172a' : '#cbd5e1', display: 'flex', alignItems: 'center' }}>
                                 {value != null && value !== '' ? `${value}${unit}` : '–'}
                             </div>
                         </div>
@@ -246,8 +269,10 @@ function PageOne({ patient, visit, today, time, diagnosis, medicines, advice, ha
             </div>
 
             {/* ── FOOTER ──────────────────────────────────────── */}
-            <div style={{ background: '#0f172a', padding: '1.2em 2em', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <span style={{ color: '#94a3b8', fontSize: '1em', fontWeight: 600, letterSpacing: '0.02em', textAlign: 'center' }}>
+            <div style={{ background: '#fff', borderTop: '2px solid #0f172a', padding: '1em 2em', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, gap: '1em' }}>
+                <span style={{ color: '#1e293b', fontSize: '1em', fontWeight: 800 }}>📞 +91 9488017536</span>
+                <span style={{ color: '#e2e8f0' }}>|</span>
+                <span style={{ color: '#475569', fontSize: '1em', fontWeight: 700, letterSpacing: '0.02em', textAlign: 'center' }}>
                     அடுத்த முறை வரும்போது இந்த மருந்துச்சீட்டை கொண்டு வரவும்
                 </span>
             </div>

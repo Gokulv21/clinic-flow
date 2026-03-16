@@ -1,7 +1,9 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { Maximize2, Minimize2, Trash2, Save, Undo, X, Eraser, PenTool, Circle, Plus, ChevronLeft, ChevronRight, Tablet } from 'lucide-react';
+import { Maximize2, Minimize2, Trash2, Save, Undo, Redo, X, Eraser, PenTool, Circle, Plus, ChevronLeft, ChevronRight, Tablet, Settings2 } from 'lucide-react';
 import PrescriptionTemplate from './PrescriptionTemplate';
+import { getStroke } from 'perfect-freehand';
+import { useGesture } from '@use-gesture/react';
 
 interface DigitalPrescriptionProps {
     patient: any;
@@ -42,9 +44,13 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
 
     const [pages, setPages] = useState<DrawnPath[][]>(getInitialPages());
     const [currentPageIndex, setCurrentPageIndex] = useState(0);
+    const [history, setHistory] = useState<DrawnPath[][][]>([getInitialPages()]);
+    const [historyStep, setHistoryStep] = useState(0);
 
     const isDrawingRef = useRef(false);
-    const currentPathRef = useRef<PathPoint[]>([]);
+    const currentPathRef = useRef<any[]>([]); // Points with pressure
+    const isDirtyRef = useRef(false);
+    const requestRef = useRef<number>();
 
     // Pinch-to-zoom state
     const lastTouchDistanceRef = useRef<number | null>(null);
@@ -70,40 +76,75 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
         if (!ctx) return;
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-
+        
+        // Draw completed paths
         pathsToRender.forEach(path => {
             const { points, color, size, isEraser } = path;
-            const pts = points;
-
-            ctx.strokeStyle = isEraser ? '#ffffff' : color;
-            ctx.lineWidth = Math.max(1.5, canvas.width * 0.001 * size);
-
+            
+            ctx.fillStyle = isEraser ? '#ffffff' : color;
             if (isEraser) {
                 ctx.globalCompositeOperation = 'destination-out';
-                ctx.lineWidth = ctx.lineWidth * 3;
             } else {
                 ctx.globalCompositeOperation = 'source-over';
             }
 
-            if (pts.length < 2) {
-                if (pts.length === 1) {
-                    ctx.beginPath();
-                    ctx.arc(pts[0].x * canvas.width, pts[0].y * canvas.height, ctx.lineWidth / 2, 0, Math.PI * 2);
-                    ctx.fillStyle = ctx.strokeStyle;
-                    ctx.fill();
-                }
-                return;
-            }
+            const stroke = getStroke(points.map(p => [p.x * canvas.width, p.y * canvas.height, (p as any).pressure || 0.5]), {
+                size: isEraser ? size * 5 : size * 2,
+                thinning: 0.5,
+                smoothing: 0.5,
+                streamline: 0.5,
+            });
+
+            if (stroke.length === 0) return;
+
             ctx.beginPath();
-            ctx.moveTo(pts[0].x * canvas.width, pts[0].y * canvas.height);
-            for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x * canvas.width, pts[i].y * canvas.height);
-            ctx.stroke();
+            ctx.moveTo(stroke[0][0], stroke[0][1]);
+            for (let i = 1; i < stroke.length; i++) {
+                ctx.lineTo(stroke[i][0], stroke[i][1]);
+            }
+            ctx.fill();
         });
 
+        // Draw current path in progress
+        if (isDrawingRef.current && currentPathRef.current.length > 0) {
+            ctx.fillStyle = isEraser ? '#ffffff' : penColor;
+            ctx.globalCompositeOperation = isEraser ? 'destination-out' : 'source-over';
+
+            const stroke = getStroke(currentPathRef.current.map(p => [p.x * canvas.width, p.y * canvas.height, p.pressure]), {
+                size: isEraser ? penSize * 5 : penSize * 2,
+                thinning: 0.5,
+                smoothing: 0.5,
+                streamline: 0.5,
+            });
+
+            if (stroke.length > 0) {
+                ctx.beginPath();
+                ctx.moveTo(stroke[0][0], stroke[0][1]);
+                for (let i = 1; i < stroke.length; i++) {
+                    ctx.lineTo(stroke[i][0], stroke[i][1]);
+                }
+                ctx.fill();
+            }
+        }
+
         ctx.globalCompositeOperation = 'source-over';
-    }, []);
+        isDirtyRef.current = false;
+    }, [penColor, penSize, isEraser]);
+
+    // ── Animation Loop
+    const animate = useCallback((time: number) => {
+        if (isDirtyRef.current) {
+            redrawPage(pages[currentPageIndex] || []);
+        }
+        requestRef.current = requestAnimationFrame(animate);
+    }, [currentPageIndex, pages, redrawPage]);
+
+    useEffect(() => {
+        requestRef.current = requestAnimationFrame(animate);
+        return () => {
+            if (requestRef.current) cancelAnimationFrame(requestRef.current);
+        };
+    }, [animate]);
 
     useEffect(() => {
         const id = setTimeout(() => {
@@ -118,13 +159,41 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
     const lastPenTapRef = useRef<number>(0);
     const isPenActiveRef = useRef(false);
 
+    // ── Gesture State
+    const [canvasTransform, setCanvasTransform] = useState({ x: 0, y: 0, scale: 1 });
+    
+    // Bind gestures
+    useGesture(
+        {
+            onDrag: ({ offset: [x, y], event }) => {
+                if ((event as any).pointerType === 'touch') {
+                    setCanvasTransform(t => ({ ...t, x, y }));
+                }
+            },
+            onPinch: ({ offset: [d, a], event }) => {
+                if ((event as any).pointerType === 'touch') {
+                    // Normalize distance to scale (base scale 1)
+                    setCanvasTransform(t => ({ ...t, scale: Math.max(0.5, Math.min(4, d)) }));
+                }
+            },
+        },
+        {
+            target: containerRef,
+            drag: {
+                from: () => [canvasTransform.x, canvasTransform.y],
+                filterTaps: true,
+                enabled: !isDrawingRef.current,
+            },
+            pinch: {
+                from: () => [canvasTransform.scale, 0],
+                enabled: !isDrawingRef.current,
+            },
+        }
+    );
+
     // ── Writing Restriction Check (Only first page has bounds)
     const isInWritingArea = (pos: { x: number, y: number }) => {
-        if (currentPageIndex > 0) return true; // Contination pages are full white
-        const HEADER_BOUND = 0.22;
-        const FOOTER_BOUND = 0.91;
-        const SIDEBAR_BOUND = 0.73;
-        return pos.y >= HEADER_BOUND && pos.y <= FOOTER_BOUND && pos.x <= SIDEBAR_BOUND;
+        return true; // Doctors can now draw everywhere (strike out vitals, etc.)
     };
 
     const getCanvasPos = (clientX: number, clientY: number) => {
@@ -147,19 +216,21 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
             if (now - lastPenTapRef.current < 350) {
                 setIsEraser(!isEraser);
                 lastPenTapRef.current = 0; // Reset
-                return; // Don't start drawing on double tap
+                isDrawingRef.current = false;
+                onPointerUp();
+                return;
             }
             lastPenTapRef.current = now;
             isPenActiveRef.current = true;
         }
 
-        // PALM REJECTION: If a pen is already active on screen, ignore new touch downs
+        // PALM REJECTION: If a pen is active, ignore finger drawing but allow gestures
         if (isPenActiveRef.current && e.pointerType === 'touch') {
             return;
         }
 
-        // START DRAWING: Only if not zooming (1 pointer)
-        if (activePointersRef.current.size === 1) {
+        // START DRAWING: Only if not already drawing and it's a pen OR touch (if pen not active)
+        if (!isDrawingRef.current && (e.pointerType === 'pen' || !isPenActiveRef.current)) {
             // Respect precision mode
             if (precisionMode && e.pointerType !== 'pen') return;
             
@@ -167,22 +238,10 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
 
             (e.target as HTMLElement).setPointerCapture(e.pointerId);
             isDrawingRef.current = true;
-            currentPathRef.current = [pos];
-
-            const canvas = canvasRef.current;
-            const ctx = canvas?.getContext('2d');
-            if (ctx && canvas) {
-                ctx.beginPath();
-                const pressure = (e as any).pressure || 0.5;
-                const pSize = isEraser ? penSize * 4 : penSize;
-                const lineWidth = Math.max(1, canvas.width * 0.001 * pSize * (pressure * 1.5));
-                
-                ctx.globalCompositeOperation = isEraser ? 'destination-out' : 'source-over';
-                ctx.fillStyle = isEraser ? '#ffffff' : penColor;
-                ctx.arc(pos.x * canvas.width, pos.y * canvas.height, lineWidth / 2, 0, Math.PI * 2);
-                ctx.fill();
-            }
-        } else {
+            const pressure = (e as any).pressure || 0.5;
+            currentPathRef.current = [{ ...pos, pressure }];
+            isDirtyRef.current = true;
+        } else if (activePointersRef.current.size > 1) {
             // Multiple pointers -> Stop any active drawing to avoid stray marks during zoom
             onPointerUp();
         }
@@ -202,17 +261,8 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
             });
         }
 
-        // Pinch-to-Zoom logic (Multi-touch)
+        // Multi-touch gestures are handled by @use-gesture, but we still track for palm rejection
         if (touchCount >= 2) {
-            const pts = Array.from(activePointersRef.current.values());
-            // Use Screen Coords for stable distance calculation
-            const dist = Math.hypot(pts[0].screenX - pts[1].screenX, pts[0].screenY - pts[1].screenY);
-            if (lastTouchDistanceRef.current !== null) {
-                const delta = dist / lastTouchDistanceRef.current;
-                // Sensitivity adjustment
-                setScale(s => Math.min(Math.max(s * delta, 0.5), 4));
-            }
-            lastTouchDistanceRef.current = dist;
             return;
         }
 
@@ -226,27 +276,9 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
             return;
         }
 
-        const path = currentPathRef.current;
-        const canvas = canvasRef.current;
-        const ctx = canvas?.getContext('2d');
-        if (ctx && canvas && path.length > 0) {
-            const last = path[path.length - 1];
-            ctx.beginPath();
-            ctx.globalCompositeOperation = isEraser ? 'destination-out' : 'source-over';
-            ctx.strokeStyle = isEraser ? '#ffffff' : penColor;
-            
-            const pressure = (e as any).pressure || 0.5;
-            const pSize = isEraser ? penSize * 4 : penSize;
-            ctx.lineWidth = Math.max(1, canvas.width * 0.001 * pSize * (pressure * 1.5));
-            
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            ctx.moveTo(last.x * canvas.width, last.y * canvas.height);
-            ctx.lineTo(pos.x * canvas.width, pos.y * canvas.height);
-            ctx.stroke();
-            ctx.globalCompositeOperation = 'source-over';
-        }
-        currentPathRef.current = [...path, pos];
+        const pressure = (e as any).pressure || 0.5;
+        currentPathRef.current = [...currentPathRef.current, { ...pos, pressure }];
+        isDirtyRef.current = true;
     };
 
     const onPointerUp = (e?: React.PointerEvent) => {
@@ -272,25 +304,47 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
             const updatedPages = [...pages];
             updatedPages[currentPageIndex] = [...(updatedPages[currentPageIndex] || []), newPath];
             setPages(updatedPages);
+            
+            // Add to history
+            const newHistory = history.slice(0, historyStep + 1);
+            newHistory.push(updatedPages);
+            setHistory(newHistory);
+            setHistoryStep(newHistory.length - 1);
         }
         currentPathRef.current = [];
         isDrawingRef.current = false;
+        isDirtyRef.current = true;
     };
 
     const handleUndo = () => {
-        const updatedPages = [...pages];
-        updatedPages[currentPageIndex] = updatedPages[currentPageIndex].slice(0, -1);
-        setPages(updatedPages);
-        redrawPage(updatedPages[currentPageIndex]);
+        if (historyStep > 0) {
+            const nextStep = historyStep - 1;
+            setHistoryStep(nextStep);
+            setPages(history[nextStep]);
+            isDirtyRef.current = true;
+        }
+    };
+
+    const handleRedo = () => {
+        if (historyStep < history.length - 1) {
+            const nextStep = historyStep + 1;
+            setHistoryStep(nextStep);
+            setPages(history[nextStep]);
+            isDirtyRef.current = true;
+        }
     };
 
     const handleClear = () => {
         const updatedPages = [...pages];
         updatedPages[currentPageIndex] = [];
         setPages(updatedPages);
-        const canvas = canvasRef.current;
-        const ctx = canvas?.getContext('2d');
-        if (ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        const newHistory = history.slice(0, historyStep + 1);
+        newHistory.push(updatedPages);
+        setHistory(newHistory);
+        setHistoryStep(newHistory.length - 1);
+        
+        isDirtyRef.current = true;
     };
 
     // ── PAGE MANAGEMENT
@@ -347,8 +401,11 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                     <Button variant="ghost" size="icon" onClick={onClose} className="shrink-0"><X className="w-5 h-5" /></Button>
                     
                     <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg shrink-0">
-                        <Button variant="ghost" size="sm" onClick={handleUndo} disabled={pages[currentPageIndex]?.length === 0} className="h-8">
+                        <Button variant="ghost" size="sm" onClick={handleUndo} disabled={historyStep === 0} className="h-8">
                             <Undo className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={handleRedo} disabled={historyStep === history.length - 1} className="h-8">
+                            <Redo className="w-4 h-4" />
                         </Button>
                         <Button variant="ghost" size="sm" onClick={handleClear} disabled={pages[currentPageIndex]?.length === 0} className="h-8 text-red-600">
                             <Trash2 className="w-4 h-4" />
@@ -357,13 +414,22 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
 
                     <div className="flex items-center gap-1.5 bg-slate-100 p-0.5 rounded-lg shrink-0">
                         <Button
+                            variant={!isEraser ? "secondary" : "ghost"}
+                            size="sm"
+                            onClick={() => setIsEraser(false)}
+                            className={`h-8 w-8 p-0 ${!isEraser ? 'bg-white shadow-sm ring-1 ring-slate-200' : ''}`}
+                        >
+                            <PenTool className={`w-4 h-4 ${!isEraser ? 'text-blue-600' : 'text-slate-600'}`} />
+                        </Button>
+                        <Button
                             variant={isEraser ? "secondary" : "ghost"}
                             size="sm"
-                            onClick={() => setIsEraser(!isEraser)}
+                            onClick={() => setIsEraser(true)}
                             className={`h-8 w-8 p-0 ${isEraser ? 'bg-white shadow-sm ring-1 ring-slate-200' : ''}`}
                         >
                             <Eraser className={`w-4 h-4 ${isEraser ? 'text-blue-600' : 'text-slate-600'}`} />
                         </Button>
+                        
                         {!isEraser && (
                             <input
                                 type="color"
@@ -372,14 +438,16 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                                 className="w-7 h-7 p-0 border-0 rounded-md cursor-pointer ring-1 ring-slate-200"
                             />
                         )}
-                        <div className="hidden xs:flex items-center gap-1.5 ml-1 px-1">
-                            <input
+                        
+                        <div className="flex items-center gap-2 px-2 ml-1 border-l border-slate-200">
+                             <span className="text-[10px] font-bold text-slate-400 w-4">{isEraser ? penSize : penSize}</span>
+                             <input
                                 type="range"
                                 min="1"
-                                max="15"
+                                max="20"
                                 value={penSize}
                                 onChange={(e) => setPenSize(parseInt(e.target.value))}
-                                className="w-12 h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                                className="w-16 h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                             />
                         </div>
                     </div>
@@ -389,7 +457,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                         variant={precisionMode ? "default" : "outline"} 
                         size="sm" 
                         onClick={() => setPrecisionMode(!precisionMode)}
-                        className={cn("h-8 gap-2 ml-1", precisionMode ? "bg-blue-600" : "text-slate-500")}
+                        className={cn("h-8 gap-2 ml-1", precisionMode ? "bg-blue-600 text-white" : "text-slate-500")}
                     >
                         <Tablet className="w-4 h-4" />
                         <span className="hidden sm:inline">{precisionMode ? 'Pen Only' : 'Finger On'}</span>
@@ -398,9 +466,9 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
 
                 <div className="flex items-center gap-2 shrink-0">
                     <div className="flex items-center gap-1 bg-slate-100 px-2 py-1 rounded-md">
-                         <span className="text-[10px] font-bold text-slate-500">{Math.round(scale * 100)}%</span>
-                         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setScale(1)}>
-                            <Undo className="w-2.5 h-2.5" />
+                         <span className="text-[10px] font-bold text-slate-500">{Math.round(canvasTransform.scale * 100)}%</span>
+                         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCanvasTransform({ x: 0, y: 0, scale: 1 })}>
+                            <Settings2 className="w-2.5 h-2.5" />
                          </Button>
                     </div>
                     <Button size="sm" onClick={handleSave} className="h-9 px-4 bg-sky-600 hover:bg-sky-700 text-white shadow-lg">
@@ -437,9 +505,9 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                         position: 'relative',
                         flexShrink: 0,
                         boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
-                        transform: `scale(${scale})`,
+                        transform: `translate3d(${canvasTransform.x}px, ${canvasTransform.y}px, 0) scale(${canvasTransform.scale})`,
                         transformOrigin: 'top center',
-                        transition: lastTouchDistanceRef.current ? 'none' : 'transform 0.15s cubic-bezier(0,0,0.2,1)',
+                        touchAction: 'none',
                     }}
                 >
                     <div style={{ position: 'absolute', inset: 0 }}>

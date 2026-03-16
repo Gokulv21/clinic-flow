@@ -331,7 +331,7 @@ export default function NurseEntry() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Blood Pressure (SBP / DBP)</Label>
+                <Label>Blood Pressure (mmHg)</Label>
                 <div className="flex items-center gap-2">
                   <Input
                     placeholder="Sys"
