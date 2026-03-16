@@ -31,8 +31,14 @@ const navItems: NavItem[] = [
 export default function AppLayout({ children }: { children: ReactNode }) {
   const { profile, roles, signOut } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+
+  const handleMobileNav = (path: string) => {
+    navigate(path);
+    setIsMobileMenuOpen(false);
+  };
 
   const visibleItems = navItems.filter(item => item.roles.some(r => roles.includes(r)));
 
@@ -138,7 +144,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         ))}
         
         {/* More Menu for Mobile */}
-        <Sheet>
+        <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
           <SheetTrigger asChild>
             <button className="flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-muted-foreground group">
               <div className="p-1 rounded-md group-hover:bg-secondary transition-colors">
@@ -156,9 +162,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
               {visibleItems.map(item => (
                 <button
                   key={item.path}
-                  onClick={() => {
-                    navigate(item.path);
-                  }}
+                  onClick={() => handleMobileNav(item.path)}
                   className={cn(
                     "flex flex-col items-center justify-center gap-2 p-3 rounded-2xl text-xs transition-all active:scale-95",
                     location.pathname === item.path ? "bg-primary/10 text-primary font-bold" : "text-muted-foreground hover:bg-secondary"

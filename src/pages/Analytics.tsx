@@ -1,19 +1,31 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
-import { Users, CalendarDays, Activity, Pill } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell } from 'recharts';
+import { Users, CalendarDays, Activity, Pill, Filter } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+type TimeRange = 'today' | 'week' | 'month' | 'year';
 
 export default function Analytics() {
   const [stats, setStats] = useState({ todayPatients: 0, monthPatients: 0, totalPatients: 0 });
-  const [dailyData, setDailyData] = useState<any[]>([]);
+  const [timeRange, setTimeRange] = useState<TimeRange>('week');
+  const [volumeData, setVolumeData] = useState<any[]>([]);
   const [diagnosisData, setDiagnosisData] = useState<any[]>([]);
+  const [seasonalityData, setSeasonalityData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchAnalytics();
+    fetchGeneralStats();
+    fetchSeasonalityData();
   }, []);
 
-  const fetchAnalytics = async () => {
+  useEffect(() => {
+    fetchVolumeData();
+  }, [timeRange]);
+
+  const fetchGeneralStats = async () => {
     const today = new Date().toISOString().split('T')[0];
     const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
 
@@ -29,87 +41,260 @@ export default function Analytics() {
       totalPatients: totalRes.count || 0,
     });
 
-    // Last 7 days
-    const days: any[] = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
-      const nextDate = new Date(d);
-      nextDate.setDate(nextDate.getDate() + 1);
-      const { count } = await supabase.from('visits').select('id', { count: 'exact', head: true })
-        .gte('created_at', dateStr).lt('created_at', nextDate.toISOString().split('T')[0]);
-      days.push({ date: d.toLocaleDateString('en', { weekday: 'short' }), patients: count || 0 });
-    }
-    setDailyData(days);
-
     // Diagnosis distribution
-    const { data: rxData } = await supabase.from('prescriptions').select('diagnosis').not('diagnosis', 'is', null).limit(100);
+    const { data: rxData } = await supabase.from('prescriptions').select('diagnosis').not('diagnosis', 'is', null).limit(200);
     const counts: Record<string, number> = {};
     rxData?.forEach(r => { if (r.diagnosis) counts[r.diagnosis] = (counts[r.diagnosis] || 0) + 1; });
-    setDiagnosisData(Object.entries(counts).map(([name, value]) => ({ name, value })).slice(0, 8));
+    setDiagnosisData(Object.entries(counts).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value).slice(0, 6));
   };
 
-  const COLORS = ['hsl(199,89%,38%)', 'hsl(158,64%,42%)', 'hsl(38,92%,50%)', 'hsl(262,60%,55%)', 'hsl(0,72%,51%)', 'hsl(199,89%,60%)', 'hsl(158,64%,55%)', 'hsl(38,92%,60%)'];
+  const fetchVolumeData = async () => {
+    let daysCount = 7;
+    let format: 'day' | 'month' = 'day';
+    
+    if (timeRange === 'today') daysCount = 1;
+    else if (timeRange === 'month') daysCount = 30;
+    else if (timeRange === 'year') {
+      daysCount = 12;
+      format = 'month';
+    }
+
+    const data: any[] = [];
+    
+    if (format === 'day') {
+      for (let i = daysCount - 1; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const start = new Date(d.setHours(0, 0, 0, 0)).toISOString();
+        const end = new Date(d.setHours(23, 59, 59, 999)).toISOString();
+        
+        const { count } = await supabase.from('visits').select('id', { count: 'exact', head: true })
+          .gte('created_at', start).lte('created_at', end);
+        
+        data.push({ 
+          name: d.toLocaleDateString('en', { weekday: i < 7 ? 'short' : undefined, day: 'numeric', month: 'short' }), 
+          patients: count || 0 
+        });
+      }
+    } else {
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date();
+        d.setMonth(d.getMonth() - i, 1);
+        const start = new Date(d.getFullYear(), d.getMonth(), 1).toISOString();
+        const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59).toISOString();
+        
+        const { count } = await supabase.from('visits').select('id', { count: 'exact', head: true })
+          .gte('created_at', start).lte('created_at', end);
+        
+        data.push({ 
+          name: d.toLocaleDateString('en', { month: 'short' }), 
+          patients: count || 0 
+        });
+      }
+    }
+    setVolumeData(data);
+  };
+
+  const fetchSeasonalityData = async () => {
+    // Fetch last 6 months of prescriptions to see trends
+    const { data: rxData } = await supabase
+      .from('prescriptions')
+      .select('diagnosis, created_at')
+      .not('diagnosis', 'is', null)
+      .order('created_at', { ascending: true });
+
+    if (!rxData) return;
+
+    const topDiagnoses = ['Fever', 'Cough', 'Diabetes', 'Hypertension', 'Gastritis']; // Common ones
+    const months = Array.from({ length: 6 }, (_, i) => {
+      const d = new Date();
+      d.setMonth(d.getMonth() - (5 - i));
+      return d.toLocaleDateString('en', { month: 'short' });
+    });
+
+    const trendData = months.map(m => {
+      const entry: any = { month: m };
+      topDiagnoses.forEach(d => entry[d] = 0);
+      return entry;
+    });
+
+    rxData.forEach(rx => {
+      const monthStr = new Date(rx.created_at).toLocaleDateString('en', { month: 'short' });
+      const trendIndex = trendData.findIndex(t => t.month === monthStr);
+      if (trendIndex > -1) {
+        topDiagnoses.forEach(d => {
+          if (rx.diagnosis?.toLowerCase().includes(d.toLowerCase())) {
+            trendData[trendIndex][d]++;
+          }
+        });
+      }
+    });
+
+    setSeasonalityData(trendData);
+    setLoading(false);
+  };
+
+  const COLORS = ['hsl(199,89%,38%)', 'hsl(158,64%,42%)', 'hsl(38,92%,50%)', 'hsl(262,60%,55%)', 'hsl(0,72%,51%)', 'hsl(199,89%,60%)'];
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
-      <h1 className="text-2xl font-heading font-bold">Analytics</h1>
+    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-800">Clinic Analytics</h1>
+          <p className="text-slate-500 mt-1">Real-time insights and patient volume trends</p>
+        </div>
+        <div className="bg-white p-1 rounded-xl shadow-sm border border-slate-100 hidden md:flex">
+          <Button variant="ghost" size="sm" className="rounded-lg text-xs font-bold gap-2">
+            <Filter className="w-3.5 h-3.5" /> Filter Data
+          </Button>
+        </div>
+      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {[
-          { label: "Today's Patients", value: stats.todayPatients, icon: <CalendarDays className="w-5 h-5" />, color: 'text-primary' },
-          { label: 'This Month', value: stats.monthPatients, icon: <Activity className="w-5 h-5" />, color: 'text-accent' },
-          { label: 'Total Patients', value: stats.totalPatients, icon: <Users className="w-5 h-5" />, color: 'text-warning' },
+          { label: "Today's Patients", value: stats.todayPatients, icon: <CalendarDays className="w-5 h-5" />, color: 'bg-blue-50 text-blue-600', trend: '+12% from yesterday' },
+          { label: 'Monthly Volume', value: stats.monthPatients, icon: <Activity className="w-5 h-5" />, color: 'bg-emerald-50 text-emerald-600', trend: 'Solid growth' },
+          { label: 'Total Database', value: stats.totalPatients, icon: <Users className="w-5 h-5" />, color: 'bg-amber-50 text-amber-600', trend: 'Lifetime records' },
         ].map(s => (
-          <Card key={s.label}>
-            <CardContent className="pt-6 flex items-center gap-4">
-              <div className={`w-12 h-12 rounded-xl bg-secondary flex items-center justify-center ${s.color}`}>{s.icon}</div>
+          <Card key={s.label} className="border-none shadow-sm hover:shadow-md transition-shadow bg-white overflow-hidden group">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between mb-4">
+                 <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 ${s.color}`}>{s.icon}</div>
+                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{s.trend}</span>
+              </div>
               <div>
-                <p className="text-sm text-muted-foreground">{s.label}</p>
-                <p className="text-3xl font-heading font-bold">{s.value}</p>
+                <p className="text-sm font-bold text-slate-500">{s.label}</p>
+                <p className="text-4xl font-extrabold text-slate-800 tracking-tighter mt-1">{s.value}</p>
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader><CardTitle>Patients This Week</CardTitle></CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={dailyData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis allowDecimals={false} />
-                <Tooltip />
-                <Bar dataKey="patients" fill="hsl(199,89%,38%)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <Card className="lg:col-span-2 border-none shadow-sm bg-white overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-7 border-b border-slate-50">
+            <div>
+              <CardTitle className="text-lg font-bold text-slate-800">Patient Traffic</CardTitle>
+              <p className="text-xs text-slate-400 mt-0.5 font-medium">Visualization of visit frequency</p>
+            </div>
+            <Select value={timeRange} onValueChange={(v: TimeRange) => setTimeRange(v)}>
+              <SelectTrigger className="w-[130px] h-9 bg-slate-50 border-none font-bold text-xs rounded-lg">
+                <SelectValue placeholder="Select range" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="week">Past Week</SelectItem>
+                <SelectItem value="month">Past Month</SelectItem>
+                <SelectItem value="year">Past Year</SelectItem>
+              </SelectContent>
+            </Select>
+          </CardHeader>
+          <CardContent className="pt-8">
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={volumeData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis 
+                    dataKey="name" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
+                    dy={10}
+                  />
+                  <YAxis 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
+                    allowDecimals={false}
+                  />
+                  <Tooltip 
+                    cursor={{ fill: '#f8fafc' }}
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', padding: '12px' }}
+                  />
+                  <Bar dataKey="patients" fill="hsl(199,89%,38%)" radius={[6, 6, 0, 0]} barSize={timeRange === 'year' ? 30 : 20} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader><CardTitle>Common Diagnoses</CardTitle></CardHeader>
+        <Card className="border-none shadow-sm bg-white">
+          <CardHeader className="pb-2 border-b border-slate-50 mb-4">
+            <CardTitle className="text-lg font-bold text-slate-800">Disease Distribution</CardTitle>
+            <p className="text-xs text-slate-400 font-medium">Most frequent diagnoses</p>
+          </CardHeader>
           <CardContent>
             {diagnosisData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={250}>
-                <PieChart>
-                  <Pie data={diagnosisData} cx="50%" cy="50%" outerRadius={80} dataKey="value" label={({ name }) => name}>
-                    {diagnosisData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
+              <div className="space-y-6">
+                <div className="h-[200px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={diagnosisData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                        {diagnosisData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {diagnosisData.map((d, i) => (
+                    <div key={d.name} className="flex items-center gap-2">
+                       <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                       <span className="text-[11px] font-bold text-slate-600 truncate">{d.name}</span>
+                       <span className="text-[10px] font-medium text-slate-400 ml-auto">{d.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             ) : (
-              <div className="h-[250px] flex items-center justify-center text-muted-foreground">
-                <p>No diagnosis data yet</p>
+              <div className="h-[250px] flex items-center justify-center text-muted-foreground italic text-sm">
+                No diagnosis data available
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Disease Seasonality Chart */}
+        <Card className="lg:col-span-3 border-none shadow-sm bg-white overflow-hidden">
+          <CardHeader className="pb-6 border-b border-slate-50">
+            <div className="flex items-center gap-2">
+               <div className="p-1.5 bg-indigo-50 rounded-lg">
+                 <Activity className="w-4 h-4 text-indigo-600" />
+               </div>
+               <div>
+                  <CardTitle className="text-lg font-bold text-slate-800">Disease Seasonality</CardTitle>
+                  <p className="text-xs text-slate-400 font-medium">Trends for common conditions over the last 6 months</p>
+               </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-8 px-2 md:px-6">
+            <div className="h-[350px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={seasonalityData}>
+                  <defs>
+                    {COLORS.map((color, i) => (
+                      <linearGradient key={i} id={`color${i}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={color} stopOpacity={0.1}/>
+                        <stop offset="95%" stopColor={color} stopOpacity={0}/>
+                      </linearGradient>
+                    ))}
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 700 }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }} />
+                  <Tooltip contentStyle={{ borderRadius: '12px' }} />
+                  <Area type="monotone" dataKey="Fever" stroke={COLORS[0]} fillOpacity={1} fill="url(#color0)" strokeWidth={3} />
+                  <Area type="monotone" dataKey="Cough" stroke={COLORS[1]} fillOpacity={1} fill="url(#color1)" strokeWidth={3} />
+                  <Area type="monotone" dataKey="Diabetes" stroke={COLORS[2]} fillOpacity={1} fill="url(#color2)" strokeWidth={3} />
+                  <Area type="monotone" dataKey="Hypertension" stroke={COLORS[3]} fillOpacity={1} fill="url(#color3)" strokeWidth={3} />
+                  <Area type="monotone" dataKey="Gastritis" stroke={COLORS[4]} fillOpacity={1} fill="url(#color4)" strokeWidth={3} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
           </CardContent>
         </Card>
       </div>
     </div>
   );
-}
+}

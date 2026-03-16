@@ -37,6 +37,7 @@ export default function DoctorConsultation() {
   const [prescriptionImage, setPrescriptionImage] = useState<string | null>(null);
   const [prescriptionPaths, setPrescriptionPaths] = useState<any[]>([]);
   const [showPreview, setShowPreview] = useState(false);
+  const [viewingHistoryRx, setViewingHistoryRx] = useState<any>(null);
 
   const fetchQueue = async () => {
     const today = new Date().toISOString().split('T')[0];
@@ -309,12 +310,22 @@ export default function DoctorConsultation() {
                 <CardContent>
                   <div className="space-y-3 max-h-40 overflow-auto">
                     {history.map(h => (
-                      <div key={h.id} className="text-sm p-2 rounded bg-muted">
-                        <div className="flex justify-between">
-                          <span className="font-medium">{new Date(h.created_at).toLocaleDateString()}</span>
-                          <span className="text-muted-foreground">Token #{h.token_number}</span>
+                      <div key={h.id} className="text-sm p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between group">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                             <span className="font-bold text-slate-700">{new Date(h.created_at).toLocaleDateString()}</span>
+                             <span className="text-[10px] font-bold text-slate-400">TOKEN #{h.token_number}</span>
+                          </div>
+                          {h.diagnosis && <p className="text-xs text-slate-500 mt-0.5 truncate italic">Dx: {h.diagnosis}</p>}
                         </div>
-                        {h.diagnosis && <p className="text-muted-foreground mt-1">Dx: {h.diagnosis}</p>}
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="h-8 w-8 p-0 text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors shrink-0"
+                          onClick={() => setViewingHistoryRx(h)}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
                       </div>
                     ))}
                   </div>
@@ -462,6 +473,29 @@ export default function DoctorConsultation() {
               medicines={medicines.filter(m => m.name.trim())}
               advice={advice}
             />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* History Preview Dialog */}
+      <Dialog open={!!viewingHistoryRx} onOpenChange={open => !open && setViewingHistoryRx(null)}>
+        <DialogContent className="max-w-[800px] p-0 overflow-hidden bg-slate-100">
+          <div className="bg-white p-4 border-b flex items-center justify-between sticky top-0 z-10">
+            <h3 className="font-bold">Prescription History</h3>
+            <Button size="sm" onClick={() => printPrescription()} className="gap-2">
+              <Printer className="w-4 h-4" /> Print
+            </Button>
+          </div>
+          <div className="p-4 md:p-8 overflow-auto max-h-[75vh] flex justify-center">
+            {viewingHistoryRx && (
+              <PrescriptionTemplate
+                patient={patient}
+                visit={viewingHistoryRx}
+                handwrittenImage={viewingHistoryRx.prescriptions?.[0]?.advice_image}
+                diagnosis={viewingHistoryRx.prescriptions?.[0]?.diagnosis || viewingHistoryRx.diagnosis}
+                medicines={viewingHistoryRx.prescriptions?.[0]?.medicines || []}
+              />
+            )}
           </div>
         </DialogContent>
       </Dialog>
