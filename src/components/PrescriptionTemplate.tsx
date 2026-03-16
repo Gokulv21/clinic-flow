@@ -165,21 +165,22 @@ function PageOne({ patient, visit, today, time, diagnosis, medicines, advice, ha
                 position: 'relative', overflow: 'hidden', flexShrink: 0,
                 borderBottom: '1px solid #e2e8f0',
             }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.8em' }}>
-                    {/* Exact Logo with Theme-Matching Filter */}
-                    <img
-                        src={prescriptionLogo}
-                        alt="Clinic Logo"
-                        style={{
-                            height: '5.8em',
-                            width: 'auto',
-                            objectFit: 'contain',
-                            flexShrink: 0,
-                            display: 'block',
-                            // This filter approximates #0f172a (Slate 900) for a black logo
-                            filter: 'brightness(0) saturate(100%) invert(8%) sepia(21%) saturate(2853%) hue-rotate(191deg) brightness(91%) contrast(94%)'
-                        }}
-                    />
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6em' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+                        <img
+                            src={prescriptionLogo}
+                            alt="Clinic Logo"
+                            style={{
+                                height: '5.2em', // Precisely tuned to match text block height
+                                width: 'auto',
+                                objectFit: 'contain',
+                                flexShrink: 0,
+                                display: 'block',
+                                // This filter approximates #0f172a (Slate 900) for a black logo
+                                filter: 'brightness(0) saturate(100%) invert(8%) sepia(21%) saturate(2853%) hue-rotate(191deg) brightness(91%) contrast(94%)'
+                            }}
+                        />
+                    </div>
 
                     <div>
                         <div style={{ fontWeight: 800, color: '#c21b1eff', fontSize: '2em', lineHeight: 1, letterSpacing: '0.01em' }}>

@@ -117,18 +117,24 @@ html, body { background: #fff; }
 
     // ── Print after allowing fonts + images to render ─────────
     const doprint = () => {
-        iframe.contentWindow?.focus();
-        iframe.contentWindow?.print();
-        const cleanup = () => {
-            try { document.body.removeChild(iframe); } catch (_) { /* already removed */ }
-        };
-        iframe.contentWindow?.addEventListener('afterprint', cleanup, { once: true });
-        setTimeout(cleanup, 20_000); // fallback
+        if (!iframe.contentWindow) return;
+        
+        // Mobile-specific focus-and-wait pattern
+        iframe.contentWindow.focus();
+        
+        setTimeout(() => {
+            iframe.contentWindow?.print();
+            const cleanup = () => {
+                try { document.body.removeChild(iframe); } catch (_) { /* already removed */ }
+            };
+            iframe.contentWindow?.addEventListener('afterprint', cleanup, { once: true });
+            setTimeout(cleanup, 30_000); // Increased fallback
+        }, 200); // 200ms delay helps mobile browsers register the focus change
     };
 
     if (doc.readyState === 'complete') {
-        setTimeout(doprint, 1000);
+        setTimeout(doprint, 1200); // Slightly longer wait for image hydration
     } else {
-        doc.addEventListener('DOMContentLoaded', () => setTimeout(doprint, 1000));
+        doc.addEventListener('DOMContentLoaded', () => setTimeout(doprint, 1200));
     }
 }

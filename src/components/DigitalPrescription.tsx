@@ -111,6 +111,24 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
         isDirtyRef.current = true;
     }, []);
 
+    // NEW: Incremental Append (Zero-Latency)
+    const appendToStatic = useCallback((path: DrawnPath) => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        
+        if (!staticCanvasRef.current) {
+            staticCanvasRef.current = document.createElement('canvas');
+            staticCanvasRef.current.width = canvas.width;
+            staticCanvasRef.current.height = canvas.height;
+        }
+        
+        const sctx = staticCanvasRef.current.getContext('2d');
+        if (!sctx) return;
+
+        renderPath(sctx, path, staticCanvasRef.current.width, staticCanvasRef.current.height);
+        isDirtyRef.current = true;
+    }, []);
+
     const redrawPage = useCallback(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -212,6 +230,9 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
     };
 
     const onPointerDown = (e: React.PointerEvent) => {
+        // Prevent scrolling/zoom during pen/touch start
+        e.preventDefault();
+        
         const pos = getCanvasPos(e.clientX, e.clientY);
         activePointersRef.current.set(e.pointerId, { ...pos, screenX: e.clientX, screenY: e.clientY, type: e.pointerType });
 
@@ -255,6 +276,9 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
         }
     };
     const onPointerMove = (e: React.PointerEvent) => {
+        // Prevent default browser behavior (scroll/zoom)
+        e.preventDefault();
+
         const touchCount = activePointersRef.current.size;
 
         // Multi-touch gestures are handled by @use-gesture, but we still track for palm rejection
@@ -306,8 +330,8 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
             const updatedPages = [...pages];
             updatedPages[currentPageIndex] = [...(updatedPages[currentPageIndex] || []), newPath];
             
-            // Immediate update for snappiness
-            redrawStatic(updatedPages[currentPageIndex]);
+            // CRITICAL: Use appendToStatic instead of redrawStatic for zero lag!
+            appendToStatic(newPath);
             
             setPages(updatedPages);
             

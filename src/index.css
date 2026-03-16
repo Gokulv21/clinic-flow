@@ -104,3 +104,36 @@
     background: linear-gradient(180deg, hsl(199 89% 15%), hsl(199 89% 10%));
   }
 }
+
+/* ── Global Print Shield ────────────────────────────────────────── */
+@media print {
+  /* Forcibly hide all main UI components */
+  #root, 
+  [role="dialog"] > div,
+  .sidebar, 
+  .no-print,
+  button,
+  nav {
+    display: none !important;
+  }
+
+  /* Only allow the print container to remain visible */
+  .print-container, 
+  .print-container * {
+    display: block !important;
+    visibility: visible !important;
+  }
+
+  /* Reset body for a clean print */
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
+  /* Ensure colors are rendered */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
