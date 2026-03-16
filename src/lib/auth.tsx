@@ -10,9 +10,11 @@ interface AuthContextType {
   roles: AppRole[];
   profile: { full_name: string } | null;
   loading: boolean;
+  error: string | null;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   hasRole: (role: AppRole) => boolean;
+  refresh: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -23,55 +25,95 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [profile, setProfile] = useState<{ full_name: string } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastFetchedId, setLastFetchedId] = useState<string | null>(null);
 
   const fetchUserData = async (userId: string) => {
-    const [rolesRes, profileRes] = await Promise.all([
-      supabase.from('user_roles').select('role').eq('user_id', userId),
-      supabase.from('profiles').select('full_name').eq('user_id', userId).maybeSingle(),
-    ]);
-    if (rolesRes.data) setRoles(rolesRes.data.map(r => r.role as AppRole));
-    setProfile(profileRes.data || null);
+    if (userId === lastFetchedId && roles.length > 0) return;
+    
+    console.log('Fetching user data for:', userId);
+    setLoading(true);
+    setError(null);
+    try {
+      const [rolesRes, profileRes] = await Promise.all([
+        supabase.from('user_roles').select('role').eq('user_id', userId),
+        supabase.from('profiles').select('full_name').eq('user_id', userId).maybeSingle(),
+      ]);
+
+      if (rolesRes.error) throw new Error(rolesRes.error.message);
+      if (profileRes.error) throw new Error(profileRes.error.message);
+
+      setRoles((rolesRes.data || []).map(r => r.role as AppRole));
+      setProfile(profileRes.data || null);
+      setLastFetchedId(userId);
+    } catch (err: any) {
+      console.error('Error fetching user data:', err);
+      setError(err.message || 'Failed to connect to security service');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const refresh = async () => {
+    if (user) {
+      setLastFetchedId(null);
+      await fetchUserData(user.id);
+    }
   };
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state change:', event);
       setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        setTimeout(() => fetchUserData(session.user.id), 0);
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      
+      if (currentUser) {
+        fetchUserData(currentUser.id);
       } else {
         setRoles([]);
         setProfile(null);
+        setError(null);
+        setLastFetchedId(null);
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) fetchUserData(session.user.id);
-      setLoading(false);
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      if (currentUser) {
+        fetchUserData(currentUser.id);
+      } else {
+        setLoading(false);
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
   const signIn = async (email: string, password: string) => {
+    setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error: error as Error | null };
   };
 
 
   const signOut = async () => {
+    setLoading(true);
     await supabase.auth.signOut();
     setRoles([]);
     setProfile(null);
+    setError(null);
+    setLastFetchedId(null);
+    setLoading(false);
   };
 
   const hasRole = (role: AppRole) => roles.includes(role);
 
   return (
-    <AuthContext.Provider value={{ user, session, roles, profile, loading, signIn, signOut, hasRole }}>
+    <AuthContext.Provider value={{ user, session, roles, profile, loading, error, signIn, signOut, hasRole, refresh }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import { useNavigate } from "react-router-dom";
+import PageBanner from "@/components/PageBanner";
+import patientEntryBanner from "@/assets/patient_entry_banner.png";
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -159,17 +162,19 @@ export default function NurseEntry() {
   }
 
   return (
-    <div className="p-6 max-w-2xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-heading font-bold">Patient Registration</h1>
-        <p className="text-muted-foreground">Register a patient and add them to the consultation queue</p>
-      </div>
+    <div className="max-w-[1600px] mx-auto animate-in fade-in duration-500 pb-12">
+      <PageBanner
+        title="Patient Registration"
+        description="Register new patients and prepare them for their consultation with vitals and history."
+        imageSrc={patientEntryBanner}
+      />
 
-      <Tabs value={tab} onValueChange={v => { setTab(v); reset(); }}>
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="new" className="gap-2"><UserPlus className="w-4 h-4" />New Patient</TabsTrigger>
-          <TabsTrigger value="old" className="gap-2"><Search className="w-4 h-4" />Existing Patient</TabsTrigger>
-        </TabsList>
+      <div className="px-4 md:px-8">
+        <Tabs value={tab} onValueChange={v => { setTab(v); reset(); }}>
+          <TabsList className="grid w-[400px] grid-cols-2 mb-8">
+            <TabsTrigger value="new" className="gap-2"><UserPlus className="w-4 h-4" />New Patient</TabsTrigger>
+            <TabsTrigger value="old" className="gap-2"><Search className="w-4 h-4" />Existing Patient</TabsTrigger>
+          </TabsList>
 
         <TabsContent value="new">
           {step === 'patient' && (
@@ -437,6 +442,7 @@ export default function NurseEntry() {
           </CardContent>
         </Card>
       )}
+      </div>
     </div>
   );
 }

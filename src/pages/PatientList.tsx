@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from "@/integrations/supabase/client";
+import PageBanner from "@/components/PageBanner";
+import patientListBanner from "@/assets/patient_list_banner.png";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -66,18 +68,20 @@ export default function PatientList() {
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-heading font-bold">Patient Database</h1>
-        <p className="text-muted-foreground">Search and manage patient records</p>
-      </div>
+    <div className="max-w-[1600px] mx-auto animate-in fade-in duration-500 pb-12">
+      <PageBanner
+        title="Patient Directory"
+        description="Manage patient records, access visit history, and review past digital prescriptions."
+        imageSrc={patientListBanner}
+      />
 
-      <div className="relative">
-        <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-        <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name, phone or ID..." className="pl-10" />
-      </div>
+      <div className="px-4 md:px-8 space-y-6">
+        <div className="relative">
+          <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+          <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name, phone or ID..." className="pl-10" />
+        </div>
 
-      <div className="grid gap-3">
+        <div className="grid gap-3">
         {patients.map(p => (
           <Card key={p.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => viewPatient(p)}>
             <CardContent className="py-4 flex items-center justify-between">
@@ -231,6 +235,7 @@ export default function PatientList() {
           </div>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }

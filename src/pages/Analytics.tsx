@@ -5,6 +5,10 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Users, CalendarDays, Activity, Pill, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import PageBanner from '@/components/PageBanner';
+import analyticsBanner from '@/assets/analytics.jpg';
+import Lottie from "lottie-react";
+import analyticsAnimation from "@/assets/animations/analytics.json";
 
 type TimeRange = 'today' | 'week' | 'month' | 'year';
 
@@ -137,13 +141,19 @@ export default function Analytics() {
   const COLORS = ['hsl(199,89%,38%)', 'hsl(158,64%,42%)', 'hsl(38,92%,50%)', 'hsl(262,60%,55%)', 'hsl(0,72%,51%)', 'hsl(199,89%,60%)'];
 
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-800">Clinic Analytics</h1>
-          <p className="text-slate-500 mt-1">Real-time insights and patient volume trends</p>
+    <div className="max-w-[1600px] mx-auto animate-in fade-in duration-500 pb-12">
+      <PageBanner
+        title="Clinic Analytics"
+        description="Real-time insights and patient volume trends for informed clinical decisions."
+        imageSrc={analyticsBanner}
+      >
+        <div className="w-24 h-24 md:w-32 md:h-32 -ml-4">
+          <Lottie animationData={analyticsAnimation} loop={true} />
         </div>
-        <div className="bg-white p-1 rounded-xl shadow-sm border border-slate-100 hidden md:flex">
+      </PageBanner>
+
+      <div className="px-4 md:px-8 space-y-8">
+        <div className="bg-white p-1 rounded-xl shadow-sm border border-slate-100 hidden md:flex w-fit ml-auto">
           <Button variant="ghost" size="sm" className="rounded-lg text-xs font-bold gap-2">
             <Filter className="w-3.5 h-3.5" /> Filter Data
           </Button>
@@ -297,4 +307,4 @@ export default function Analytics() {
       </div>
     </div>
   );
-}
+}

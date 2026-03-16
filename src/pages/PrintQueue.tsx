@@ -4,6 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import PageBanner from '@/components/PageBanner';
+import printQueueBanner from '@/assets/print_queue_banner.png';
 import { Printer, CheckCircle, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import PrescriptionTemplate from '@/components/PrescriptionTemplate';
@@ -55,7 +57,12 @@ export default function PrintQueue() {
   const printed = prescriptions.filter(p => p.is_printed);
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
+    <div className="max-w-[1600px] mx-auto animate-in fade-in duration-500 pb-12">
+      <PageBanner
+        title="Pharmacy Print Queue"
+        description="Monitor and process prescription print requests in real-time for efficient patient service."
+        imageSrc={printQueueBanner}
+      />
 
       {/* Hidden print container */}
       {printData && (
@@ -71,10 +78,15 @@ export default function PrintQueue() {
         </div>
       )}
 
-      <div className="print:hidden">
-        <h1 className="text-2xl font-heading font-bold">Print Queue</h1>
-        <p className="text-muted-foreground">{unprinted.length} prescriptions waiting to be printed</p>
-      </div>
+      <div className="px-4 md:px-8 space-y-8">
+        <div className="print:hidden">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-heading font-bold">Print Queue Status</h1>
+              <p className="text-muted-foreground">{unprinted.length} prescriptions waiting to be processed</p>
+            </div>
+          </div>
+        </div>
 
       <Tabs defaultValue="unprinted" className="print:hidden">
         <TabsList>
@@ -131,7 +143,8 @@ export default function PrintQueue() {
             </Card>
           ))}
         </TabsContent>
-      </Tabs>
+        </Tabs>
+      </div>
     </div>
   );
 }

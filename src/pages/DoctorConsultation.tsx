@@ -15,6 +15,8 @@ import PrescriptionTemplate from '@/components/PrescriptionTemplate';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { printPrescription } from '@/lib/printPrescription';
+import PageBanner from '@/components/PageBanner';
+import consultationBanner from '@/assets/consultation_banner.png';
 
 interface Medicine {
   name: string;
