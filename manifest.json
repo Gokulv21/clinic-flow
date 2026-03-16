@@ -2,16 +2,21 @@
   "name": "Clinic Manager",
   "short_name": "ClinicMgr",
   "description": "Complete clinic management system",
-  "start_url": "/",
+  "start_url": "/clinic-flow/",
   "display": "standalone",
   "background_color": "#f5f7fa",
   "theme_color": "#0284c7",
   "orientation": "any",
   "icons": [
     {
-      "src": "/favicon.ico",
-      "sizes": "64x64",
-      "type": "image/x-icon"
+      "src": "/clinic-flow/logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/clinic-flow/logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
     }
   ]
 }
