@@ -181,6 +181,10 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
     const activePointersRef = useRef(new Map<number, { x: number, y: number, screenX: number, screenY: number, type: string }>());
     const lastPenTapRef = useRef<number>(0);
     const isPenActiveRef = useRef(false);
+    // Track if the last pen interaction was an actual drawing stroke (not just a tap)
+    const didDrawOnLastPenDownRef = useRef(false);
+    // Track pen barrel double-tap (simulated via rapid tap without movement)
+    const lastPenTapPositionRef = useRef<{ x: number, y: number } | null>(null);
 
     // ── Gesture State
     const [canvasTransform, setCanvasTransform] = useState({ x: 0, y: 0, scale: 1 });
@@ -237,20 +241,23 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
         activePointersRef.current.set(e.pointerId, { ...pos, screenX: e.clientX, screenY: e.clientY, type: e.pointerType });
 
         // Double-Tap Detection (Pencil barrel sim)
+        // Only trigger if previous tap was NOT a drawing stroke (just a tap)
         if (e.pointerType === 'pen') {
             const now = Date.now();
             const timeDiff = now - lastPenTapRef.current;
 
-            // Check for double tap
-            if (timeDiff > 20 && timeDiff < 450) {
+            // Check for double tap - but only if no drawing occurred on last pen down
+            if (timeDiff > 20 && timeDiff < 300 && !didDrawOnLastPenDownRef.current) {
                 setIsEraser(prev => !prev);
                 lastPenTapRef.current = 0;
-                isDrawingRef.current = false;
+                didDrawOnLastPenDownRef.current = false;
                 onPointerUp();
                 return;
             }
             lastPenTapRef.current = now;
             isPenActiveRef.current = true;
+            // Reset the drawing flag at start of new stroke
+            didDrawOnLastPenDownRef.current = false;
         }
 
         // PALM REJECTION: If a pen is active, ignore finger drawing but allow gestures
@@ -297,11 +304,18 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
         // This is critical for high-speed pencil movements
         const coalescedEvents = (e.nativeEvent as any).getCoalescedEvents ? (e.nativeEvent as any).getCoalescedEvents() : [e.nativeEvent];
 
+        let pointsAdded = false;
         for (const ce of coalescedEvents) {
             const cPos = getCanvasPos(ce.clientX, ce.clientY);
             if (isInWritingArea(cPos)) {
                 currentPathRef.current.push({ ...cPos, pressure: ce.pressure || 0.5 });
+                pointsAdded = true;
             }
+        }
+
+        // Mark that actual drawing occurred (more than just the initial point)
+        if (pointsAdded && currentPathRef.current.length > 2) {
+            didDrawOnLastPenDownRef.current = true;
         }
 
         isDirtyRef.current = true;
@@ -601,7 +615,14 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
             </div>
 
             {/* ── Pagination Bottom Bar */}
-            <div className="bg-white/90 backdrop-blur border-t px-6 py-4 flex items-center justify-between shrink-0 rounded-b-xl shadow-2xl">
+            <div
+                className="bg-white/90 backdrop-blur border-t px-6 py-4 flex items-center justify-between shrink-0 rounded-b-xl shadow-2xl"
+                style={{
+                    WebkitUserSelect: 'none',
+                    userSelect: 'none',
+                    WebkitTouchCallout: 'none',
+                }}
+            >
                 <div className="flex items-center gap-3">
                     <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
                         <Button
