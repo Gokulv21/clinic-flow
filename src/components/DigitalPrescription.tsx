@@ -26,14 +26,14 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
     const [penColor, setPenColor] = useState('#1e293b');
     const [penSize, setPenSize] = useState(3);
     const [isEraser, setIsEraser] = useState(false);
-    
+
     // NEW: Precision Mode (Pen Only)
     const [precisionMode, setPrecisionMode] = useState(false);
 
     // Multi-page State
     type PathPoint = { x: number; y: number };
     type DrawnPath = { points: PathPoint[]; color: string; size: number; isEraser: boolean };
-    
+
     // Improved initialization: check if initialPaths is already structured as pages (array of arrays)
     const getInitialPages = () => {
         if (initialPages) return initialPages;
@@ -63,7 +63,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
         if (!canvas || !container) return;
         const targetWidth = 1240;
         const targetHeight = Math.floor(targetWidth * 1.414);
-        
+
         if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
             canvas.width = targetWidth;
             canvas.height = targetHeight;
@@ -95,11 +95,11 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
     const redrawStatic = useCallback((pathsToRender: DrawnPath[]) => {
         const canvas = canvasRef.current;
         if (!canvas) return;
-        
+
         if (!staticCanvasRef.current) {
             staticCanvasRef.current = document.createElement('canvas');
         }
-        
+
         const sc = staticCanvasRef.current;
         sc.width = canvas.width;
         sc.height = canvas.height;
@@ -115,13 +115,13 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
     const appendToStatic = useCallback((path: DrawnPath) => {
         const canvas = canvasRef.current;
         if (!canvas) return;
-        
+
         if (!staticCanvasRef.current) {
             staticCanvasRef.current = document.createElement('canvas');
             staticCanvasRef.current.width = canvas.width;
             staticCanvasRef.current.height = canvas.height;
         }
-        
+
         const sctx = staticCanvasRef.current.getContext('2d');
         if (!sctx) return;
 
@@ -136,7 +136,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
         if (!ctx) return;
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
+
         // Draw static layer
         if (staticCanvasRef.current) {
             ctx.drawImage(staticCanvasRef.current, 0, 0);
@@ -184,7 +184,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
 
     // ── Gesture State
     const [canvasTransform, setCanvasTransform] = useState({ x: 0, y: 0, scale: 1 });
-    
+
     // Bind gestures
     useGesture(
         {
@@ -232,7 +232,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
     const onPointerDown = (e: React.PointerEvent) => {
         // Prevent scrolling/zoom during pen/touch start
         e.preventDefault();
-        
+
         const pos = getCanvasPos(e.clientX, e.clientY);
         activePointersRef.current.set(e.pointerId, { ...pos, screenX: e.clientX, screenY: e.clientY, type: e.pointerType });
 
@@ -240,11 +240,11 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
         if (e.pointerType === 'pen') {
             const now = Date.now();
             const timeDiff = now - lastPenTapRef.current;
-            
+
             // Check for double tap
             if (timeDiff > 20 && timeDiff < 450) {
                 setIsEraser(prev => !prev);
-                lastPenTapRef.current = 0; 
+                lastPenTapRef.current = 0;
                 isDrawingRef.current = false;
                 onPointerUp();
                 return;
@@ -262,7 +262,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
         if (!isDrawingRef.current && (e.pointerType === 'pen' || !isPenActiveRef.current)) {
             // Respect precision mode
             if (precisionMode && e.pointerType !== 'pen') return;
-            
+
             if (!isInWritingArea(pos)) return;
 
             (e.target as HTMLElement).setPointerCapture(e.pointerId);
@@ -287,23 +287,23 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
         }
 
         if (!isDrawingRef.current) return;
-        
+
         // Strict Palm Rejection: If pen is active, ignore this touch move
         if (isPenActiveRef.current && e.pointerType === 'touch') return;
 
         const pressure = (e as any).pressure || 0.5;
-        
+
         // High-frequency optimization: Use coalesced events to get all intermediate points
         // This is critical for high-speed pencil movements
         const coalescedEvents = (e.nativeEvent as any).getCoalescedEvents ? (e.nativeEvent as any).getCoalescedEvents() : [e.nativeEvent];
-        
+
         for (const ce of coalescedEvents) {
             const cPos = getCanvasPos(ce.clientX, ce.clientY);
             if (isInWritingArea(cPos)) {
                 currentPathRef.current.push({ ...cPos, pressure: ce.pressure || 0.5 });
             }
         }
-        
+
         isDirtyRef.current = true;
     };
 
@@ -329,12 +329,12 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
             };
             const updatedPages = [...pages];
             updatedPages[currentPageIndex] = [...(updatedPages[currentPageIndex] || []), newPath];
-            
+
             // CRITICAL: Use appendToStatic instead of redrawStatic for zero lag!
             appendToStatic(newPath);
-            
+
             setPages(updatedPages);
-            
+
             // Add to history
             const newHistory = history.slice(0, historyStep + 1);
             newHistory.push(updatedPages);
@@ -370,12 +370,12 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
         const updatedPages = [...pages];
         updatedPages[currentPageIndex] = [];
         setPages(updatedPages);
-        
+
         const newHistory = history.slice(0, historyStep + 1);
         newHistory.push(updatedPages);
         setHistory(newHistory);
         setHistoryStep(newHistory.length - 1);
-        
+
         redrawStatic([]); // Manual redraw for clear
         isDirtyRef.current = true;
     };
@@ -420,7 +420,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
     };
 
     return (
-        <div 
+        <div
             style={{
                 position: 'fixed', inset: 0, zIndex: 100,
                 background: 'rgba(0,0,0,0.8)',
@@ -434,7 +434,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
             <div className="bg-white border-b px-2 py-2 md:px-4 md:py-3 flex flex-wrap items-center justify-between gap-y-2 shrink-0 drop-shadow-md sticky top-0 z-50 rounded-t-xl">
                 <div className="flex items-center gap-1 md:gap-2 min-w-0 flex-wrap">
                     <Button variant="ghost" size="icon" onClick={onClose} className="shrink-0 h-8 w-8 md:h-10 md:w-10"><X className="w-5 h-5" /></Button>
-                    
+
                     <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg shrink-0">
                         <Button variant="ghost" size="sm" onClick={handleUndo} disabled={historyStep === 0} className="h-8">
                             <Undo className="w-4 h-4" />
@@ -465,7 +465,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                             >
                                 <Eraser className={`w-4 h-4 ${isEraser ? 'text-blue-600' : 'text-slate-600'}`} />
                             </Button>
-                            
+
                             {!isEraser && (
                                 <input
                                     type="color"
@@ -475,10 +475,10 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                                 />
                             )}
                         </div>
-                        
+
                         <div className="flex items-center gap-2 px-2 border-l border-slate-200 h-6">
-                             <span className="text-[10px] font-bold text-slate-400 w-4">{penSize}</span>
-                             <input
+                            <span className="text-[10px] font-bold text-slate-400 w-4">{penSize}</span>
+                            <input
                                 type="range"
                                 min="1"
                                 max="20"
@@ -490,9 +490,9 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                     </div>
 
                     {/* Precision Mode Toggle */}
-                    <Button 
-                        variant={precisionMode ? "default" : "outline"} 
-                        size="sm" 
+                    <Button
+                        variant={precisionMode ? "default" : "outline"}
+                        size="sm"
                         onClick={() => setPrecisionMode(!precisionMode)}
                         className={cn("h-8 gap-1 md:gap-2 px-2", precisionMode ? "bg-blue-600 text-white" : "text-slate-500")}
                     >
@@ -503,10 +503,10 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
 
                 <div className="flex items-center gap-2 ml-auto pl-2">
                     <div className="hidden sm:flex items-center gap-1 bg-slate-100 px-2 py-1 rounded-md">
-                         <span className="text-[10px] font-bold text-slate-500">{Math.round(canvasTransform.scale * 100)}%</span>
-                         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCanvasTransform({ x: 0, y: 0, scale: 1 })}>
+                        <span className="text-[10px] font-bold text-slate-500">{Math.round(canvasTransform.scale * 100)}%</span>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCanvasTransform({ x: 0, y: 0, scale: 1 })}>
                             <Settings2 className="w-2.5 h-2.5" />
-                         </Button>
+                        </Button>
                     </div>
                     <Button size="sm" onClick={handleSave} className="h-8 md:h-9 px-3 md:px-4 bg-sky-600 hover:bg-sky-700 text-white shadow-lg shrink-0">
                         <Save className="w-4 h-4 mr-1 md:mr-2" /> <span className="text-xs md:text-sm">Save</span>
@@ -515,7 +515,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
             </div>
 
             {/* ── Main Canvas Area */}
-            <div 
+            <div
                 ref={scrollContainerRef}
                 style={{
                     flex: 1,
@@ -525,7 +525,9 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                     flexDirection: 'column',
                     alignItems: 'center',
                     touchAction: 'none',
+                    WebkitUserSelect: 'none',
                     userSelect: 'none',
+                    WebkitTouchCallout: 'none',
                 }}
                 onTouchEnd={() => {
                     activePointersRef.current.clear();
@@ -545,14 +547,22 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                         transform: `translate3d(${canvasTransform.x}px, ${canvasTransform.y}px, 0) scale(${canvasTransform.scale})`,
                         transformOrigin: 'top center',
                         touchAction: 'none',
+                        WebkitUserSelect: 'none',
+                        userSelect: 'none',
+                        WebkitTouchCallout: 'none',
                     }}
                 >
-                    <div style={{ position: 'absolute', inset: 0 }}>
-                        <PrescriptionTemplate 
-                            patient={patient} 
-                            visit={visit} 
-                            handwrittenImage={null} 
-                            // Only show template on first page
+                    <div style={{
+                        position: 'absolute', inset: 0,
+                        WebkitUserSelect: 'none',
+                        userSelect: 'none',
+                        WebkitTouchCallout: 'none',
+                    }}>
+                        <PrescriptionTemplate
+                            patient={patient}
+                            visit={visit}
+                            handwrittenImage={null}
+                        // Only show template on first page
                         />
                         {/* Background for continuation pages */}
                         {currentPageIndex > 0 && (
@@ -560,8 +570,8 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                         )}
                         {/* Branding for continuation pages */}
                         {currentPageIndex > 0 && (
-                             <div style={{ 
-                                position: 'absolute', top: '2em', right: '3em', 
+                            <div style={{
+                                position: 'absolute', top: '2em', right: '3em',
                                 color: '#cbd5e1', fontSize: '1.5cqw', fontWeight: 800,
                                 zIndex: 5
                             }}>
@@ -572,10 +582,14 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
 
                     <canvas
                         ref={canvasRef}
+                        tabIndex={-1}
                         style={{
                             position: 'absolute', inset: 0,
                             width: '100%', height: '100%',
                             zIndex: 20, cursor: 'crosshair', touchAction: 'none',
+                            WebkitUserSelect: 'none',
+                            userSelect: 'none',
+                            WebkitTouchCallout: 'none',
                         }}
                         onPointerDown={onPointerDown}
                         onPointerMove={onPointerMove}
@@ -590,8 +604,8 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
             <div className="bg-white/90 backdrop-blur border-t px-6 py-4 flex items-center justify-between shrink-0 rounded-b-xl shadow-2xl">
                 <div className="flex items-center gap-3">
                     <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
-                        <Button 
-                            variant="ghost" size="sm" 
+                        <Button
+                            variant="ghost" size="sm"
                             disabled={currentPageIndex === 0}
                             onClick={() => setCurrentPageIndex(p => p - 1)}
                             className="h-8 w-8 p-0"
@@ -601,8 +615,8 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                         <span className="px-3 text-sm font-bold text-slate-700">
                             Page {currentPageIndex + 1} of {pages.length}
                         </span>
-                        <Button 
-                            variant="ghost" size="sm" 
+                        <Button
+                            variant="ghost" size="sm"
                             disabled={currentPageIndex === pages.length - 1}
                             onClick={() => setCurrentPageIndex(p => p + 1)}
                             className="h-8 w-8 p-0"
@@ -612,7 +626,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                     </div>
                     {pages.length > 1 && (
                         <Button variant="ghost" size="sm" onClick={deleteCurrentPage} className="text-red-500 hover:text-red-700 h-8">
-                             Delete Page
+                            Delete Page
                         </Button>
                     )}
                 </div>
