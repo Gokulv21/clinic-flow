@@ -1,20 +1,20 @@
 {
-  "name": "Clinic Manager",
-  "short_name": "ClinicMgr",
+  "name": "Prescripto",
+  "short_name": "Prescripto",
   "description": "Complete clinic management system",
-  "start_url": "/clinic-flow/",
+  "start_url": "/prescripto/",
   "display": "standalone",
   "background_color": "#f5f7fa",
   "theme_color": "#0284c7",
   "orientation": "any",
   "icons": [
     {
-      "src": "/clinic-flow/logo.png",
+      "src": "/prescripto/logo.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/clinic-flow/logo.png",
+      "src": "/prescripto/logo.png",
       "sizes": "512x512",
       "type": "image/png"
     }

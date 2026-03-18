@@ -1,4 +1,4 @@
-const CACHE_NAME = 'clinic-manager-v1';
+const CACHE_NAME = 'prescripto-v1';
 const URLS_TO_CACHE = ['/', '/index.html'];
 
 self.addEventListener('install', (event) => {

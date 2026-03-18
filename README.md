@@ -1,4 +1,4 @@
-# Clinic Manager
+# Prescripto
 
 A high-performance clinic management system built with React, Vite, and Supabase. Optimized for Apple Pencil drawing and printer-friendly prescriptions.
 
@@ -30,7 +30,7 @@ A high-performance clinic management system built with React, Vite, and Supabase
 1. Clone the repository:
    ```bash
    git clone <repository-url>
-   cd clinic-flow
+   cd prescripto
    ```
 
 2. Install dependencies:

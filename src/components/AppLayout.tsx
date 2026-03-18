@@ -58,7 +58,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             <div className={cn(
               "transition-all duration-300 whitespace-nowrap opacity-0 group-hover:opacity-100"
             )}>
-              <h2 className="font-heading font-bold text-sidebar-foreground text-sm uppercase tracking-wider">Clinic Manager</h2>
+              <h2 className="font-heading font-bold text-sidebar-foreground text-sm uppercase tracking-wider">Prescripto</h2>
               <p className="text-[10px] text-sidebar-foreground/60 truncate max-w-[140px] uppercase font-medium">{profile?.full_name}</p>
             </div>
           </div>

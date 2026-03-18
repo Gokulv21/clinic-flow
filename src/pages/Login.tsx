@@ -40,7 +40,7 @@ export default function Login() {
             <Stethoscope className="w-10 h-10 text-primary-foreground relative z-10" />
           </div>
           <div>
-            <CardTitle className="text-3xl font-heading font-bold tracking-tight">Clinic Flow</CardTitle>
+            <CardTitle className="text-3xl font-heading font-bold tracking-tight">Prescripto</CardTitle>
             <CardDescription className="text-base font-medium text-muted-foreground/80">
               Hospital Management System
             </CardDescription>

@@ -1,10 +1,10 @@
-# PROJECT DOSSIER: CLINIC FLOW (GV CLINIC)
+# PROJECT DOSSIER: PRESCRIPTO
 ### Version 2.0.0 | Official Technical Documentation
 
 ---
 
 ## 1. EXECUTIVE SUMMARY
-**Clinic Flow** is a high-performance, tablet-optimized clinic management and digital prescription system designed for modern healthcare practices. The platform integrates patient registration, clinical vitals tracking, and a state-of-the-art digital handwriting engine for prescriptions, providing a seamless bridge between traditional medical charting and modern electronic health records (EHR).
+**Prescripto** is a high-performance, tablet-optimized clinic management and digital prescription system designed for modern healthcare practices. The platform integrates patient registration, clinical vitals tracking, and a state-of-the-art digital handwriting engine for prescriptions, providing a seamless bridge between traditional medical charting and modern electronic health records (EHR).
 
 Developed with a focus on "opulent aesthetics" and "technical precision," the system is tailored for Apple Pencil integration, ensuring that doctors can maintain their natural writing flow while benefiting from digital data storage and instant printing.
 
@@ -60,7 +60,7 @@ Configurations are managed via environment-specific variables, separating develo
 ## 5. RECENT PATCH NOTES & RELEASES
 ### V2.0.0 (Current) - "Branding & Performance Update"
 - **Canvas Overhaul**: Switched to pointer-events API for superior stylus response.
-- **Branding Integration**: Full deployment of "GV Clinic" assets, including custom icons and themed headers.
+- **Branding Integration**: Full deployment of "Prescripto" assets, including custom icons and themed headers.
 - **History System**: Added "Prescription Recall" enabling doctors to re-print prescriptions from previous visits.
 - **Unit Standardization**: Enforced strict clinical units (mmHg, kg, SpO2 %) across all data points.
 
@@ -80,8 +80,8 @@ Configurations are managed via environment-specific variables, separating develo
 
 ## 7. MAINTENANCE & CONTACT
 - **Lead Developer**: Gokul V
-- **Platform URL**: [https://gokulv21.github.io/clinic-flow/](https://gokulv21.github.io/clinic-flow/)
+- **Platform URL**: [https://gokulv21.github.io/prescripto/](https://gokulv21.github.io/prescripto/)
 - **Contact**: +91 9488017536
 
 ---
-*This document serves as an official technical record of the Clinic Flow system architecture and implementation.*
+*This document serves as an official technical record of the Prescripto system architecture and implementation.*

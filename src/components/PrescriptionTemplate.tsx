@@ -292,6 +292,18 @@ function PageOne({ patient, visit, today, time, clinicalNotes, diagnosis, medici
                             {advice && <div style={{ marginTop: '1em', fontStyle: 'italic', color: '#475569', fontSize: '1em', fontWeight: 500 }}>Advice: {advice}</div>}
                         </div>
                     )}
+                    {/* Watermark */}
+                    <div style={{
+                        position: 'absolute', top: '50%', left: '50%',
+                        transform: 'translate(-50%, -50%) rotate(-45deg)',
+                        fontSize: '8cqw', fontWeight: 900, color: '#000',
+                        opacity: 0.03, pointerEvents: 'none', zIndex: 5,
+                        whiteSpace: 'nowrap', textTransform: 'uppercase',
+                        letterSpacing: '0.2em'
+                    }}>
+                        GV CLINIC
+                    </div>
+
                     {/* Writing Grid */}
                     <div className="no-print" style={{ position: 'absolute', top: '5em', left: '1.5em', right: '1.5em', bottom: 0, backgroundImage: 'radial-gradient(circle, #cbd5e1 0.8px, transparent 0.8px)', backgroundSize: '1.8em 1.8em', pointerEvents: 'none', zIndex: 0, opacity: 0.4 }} />
                 </div>
@@ -312,9 +324,14 @@ function PageOne({ patient, visit, today, time, clinicalNotes, diagnosis, medici
 
             {/* ── FOOTER ──────────────────────────────────────── */}
             <div style={{ background: '#fff', borderTop: '2px solid #0f172a', padding: '1em 2em', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, gap: '1em' }}>
-                <span style={{ color: '#475569', fontSize: '1em', fontWeight: 700, letterSpacing: '0.02em', textAlign: 'center' }}>
-                    அடுத்த முறை வரும்போது இந்த மருந்துச்சீட்டை கொண்டு வரவும்
-                </span>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2em' }}>
+                    <span style={{ color: '#475569', fontSize: '1em', fontWeight: 700, letterSpacing: '0.02em', textAlign: 'center' }}>
+                        அடுத்த முறை வரும்போது இந்த மருந்துச்சீட்டை கொண்டு வரவும்
+                    </span>
+                    <span style={{ color: '#94a3b8', fontSize: '0.6em', fontWeight: 600, letterSpacing: '1em', textTransform: 'uppercase', marginTop: '0.3em' }}>
+                        Developed by Prescripto
+                    </span>
+                </div>
             </div>
         </div>
     );

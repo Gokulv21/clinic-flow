@@ -14,7 +14,7 @@ export default function Help() {
         },
         {
           q: "What is the official login link?",
-          a: "The official URL for Clinic Flow is: https://gokulv21.github.io/clinic-flow/"
+          a: "The official URL for Prescripto is: https://gokulv21.github.io/prescripto/"
         },
         {
           q: "I forgot my password, what should I do?",
@@ -92,7 +92,7 @@ export default function Help() {
           Help
         </h1>
         <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-          A high-performance digital healthcare platform optimized for GV Clinic.
+          A high-performance digital healthcare platform optimized for Prescripto.
         </p>
       </div>
 
@@ -106,7 +106,7 @@ export default function Help() {
           </CardHeader>
           <CardContent className="text-sm space-y-4">
             <p>
-              Welcome to the Help Center. Clinic Flow is designed to be intuitive, but if you have questions, please check the categories on the right.
+              Welcome to the Help Center. Prescripto is designed to be intuitive, but if you have questions, please check the categories on the right.
             </p>
             <div className="p-3 bg-white rounded-lg border border-primary/10">
               <p className="font-bold text-xs text-primary uppercase mb-1">Clinic Support</p>
@@ -114,7 +114,7 @@ export default function Help() {
             </div>
             <div className="pt-4 border-t">
               <p className="text-xs text-muted-foreground italic" style={{ textAlign: 'center' }}>
-                GV Clinic Official
+                Prescripto Official
               </p>
             </div>
           </CardContent>
