@@ -498,7 +498,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                 ref={scrollContainerRef}
                 style={{
                     flex: 1,
-                    overflow: 'hidden',
+                    overflow: 'auto',
                     background: '#0f172a',
                     display: 'flex',
                     flexDirection: 'column',

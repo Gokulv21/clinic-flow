@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from "react-router-dom";
 import PageBanner from "@/components/PageBanner";
 import patientEntryBanner from "@/assets/patient_entry_banner.png";
+import { formatAge } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { UserPlus, Search, Loader2, CheckCircle } from 'lucide-react';
+import { UserPlus, Search, Loader2, CheckCircle, ChevronDown } from 'lucide-react';
 
 interface PatientForm {
   title: string;
@@ -42,6 +43,7 @@ export default function NurseEntry() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
+  const [ageUnit, setAgeUnit] = useState<'years' | 'months' | 'days'>('years');
   const [tokenNumber, setTokenNumber] = useState<number | null>(null);
 
   const searchPatients = async () => {
@@ -72,6 +74,7 @@ export default function NurseEntry() {
       toast.error('Please fill all required fields');
       return;
     }
+    // Convert age to years for the preview context if needed
     setStep('vitals');
   };
 
@@ -81,12 +84,16 @@ export default function NurseEntry() {
       let patientId = selectedPatientId;
 
       if (!patientId) {
+        let ageInYears = parseFloat(patient.age);
+        if (ageUnit === 'months') ageInYears = ageInYears / 12;
+        if (ageUnit === 'days') ageInYears = ageInYears / 365;
+
         const { data: newPatient, error } = await supabase
           .from('patients')
           .insert({ 
             title: patient.title,
             name: patient.name, 
-            age: parseFloat(patient.age), 
+            age: ageInYears, 
             sex: patient.sex, 
             phone: patient.phone, 
             address: patient.address || null 
@@ -131,11 +138,15 @@ export default function NurseEntry() {
     setTokenNumber(null);
     setSearchQuery('');
     setSearchResults([]);
+    setAgeUnit('years');
   };
 
-  const autoSetTitle = (age: string, sex: string) => {
+  const autoSetTitle = (age: string, sex: string, unit: 'years' | 'months' | 'days') => {
     if (!age || !sex) return;
-    const ageVal = parseFloat(age);
+    let ageVal = parseFloat(age);
+    if (unit === 'months') ageVal = ageVal / 12;
+    if (unit === 'days') ageVal = ageVal / 365;
+
     if (ageVal < 2) {
       setPatient(p => ({ ...p, title: 'Baby' }));
     } else if (sex === 'Male') {
@@ -203,18 +214,32 @@ export default function NurseEntry() {
                   </div>
                   <div className="space-y-2">
                     <Label>Age *</Label>
-                    <Input 
-                      type="number" 
-                      step="0.1"
-                      value={patient.age} 
-                      onChange={e => {
-                        const val = parseFloat(e.target.value);
-                        if (val > 120) return;
-                        setPatient(p => ({ ...p, age: e.target.value }));
-                        autoSetTitle(e.target.value, patient.sex);
-                      }} 
-                      placeholder="Age" 
-                    />
+                    <div className="flex gap-2">
+                      <Input 
+                        type="number" 
+                        step="0.1"
+                        value={patient.age} 
+                        onChange={e => {
+                          const val = parseFloat(e.target.value);
+                          if (val > 1000) return;
+                          setPatient(p => ({ ...p, age: e.target.value }));
+                          autoSetTitle(e.target.value, patient.sex, ageUnit);
+                        }} 
+                        placeholder="Age" 
+                        className="flex-1"
+                      />
+                      <Select value={ageUnit} onValueChange={(v: any) => {
+                        setAgeUnit(v);
+                        autoSetTitle(patient.age, patient.sex, v);
+                      }}>
+                        <SelectTrigger className="w-[110px]"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="years">Years</SelectItem>
+                          <SelectItem value="months">Months</SelectItem>
+                          <SelectItem value="days">Days</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label>Sex *</Label>
@@ -222,7 +247,7 @@ export default function NurseEntry() {
                       value={patient.sex} 
                       onValueChange={v => {
                         setPatient(p => ({ ...p, sex: v }));
-                        autoSetTitle(patient.age, v);
+                        autoSetTitle(patient.age, v, ageUnit);
                       }}
                     >
                       <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
@@ -297,7 +322,7 @@ export default function NurseEntry() {
                           className="w-full text-left p-3 hover:bg-slate-100 transition-colors border-b last:border-b-0"
                         >
                           <div className="font-medium text-slate-800">{p.name}</div>
-                          <div className="text-xs text-slate-500">{p.phone} · {p.age}y · {p.sex}</div>
+                          <div className="text-xs text-slate-500">{p.phone} · {formatAge(p.age)} · {p.sex}</div>
                         </button>
                       ))}
                       {searchResults.length === 0 && (

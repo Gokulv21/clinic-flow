@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,10 +8,13 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
-import { User, Clock, CheckCircle, Plus, Trash2, Save, Loader2, PenTool, Eye, Menu, Printer, ArrowLeft, Activity, ClipboardList, Scale, Heart, Wind, Thermometer, Droplet } from 'lucide-react';
+import { cn, formatAge } from '@/lib/utils';
+import { User, Clock, CheckCircle, Plus, Trash2, Save, Loader2, PenTool, Eye, Menu, Printer, ArrowLeft, Activity, ClipboardList, Scale, Heart, Wind, Thermometer, Droplet, Pencil, Calendar } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 import DigitalPrescription from '@/components/DigitalPrescription';
 import PrescriptionTemplate from '@/components/PrescriptionTemplate';
+import { format } from "date-fns";
+import prescriptionLogo from '@/assets/prescriptionLogo.png';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { printPrescription } from '@/lib/printPrescription';
@@ -40,12 +43,16 @@ export default function DoctorConsultation() {
   const [prescriptionPaths, setPrescriptionPaths] = useState<any[]>([]);
   const [showPreview, setShowPreview] = useState(false);
   const [viewingHistoryRx, setViewingHistoryRx] = useState<any>(null);
+  const [isWritingMode, setIsWritingMode] = useState(false);
+  const [clinicalNotes, setClinicalNotes] = useState('');
+  const [showVitalsEdit, setShowVitalsEdit] = useState(false);
+  const lastLoadedVisitId = useRef<string | null>(null);
 
   const fetchQueue = async () => {
     const today = new Date().toISOString().split('T')[0];
     const { data } = await supabase
       .from('visits')
-      .select('*, patients(*)')
+      .select('*, patients(*), prescriptions(*)')
       .gte('created_at', today)
       .in('status', ['waiting', 'in_consultation'])
       .order('token_number', { ascending: true });
@@ -58,29 +65,113 @@ export default function DoctorConsultation() {
       .channel('visits-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'visits' }, () => fetchQueue())
       .subscribe();
+
+    // RESTORE STATE FROM LOCALSTORAGE
+    const restoreState = async () => {
+      const savedVisitId = localStorage.getItem('active_consultation_id');
+      if (savedVisitId) {
+        // Find visit in queue if possible or fetch fresh
+        const { data } = await supabase
+          .from('visits')
+          .select('*, patients(*), prescriptions(*)')
+          .eq('id', savedVisitId)
+          .single();
+        
+        if (data) {
+          selectVisit(data, true); // true = check for drafts
+        }
+      }
+    };
+    restoreState();
+
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  const selectVisit = async (visit: any) => {
+  // AUTO-SAVE DRAFT TO LOCALSTORAGE
+  useEffect(() => {
+    if (selectedVisit?.id && selectedVisit.id === lastLoadedVisitId.current) {
+      const draft = {
+        diagnosis,
+        clinicalNotes,
+        medicines,
+        advice,
+        prescriptionImage,
+        prescriptionPaths,
+        isWritingMode,
+        timestamp: Date.now()
+      };
+      localStorage.setItem(`draft_${selectedVisit.id}`, JSON.stringify(draft));
+      localStorage.setItem('active_consultation_id', selectedVisit.id);
+    }
+  }, [selectedVisit?.id, diagnosis, clinicalNotes, medicines, advice, prescriptionImage, prescriptionPaths, isWritingMode]);
+
+  const selectVisit = async (visit: any, checkForDrafts = false) => {
     setSelectedVisit(visit);
     setPatient(visit.patients);
-    setAdvice('');
     
-    // Check if prescription image is an array of pages (stored as JSON string)
-    let rxData = visit.prescriptions?.[0];
-    let rxImage = rxData?.advice_image;
-    let rxPaths = rxData?.raw_paths || [];
-    
-    try {
-      if (rxImage && rxImage.startsWith('[')) {
-        rxImage = JSON.parse(rxImage);
+    // Check for drafts in localStorage
+    const savedDraft = localStorage.getItem(`draft_${visit.id}`);
+    if (checkForDrafts && savedDraft) {
+      try {
+        const draft = JSON.parse(savedDraft);
+        // Only use draft if it's less than 24 hours old
+        if (Date.now() - draft.timestamp < 24 * 60 * 60 * 1000) {
+          setDiagnosis(draft.diagnosis || '');
+          setClinicalNotes(draft.clinicalNotes || '');
+          setMedicines(draft.medicines || [{ name: '', dosage: '', frequency: '', duration: '' }]);
+          setAdvice(draft.advice || '');
+          setPrescriptionImage(draft.prescriptionImage);
+          setPrescriptionPaths(draft.prescriptionPaths || []);
+          setIsWritingMode(draft.isWritingMode ?? false);
+          lastLoadedVisitId.current = visit.id;
+          return;
+        }
+      } catch (e) {
+        console.error("Error restoring draft", e);
       }
-    } catch (e) {
-      console.error("Error parsing multi-page images", e);
     }
 
-    setPrescriptionImage(rxImage);
+    // Default: Check if prescription image is an array of pages (stored as JSON string)
+    const rxData = visit.prescriptions?.[0];
+    let rxImage = rxData?.advice_image;
+    const rxPaths = rxData?.raw_paths || [];
+    
+    // Load existing prescription data
+    setDiagnosis(rxData?.diagnosis || '');
+    setClinicalNotes(rxData?.clinical_notes || '');
+    setMedicines(rxData?.medicines || [{ name: '', dosage: '', frequency: '', duration: '' }]);
+    
+    // Determine if it's a handwritten prescription or typed advice
+    if (rxImage && rxImage.startsWith('data:image')) {
+      // It's a drawing
+      setPrescriptionImage(rxImage);
+      setAdvice('');
+      setIsWritingMode(true);
+    } else if (rxImage && rxImage.startsWith('[')) {
+      // It's a multi-page drawing (JSON array of data URLs)
+      try {
+        const parsed = JSON.parse(rxImage);
+        setPrescriptionImage(parsed);
+        setAdvice('');
+        setIsWritingMode(true);
+      } catch (e) {
+        console.error("Error parsing multi-page images", e);
+        setPrescriptionImage(rxImage);
+        setIsWritingMode(true);
+      }
+    } else {
+      // It's text advice or empty
+      setPrescriptionImage(null);
+      setAdvice(rxImage || '');
+      setIsWritingMode(false);
+    }
+
     setPrescriptionPaths(rxPaths);
+    
+    // If there's a drawing, force writing mode
+    if (rxPaths && rxPaths.length > 0 && rxPaths[0].length > 0) {
+      setIsWritingMode(true);
+    }
 
     // Update status to in_consultation
     if (visit.status === 'waiting') {
@@ -98,6 +189,7 @@ export default function DoctorConsultation() {
       .order('created_at', { ascending: false })
       .limit(10);
     setHistory(data || []);
+    lastLoadedVisitId.current = visit.id;
   };
 
   const addMedicine = () => setMedicines(m => [...m, { name: '', dosage: '', frequency: '', duration: '' }]);
@@ -107,35 +199,59 @@ export default function DoctorConsultation() {
 
   const savePrescription = async () => {
     if (!selectedVisit || !patient) return;
-    const validMeds = medicines.filter(m => m.name.trim());
-    if (!diagnosis.trim() && validMeds.length === 0 && !prescriptionImage) {
-      toast.error('Please add diagnosis, medicines or handwriting');
+    
+    // In writing mode, we ignore typed medicines/diagnosis/advice
+    // In typing mode, we ignore handwritten image/paths
+    const finalDiagnosis = isWritingMode ? null : (diagnosis || null);
+    const finalClinicalNotes = isWritingMode ? null : (clinicalNotes || null);
+    const finalMedicines = isWritingMode ? [] : medicines.filter(m => m.name.trim());
+    const finalAdviceImage = isWritingMode ? prescriptionImage : (advice || null);
+    const finalPaths = isWritingMode ? prescriptionPaths : [];
+
+    if (!isWritingMode && !finalDiagnosis && finalMedicines.length === 0 && !advice && !finalClinicalNotes) {
+      toast.error('Please add diagnosis, notes, medicines or advice');
       return;
     }
+    
+    if (isWritingMode && !prescriptionImage) {
+      toast.error('Please add handwriting using the template');
+      return;
+    }
+
     setSaving(true);
     try {
       // Save prescription
       const { error: rxError } = await supabase.from('prescriptions').insert({
         visit_id: selectedVisit.id,
         patient_id: patient.id,
-        diagnosis: diagnosis || null,
-        medicines: validMeds as any,
-        advice_image: prescriptionImage || advice || null,
-        raw_paths: prescriptionPaths as any,
+        diagnosis: finalDiagnosis,
+        clinical_notes: finalClinicalNotes,
+        medicines: finalMedicines as any,
+        advice_image: finalAdviceImage,
+        raw_paths: finalPaths as any,
       });
       if (rxError) throw rxError;
 
       // Mark visit completed
       await supabase.from('visits').update({ 
         status: 'completed', 
-        diagnosis
+        diagnosis: finalDiagnosis
       }).eq('id', selectedVisit.id);
 
       toast.success('Prescription saved & sent to print queue');
+      
+      // Clear persistence info
+      localStorage.removeItem(`draft_${selectedVisit.id}`);
+      localStorage.removeItem('active_consultation_id');
+      
       setSelectedVisit(null);
       setPatient(null);
       setPrescriptionImage(null);
       setPrescriptionPaths([]);
+      setDiagnosis('');
+      setClinicalNotes('');
+      setMedicines([{ name: '', dosage: '', frequency: '', duration: '' }]);
+      setAdvice('');
       fetchQueue();
     } catch (err: any) {
       toast.error(err.message);
@@ -148,6 +264,9 @@ export default function DoctorConsultation() {
     setPrescriptionImage(Array.isArray(data) ? JSON.stringify(data) : data);
     setPrescriptionPaths(pages as any);
     setShowDigitalRx(false);
+    setIsWritingMode(true);
+    // Clear typed advice since we are in writing mode
+    setAdvice('');
   };
 
   const statusColor = (s: string) => {
@@ -232,11 +351,14 @@ export default function DoctorConsultation() {
             </div>
           </div>
         ) : (
-          <div className="max-w-3xl mx-auto p-4 md:p-6 space-y-6 animate-slide-in pb-20 font-jakarta-sans">
+          <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-6 animate-slide-in pb-20 font-jakarta-sans">
             {/* Mobile-only Header with Back Button */}
             <div className="md:hidden flex items-center justify-between mb-4 bg-white/80 backdrop-blur sticky top-[-1rem] z-20 py-2 -mx-4 px-4 border-b border-border shadow-sm">
               <div className="flex items-center gap-3">
-                <Button variant="ghost" size="icon" onClick={() => setSelectedVisit(null)} className="-ml-2">
+                <Button variant="ghost" size="icon" onClick={() => {
+                  localStorage.removeItem('active_consultation_id');
+                  setSelectedVisit(null);
+                }} className="-ml-2">
                   <ArrowLeft className="w-5 h-5 text-primary" />
                 </Button>
                 <div>
@@ -269,7 +391,7 @@ export default function DoctorConsultation() {
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 text-sm">
                   <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100">
                     <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Age / Sex</p>
-                    <p className="text-base font-bold text-slate-700">{patient?.age}y · {patient?.sex}</p>
+                    <p className="text-base font-bold text-slate-700">{formatAge(patient?.age)} · {patient?.sex}</p>
                   </div>
                   <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100">
                     <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Phone</p>
@@ -282,9 +404,20 @@ export default function DoctorConsultation() {
                 </div>
 
                 <div className="mt-8">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Activity className="w-4 h-4 text-blue-500" />
-                    <h4 className="text-[12px] font-extrabold text-slate-600 uppercase tracking-widest">Clinical Vitals</h4>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <Activity className="w-4 h-4 text-blue-500" />
+                      <h4 className="text-[12px] font-extrabold text-slate-600 uppercase tracking-widest">Clinical Vitals</h4>
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => setShowVitalsEdit(true)}
+                      className="h-8 px-2 text-blue-600 hover:bg-blue-50 gap-1 rounded-lg"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      <span className="text-[11px] font-bold">Edit</span>
+                    </Button>
                   </div>
                   <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
                     {[
@@ -340,22 +473,56 @@ export default function DoctorConsultation() {
 
             {/* Prescription */}
             <Card className="border-none shadow-sm overflow-hidden bg-white">
-              <CardHeader className="flex flex-row items-center justify-between pb-3 px-6 bg-slate-50/50">
+              <CardHeader className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 pb-4 px-6 bg-slate-50/50">
                 <div className="flex items-center gap-2">
                   <div className="p-1.5 bg-blue-100 rounded-md">
                     <ClipboardList className="w-4 h-4 text-blue-600" />
                   </div>
                   <CardTitle className="text-lg font-bold text-slate-800">Prescription Details</CardTitle>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowDigitalRx(true)}
-                  className="bg-primary/5 border-primary/20 text-primary hover:bg-primary/10"
-                >
-                  <PenTool className="w-4 h-4 mr-2" />
-                  Open Template (iPad/Pen)
-                </Button>
+                
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg shrink-0">
+                    <Button
+                      variant={!isWritingMode ? "secondary" : "ghost"}
+                      size="sm"
+                      onClick={() => setIsWritingMode(false)}
+                      className={cn("h-8 px-3 text-[11px] font-bold", !isWritingMode && "bg-white shadow-sm")}
+                    >
+                      Typing Mode
+                    </Button>
+                    <Button
+                      variant={isWritingMode ? "secondary" : "ghost"}
+                      size="sm"
+                      onClick={() => setIsWritingMode(true)}
+                      className={cn("h-8 px-3 text-[11px] font-bold", isWritingMode && "bg-white shadow-sm")}
+                    >
+                      Writing Mode
+                    </Button>
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (!isWritingMode) {
+                        toast.error("Please switch to Writing Mode first", {
+                          description: "The Pen template is only available in Writing Mode.",
+                          duration: 3000
+                        });
+                        return;
+                      }
+                      setShowDigitalRx(true);
+                    }}
+                    className={cn(
+                      "h-8 px-4 bg-primary/5 border-primary/20 text-primary hover:bg-primary/10 transition-all",
+                      !isWritingMode && "opacity-40"
+                    )}
+                  >
+                    <PenTool className="w-4 h-4 mr-2" />
+                    <span className="text-[11px] font-bold">Open Template (Pen)</span>
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 {prescriptionImage && (
@@ -372,22 +539,38 @@ export default function DoctorConsultation() {
                   </div>
                 )}
 
-                <div className="space-y-3">
-                  <Label className="text-[12px] font-extrabold text-slate-500 uppercase tracking-widest ml-1">Diagnosis</Label>
-                  <Input 
-                    value={diagnosis} 
-                    onChange={e => setDiagnosis(e.target.value)} 
-                    placeholder="Enter diagnosis" 
-                    className="h-12 text-base font-bold bg-slate-50/50 border-slate-100 focus:bg-white focus:ring-blue-500 transition-all rounded-xl"
-                  />
+                <div className="space-y-4">
+                  <div className="space-y-3">
+                    <Label className="text-[12px] font-extrabold text-slate-500 uppercase tracking-widest ml-1">Clinical Notes</Label>
+                    <Textarea 
+                      value={clinicalNotes} 
+                      onChange={e => setClinicalNotes(e.target.value)} 
+                      placeholder="Enter clinical examination notes, symptoms, etc." 
+                      disabled={isWritingMode}
+                      className="min-h-[100px] text-base font-bold bg-slate-50/50 border-slate-100 focus:bg-white focus:ring-blue-500 transition-all rounded-xl disabled:opacity-50 disabled:cursor-not-allowed resize-none"
+                    />
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label className="text-[12px] font-extrabold text-slate-500 uppercase tracking-widest ml-1">Diagnosis</Label>
+                    <Input 
+                      value={diagnosis} 
+                      onChange={e => setDiagnosis(e.target.value)} 
+                      placeholder="Enter diagnosis" 
+                      disabled={isWritingMode}
+                      className="h-12 text-base font-bold bg-slate-50/50 border-slate-100 focus:bg-white focus:ring-blue-500 transition-all rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-4 pt-2">
                   <div className="flex items-center justify-between ml-1">
                     <Label className="text-[12px] font-extrabold text-slate-500 uppercase tracking-widest">Medicines</Label>
-                    <Button size="sm" variant="outline" onClick={addMedicine} className="h-8 pr-3 pl-2 text-[11px] font-bold border-blue-100 text-blue-600 hover:bg-blue-50 bg-white rounded-lg">
-                      <Plus className="w-3.5 h-3.5 mr-1" /> Add Medicine
-                    </Button>
+                    {!isWritingMode && (
+                      <Button size="sm" variant="outline" onClick={addMedicine} className="h-8 pr-3 pl-2 text-[11px] font-bold border-blue-100 text-blue-600 hover:bg-blue-50 bg-white rounded-lg">
+                        <Plus className="w-3.5 h-3.5 mr-1" /> Add Medicine
+                      </Button>
+                    )}
                   </div>
                   <div className="space-y-3">
                     {medicines.map((med, i) => (
@@ -395,24 +578,26 @@ export default function DoctorConsultation() {
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 flex-1">
                           <div className="space-y-1">
                             <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">Name</p>
-                            <Input placeholder="Paracetamol" value={med.name} onChange={e => updateMedicine(i, 'name', e.target.value)} className="h-10 text-sm font-bold border-slate-200 bg-white rounded-lg" />
+                            <Input placeholder="Paracetamol" value={med.name} onChange={e => updateMedicine(i, 'name', e.target.value)} disabled={isWritingMode} className="h-10 text-sm font-bold border-slate-200 bg-white rounded-lg" />
                           </div>
                           <div className="space-y-1">
                             <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">Dosage</p>
-                            <Input placeholder="500mg" value={med.dosage} onChange={e => updateMedicine(i, 'dosage', e.target.value)} className="h-10 text-sm font-bold border-slate-200 bg-white rounded-lg" />
+                            <Input placeholder="500mg" value={med.dosage} onChange={e => updateMedicine(i, 'dosage', e.target.value)} disabled={isWritingMode} className="h-10 text-sm font-bold border-slate-200 bg-white rounded-lg" />
                           </div>
                           <div className="space-y-1">
                             <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">Frequency</p>
-                            <Input placeholder="1-0-1" value={med.frequency} onChange={e => updateMedicine(i, 'frequency', e.target.value)} className="h-10 text-sm font-bold border-slate-200 bg-white rounded-lg" />
+                            <Input placeholder="1-0-1" value={med.frequency} onChange={e => updateMedicine(i, 'frequency', e.target.value)} disabled={isWritingMode} className="h-10 text-sm font-bold border-slate-200 bg-white rounded-lg" />
                           </div>
                           <div className="space-y-1">
                             <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">Duration</p>
-                            <Input placeholder="5 Days" value={med.duration} onChange={e => updateMedicine(i, 'duration', e.target.value)} className="h-10 text-sm font-bold border-slate-200 bg-white rounded-lg" />
+                            <Input placeholder="5 Days" value={med.duration} onChange={e => updateMedicine(i, 'duration', e.target.value)} disabled={isWritingMode} className="h-10 text-sm font-bold border-slate-200 bg-white rounded-lg" />
                           </div>
                         </div>
-                        <Button size="icon" variant="ghost" onClick={() => removeMedicine(i)} className="text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg h-10 w-10 mt-5 transition-colors">
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        {!isWritingMode && (
+                          <Button size="icon" variant="ghost" onClick={() => removeMedicine(i)} className="text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg h-10 w-10 mt-5 transition-colors">
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -424,7 +609,8 @@ export default function DoctorConsultation() {
                     value={advice} 
                     onChange={e => setAdvice(e.target.value)} 
                     placeholder="Drink plenty of water..." 
-                    className="h-12 text-base font-bold bg-slate-50/50 border-slate-100 focus:bg-white focus:ring-blue-500 transition-all rounded-xl"
+                    disabled={isWritingMode}
+                    className="h-12 text-base font-bold bg-slate-50/50 border-slate-100 focus:bg-white focus:ring-blue-500 transition-all rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                 </div>
 
@@ -474,6 +660,7 @@ export default function DoctorConsultation() {
               patient={patient}
               visit={selectedVisit}
               handwrittenImage={prescriptionImage}
+              clinicalNotes={clinicalNotes}
               diagnosis={diagnosis}
               medicines={medicines.filter(m => m.name.trim())}
               advice={advice}
@@ -497,10 +684,90 @@ export default function DoctorConsultation() {
                 patient={patient}
                 visit={viewingHistoryRx}
                 handwrittenImage={viewingHistoryRx.prescriptions?.[0]?.advice_image}
+                clinicalNotes={viewingHistoryRx.prescriptions?.[0]?.clinical_notes}
                 diagnosis={viewingHistoryRx.prescriptions?.[0]?.diagnosis || viewingHistoryRx.diagnosis}
                 medicines={viewingHistoryRx.prescriptions?.[0]?.medicines || []}
               />
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Vitals Edit Dialog */}
+      <Dialog open={showVitalsEdit} onOpenChange={setShowVitalsEdit}>
+        <DialogContent className="max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Edit Clinical Vitals</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-4 py-4">
+            <div className="space-y-2">
+              <Label>Weight (kg)</Label>
+              <Input 
+                type="number" 
+                value={selectedVisit?.weight || ''} 
+                onChange={e => setSelectedVisit({...selectedVisit, weight: e.target.value})}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>BP (mmHg)</Label>
+              <Input 
+                value={selectedVisit?.blood_pressure || ''} 
+                onChange={e => setSelectedVisit({...selectedVisit, blood_pressure: e.target.value})}
+                placeholder="120/80"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Pulse (bpm)</Label>
+              <Input 
+                type="number" 
+                value={selectedVisit?.pulse_rate || ''} 
+                onChange={e => setSelectedVisit({...selectedVisit, pulse_rate: e.target.value})}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>SpO2 (%)</Label>
+              <Input 
+                type="number" 
+                value={selectedVisit?.spo2 || ''} 
+                onChange={e => setSelectedVisit({...selectedVisit, spo2: e.target.value})}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Temp (°F)</Label>
+              <Input 
+                type="number" 
+                value={selectedVisit?.temperature || ''} 
+                onChange={e => setSelectedVisit({...selectedVisit, temperature: e.target.value})}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>CBG (mg/dL)</Label>
+              <Input 
+                type="number" 
+                value={selectedVisit?.cbg || ''} 
+                onChange={e => setSelectedVisit({...selectedVisit, cbg: e.target.value})}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 mt-4">
+            <Button variant="outline" onClick={() => setShowVitalsEdit(false)}>Cancel</Button>
+            <Button onClick={async () => {
+              try {
+                const { error } = await supabase.from('visits').update({
+                  weight: selectedVisit.weight,
+                  blood_pressure: selectedVisit.blood_pressure,
+                  pulse_rate: selectedVisit.pulse_rate,
+                  spo2: selectedVisit.spo2,
+                  temperature: selectedVisit.temperature,
+                  cbg: selectedVisit.cbg
+                }).eq('id', selectedVisit.id);
+                if (error) throw error;
+                toast.success('Vitals updated');
+                setShowVitalsEdit(false);
+              } catch (e: any) {
+                toast.error(e.message);
+              }
+            }}>Save Changes</Button>
           </div>
         </DialogContent>
       </Dialog>

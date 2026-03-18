@@ -17,6 +17,7 @@ interface PrescriptionTemplateProps {
     visit?: any;
     handwrittenImage?: string | string[] | null;
     diagnosis?: string;
+    clinicalNotes?: string;
     medicines?: any[];
     advice?: string;
     isPrint?: boolean;
@@ -24,7 +25,7 @@ interface PrescriptionTemplateProps {
 
 const PrescriptionTemplate = React.memo(({
     patient, visit, handwrittenImage,
-    diagnosis, medicines = [], advice, isPrint = false,
+    diagnosis, clinicalNotes, medicines = [], advice, isPrint = false,
 }: PrescriptionTemplateProps) => {
 
     const today = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -39,7 +40,7 @@ const PrescriptionTemplate = React.memo(({
         { label: 'CBG', value: visit?.cbg, unit: ' mg/dL' },
     ];
 
-    const hasTyped = !!(diagnosis || (medicines && medicines.length > 0) || advice);
+    const hasTyped = !!(diagnosis || clinicalNotes || (medicines && medicines.length > 0) || advice);
 
     // Multi-page parsing logic: handles both raw arrays and JSON-stringified arrays from the DB
     let images: (string | null)[] = [];
@@ -67,7 +68,9 @@ const PrescriptionTemplate = React.memo(({
                     className="single-page-prescription"
                     style={{
                         width: isPrint ? '210mm' : '100%',
+                        maxWidth: '100%',
                         height: isPrint ? '296mm' : undefined,
+                        maxHeight: isPrint ? '100%' : undefined,
                         aspectRatio: isPrint ? undefined : `${EXPORT_W} / ${EXPORT_H}`,
                         containerType: 'inline-size' as any,
                         position: 'relative',
@@ -84,6 +87,7 @@ const PrescriptionTemplate = React.memo(({
                             visit={visit}
                             today={today}
                             time={time}
+                            clinicalNotes={clinicalNotes}
                             diagnosis={diagnosis}
                             medicines={medicines}
                             advice={advice}
@@ -126,6 +130,7 @@ interface PageOneProps {
     visit: any;
     today: string;
     time: string;
+    clinicalNotes?: string;
     diagnosis?: string;
     medicines: any[];
     advice?: string;
@@ -133,7 +138,7 @@ interface PageOneProps {
     vitals: { label: string; value: any; unit: string }[];
 }
 
-function PageOne({ patient, visit, today, time, diagnosis, medicines, advice, hasTyped, vitals }: PageOneProps) {
+function PageOne({ patient, visit, today, time, clinicalNotes, diagnosis, medicines, advice, hasTyped, vitals }: PageOneProps) {
     return (
         <div
             id="rx-inner"
@@ -244,6 +249,12 @@ function PageOne({ patient, visit, today, time, diagnosis, medicines, advice, ha
                     <div style={{ height: '5em', flexShrink: 0 }} />
                     {hasTyped && (
                         <div style={{ lineHeight: 1.6, fontSize: '1.1em', overflow: 'hidden', zIndex: 30, position: 'relative' }}>
+                            {clinicalNotes && (
+                                <div style={{ marginBottom: '1.2em', color: '#334155' }}>
+                                    <div style={{ fontWeight: 800, fontSize: '0.8em', textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.05em', marginBottom: '0.4em' }}>Clinical Notes & History:</div>
+                                    <div style={{ whiteSpace: 'pre-wrap', fontWeight: 500, borderLeft: '3px solid #e2e8f0', paddingLeft: '0.8em', fontStyle: 'italic' }}>{clinicalNotes}</div>
+                                </div>
+                            )}
                             {diagnosis && <div style={{ fontWeight: 800, fontSize: '1.2em', marginBottom: '0.6em', color: '#1e293b' }}>Dx: {diagnosis}</div>}
                             {medicines.map((m, i) => (
                                 <div key={i} style={{ marginBottom: '0.6em', paddingLeft: '1em', borderLeft: '3px solid #3b82f6' }}>

@@ -1,136 +1,49 @@
 /**
  * printPrescription
  * ─────────────────
- * Renders multiple prescription pages in a hidden iframe and prints them.
- */
-export function printPrescription(): void {
-    // ── Get the container holding all pages ──────────────────────────
+ * Renders multiple prescription pages in a hexport function printPrescription(): void {
     const container = document.querySelector('.print-container');
     if (!container) {
         console.error('[printPrescription] .print-container not found');
         return;
     }
 
-    // Capture pages
-    const pages = container.querySelectorAll('.single-page-prescription');
-    if (pages.length === 0) {
-        console.error('[printPrescription] No .single-page-prescription found');
-        return;
-    }
-
-    let finalHtml = '';
-
-    // Process each page
-    pages.forEach((pageEl, idx) => {
-        let html = pageEl.outerHTML;
-        
-        // Find handwriting img if exists
-        const hwImg = pageEl.querySelector('img[alt^="handwriting"]') as HTMLImageElement | null;
-        if (hwImg) {
-            const hwSrc = hwImg.src;
-            // Remove old img tag from HTML string
-            html = html.replace(/<img[^>]+alt="handwriting[^>]*"[^>]*>/i, '');
-            // Append clean img tag
-            const imgTag = `<img src="${hwSrc}" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:fill;z-index:99;pointer-events:none;" alt="handwriting">`;
-            html = html.replace(/<\/div>\s*$/i, `${imgTag}</div>`);
-        }
-        
-        finalHtml += html;
+    // ── 1. Preparation: Clone the container ──────────────────────────
+    const printMount = document.createElement('div');
+    printMount.id = 'print-mount';
+    printMount.style.cssText = 'position:absolute;top:0;left:0;width:100%;z-index:-1;visibility:hidden;';
+    
+    // We clone the inner content to avoid ID collisions and to manipulate styles if needed
+    printMount.innerHTML = container.innerHTML;
+    
+    // Handle the handwriting images specifically to ensure they carry over correctly
+    const originalImgs = container.querySelectorAll('img');
+    const clonedImgs = printMount.querySelectorAll('img');
+    originalImgs.forEach((img, i) => {
+        if (clonedImgs[i]) clonedImgs[i].src = img.src;
     });
 
-    // ── Create hidden iframe ───────────────────────────────────────────
-    const iframe = document.createElement('iframe');
-    iframe.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;border:none;opacity:0;';
-    document.body.appendChild(iframe);
+    document.body.appendChild(printMount);
+    document.body.classList.add('is-printing');
 
-    const doc = iframe.contentDocument ?? iframe.contentWindow?.document;
-    if (!doc) { document.body.removeChild(iframe); return; }
-
-    doc.open();
-    doc.write(`<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>Prescription</title>
-<style>
-/* ── Reset ─────────────────────────────────────────────────────── */
-* { margin: 0; padding: 0; box-sizing: border-box; }
-html, body { background: #fff; }
-
-/* ── Page container ─────────────────────────────────────────────── */
-.single-page-prescription {
-    width: 210mm !important;
-    height: 296mm !important; 
-    position: relative !important;
-    overflow: hidden !important;
-    box-shadow: none !important;
-    aspect-ratio: unset !important;
-    container-type: inline-size !important;
-    page-break-after: always !important;
-    break-after: page !important;
-    margin: 0 auto !important; /* Center on larger paper */
-    background: white !important;
-}
-
-/* ── Inner wrapper ─────────────────────────────────────────────── */
-#rx-inner {
-    font-size: 3.5mm !important; 
-    position: absolute !important;
-    inset: 0 !important;
-    overflow: hidden !important;
-}
-
-/* ── Print ──────────────────────────────────────────────────────── */
-@page { 
-    margin: 0; 
-    /* Removed hardcoded size to allow browser-selected formats */
-}
-
-@media print {
-    /* Hide everything that isn't the print container */
-    body > *:not(.print-container) {
-        display: none !important;
-    }
-    
-    * {
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-    }
-    html, body { 
-        margin: 0; 
-        padding: 0; 
-        background: #fff !important;
-        width: 100% !important;
-        height: auto !important;
-    }
-    .print-container { 
-        width: 100% !important; 
-        margin: 0 !important;
-        padding: 0 !important;
-        display: flex !important;
-        flex-direction: column !important;
-        align-items: center !important;
-    }
-}
-</style>
-</head>
-<body>
-    <div class="print-container">
-        ${finalHtml}
-    </div>
-</body>
-</html>`);
-    doc.close();
-
-    // ── Print after allowing fonts + images to render ─────────
-    const doprint = () => {
-        if (!iframe.contentWindow) return;
+    // ── 2. Trigger Print ────────────────────────────────────────────
+    const triggerPrint = () => {
+        window.print();
         
-        // Mobile-specific focus-and-wait pattern
-        iframe.contentWindow.focus();
-        
+        // ── 3. Cleanup ─────────────────────────────────────────────
         setTimeout(() => {
-            iframe.contentWindow?.print();
+            document.body.classList.remove('is-printing');
+            if (document.getElementById('print-mount')) {
+                document.body.removeChild(printMount);
+            }
+        }, 1000);
+    };
+
+    // Give it a moment to ensure all cloned images/styles are settled
+    // On mobile, this delay is crucial for the print engine to 'see' the new DOM nodes
+    setTimeout(triggerPrint, 500);
+}
+indow?.print();
             const cleanup = () => {
                 try { document.body.removeChild(iframe); } catch (_) { /* already removed */ }
             };

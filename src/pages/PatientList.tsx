@@ -12,6 +12,7 @@ import { Search, User, History, Edit, Printer, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import PrescriptionTemplate from '@/components/PrescriptionTemplate';
 import { printPrescription } from '@/lib/printPrescription';
+import { formatAge } from '@/lib/utils';
 
 export default function PatientList() {
   const [patients, setPatients] = useState<any[]>([]);
@@ -19,7 +20,7 @@ export default function PatientList() {
   const [selectedPatient, setSelectedPatient] = useState<any>(null);
   const [visits, setVisits] = useState<any[]>([]);
   const [editing, setEditing] = useState(false);
-  const [editForm, setEditForm] = useState({ title: '', name: '', age: '', phone: '', address: '' });
+  const [editForm, setEditForm] = useState({ title: '', name: '', age: '', ageUnit: 'years', phone: '', address: '' });
   const [viewingRx, setViewingRx] = useState<any>(null);
 
   const fetchPatients = async () => {
@@ -41,7 +42,14 @@ export default function PatientList() {
 
   const viewPatient = async (p: any) => {
     setSelectedPatient(p);
-    setEditForm({ title: p.title || '', name: p.name, age: String(p.age), phone: p.phone, address: p.address || '' });
+    setEditForm({ 
+      title: p.title || '', 
+      name: p.name, 
+      age: String(p.age), 
+      ageUnit: 'years', // Default to years when viewing existing
+      phone: p.phone, 
+      address: p.address || '' 
+    });
     const { data } = await supabase
       .from('visits')
       .select('*, prescriptions(*)')
@@ -52,10 +60,14 @@ export default function PatientList() {
 
   const saveEdit = async () => {
     if (!selectedPatient) return;
+    let ageInYears = parseFloat(editForm.age);
+    if (editForm.ageUnit === 'months') ageInYears = ageInYears / 12;
+    if (editForm.ageUnit === 'days') ageInYears = ageInYears / 365;
+
     const { error } = await supabase.from('patients').update({
       title: editForm.title,
       name: editForm.name,
-      age: parseFloat(editForm.age),
+      age: ageInYears,
       phone: editForm.phone,
       address: editForm.address || null,
     }).eq('id', selectedPatient.id);
@@ -91,7 +103,7 @@ export default function PatientList() {
                 </div>
                 <div>
                   <p className="font-medium">{(p.title ? p.title + ' ' : '') + p.name}</p>
-                  <p className="text-sm text-muted-foreground">{p.phone} · {p.age}y · {p.sex}</p>
+                  <p className="text-sm text-muted-foreground">{p.phone} · {formatAge(p.age)} · {p.sex}</p>
                   <p className="text-[10px] text-muted-foreground/50 font-mono mt-0.5">ID: {p.id}</p>
                 </div>
               </div>
@@ -136,16 +148,27 @@ export default function PatientList() {
                 </div>
                 <div>
                   <Label>Age</Label>
-                  <Input 
-                    type="number" 
-                    step="0.1"
-                    value={editForm.age} 
-                    onChange={e => {
-                      const val = parseFloat(e.target.value);
-                      if (val > 120) return;
-                      setEditForm(f => ({ ...f, age: e.target.value }));
-                    }} 
-                  />
+                  <div className="flex gap-2">
+                    <Input 
+                      type="number" 
+                      step="0.1"
+                      value={editForm.age} 
+                      onChange={e => {
+                        const val = parseFloat(e.target.value);
+                        if (val > 1000) return;
+                        setEditForm(f => ({ ...f, age: e.target.value }));
+                      }} 
+                      className="flex-1"
+                    />
+                    <Select value={editForm.ageUnit} onValueChange={v => setEditForm(f => ({ ...f, ageUnit: v }))}>
+                      <SelectTrigger className="w-[100px]"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="years">Yrs</SelectItem>
+                        <SelectItem value="months">Mnt</SelectItem>
+                        <SelectItem value="days">Day</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <div>
                   <Label>Phone</Label>
@@ -165,7 +188,7 @@ export default function PatientList() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div><span className="text-muted-foreground">Title:</span> {selectedPatient?.title || '—'}</div>
-                <div><span className="text-muted-foreground">Age:</span> {selectedPatient?.age}y</div>
+                <div><span className="text-muted-foreground">Age:</span> {formatAge(selectedPatient?.age)}</div>
                 <div><span className="text-muted-foreground">Sex:</span> {selectedPatient?.sex}</div>
                 <div><span className="text-muted-foreground">Phone:</span> {selectedPatient?.phone}</div>
                 <div className="col-span-2"><span className="text-muted-foreground">Address:</span> {selectedPatient?.address || '—'}</div>

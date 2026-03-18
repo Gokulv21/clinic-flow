@@ -30,7 +30,6 @@ const navItems: NavItem[] = [
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const { profile, roles, signOut } = useAuth();
-  const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -44,11 +43,11 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen flex bg-background">
-      {/* Sidebar */}
+      {/* Sidebar - Hover to expand */}
       <aside 
         className={cn(
           "gradient-sidebar flex flex-col shrink-0 hidden md:flex h-screen sticky top-0 transition-all duration-300 ease-in-out group z-50",
-          isCollapsed ? "w-20 hover:w-64" : "w-64"
+          "w-20 hover:w-64"
         )}
       >
         <div className="p-4 border-b border-sidebar-border relative min-h-[85px] flex items-center mb-2">
@@ -57,23 +56,12 @@ export default function AppLayout({ children }: { children: ReactNode }) {
               <img src={logo} className="w-8 h-8 object-contain" alt="Logo" />
             </div>
             <div className={cn(
-              "transition-all duration-300 whitespace-nowrap",
-              isCollapsed ? "opacity-0 group-hover:opacity-100" : "opacity-100"
+              "transition-all duration-300 whitespace-nowrap opacity-0 group-hover:opacity-100"
             )}>
               <h2 className="font-heading font-bold text-sidebar-foreground text-sm uppercase tracking-wider">Clinic Manager</h2>
               <p className="text-[10px] text-sidebar-foreground/60 truncate max-w-[140px] uppercase font-medium">{profile?.full_name}</p>
             </div>
           </div>
-          
-          <button
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className={cn(
-              "absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-sidebar-primary text-sidebar-primary-foreground flex items-center justify-center shadow-lg transition-transform hover:scale-110 z-50",
-              isCollapsed && "translate-x-0"
-            )}
-          >
-            <Menu className="w-3.5 h-3.5" />
-          </button>
         </div>
 
         <nav className="flex-1 p-3 space-y-2 overflow-y-auto overflow-x-hidden scrollbar-hide">
@@ -88,18 +76,12 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             >
               <div className="shrink-0 w-6 flex justify-center">{item.icon}</div>
               <span className={cn(
-                "transition-all duration-300 whitespace-nowrap",
-                isCollapsed ? "opacity-0 group-hover:opacity-100" : "opacity-100"
+                "transition-all duration-300 whitespace-nowrap opacity-0 group-hover:opacity-100"
               )}>
                 {item.label}
               </span>
               
-              {/* Tooltip-like indicator when collapsed */}
-              {isCollapsed && (
-                <div className="absolute left-full ml-4 px-2 py-1 bg-popover text-popover-foreground text-xs rounded opacity-0 pointer-events-none group-hover/item:opacity-0 hidden">
-                  {item.label}
-                </div>
-              )}
+              {/* Tooltip for when collapsed (if needed, but group-hover handles it now) */}
             </button>
           ))}
         </nav>
@@ -113,8 +95,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
               <LogOut className="w-5 h-5" />
             </div>
             <span className={cn(
-              "transition-all duration-300 whitespace-nowrap",
-              isCollapsed ? "opacity-0 group-hover:opacity-100" : "opacity-100"
+              "transition-all duration-300 whitespace-nowrap opacity-0 group-hover:opacity-100"
             )}>
               Sign Out
             </span>
