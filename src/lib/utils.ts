@@ -13,13 +13,11 @@ export function formatAge(ageInYears: number | string | null | undefined): strin
         return Math.floor(years) + 'y';
     }
     
-    // Less than 1 year
-    const months = Math.round(years * 12);
-    if (months >= 1) {
-        return months + 'm';
+    const days = Math.round(years * 365);
+    if (days < 90) {
+        return (days || 0) + 'd';
     }
     
-    // Less than 1 month
-    const days = Math.round(years * 365);
-    return (days || 0) + 'd';
+    const months = Math.round(years * 12);
+    return (months || 0) + 'm';
 }

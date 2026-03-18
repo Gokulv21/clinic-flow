@@ -3,7 +3,7 @@ import { useAuth, AppRole } from '@/lib/auth';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import {
-  Stethoscope, ClipboardPlus, Printer, BarChart3, Users, LogOut, Home, Menu, Info
+  Stethoscope, ClipboardPlus, Printer, BarChart3, Users, LogOut, Home, Menu, HelpCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -25,7 +25,7 @@ const navItems: NavItem[] = [
   { label: 'Analytics', path: '/analytics', icon: <BarChart3 className="w-5 h-5" />, roles: ['doctor'] },
   { label: 'Profile', path: '/profile', icon: <Users className="w-5 h-5" />, roles: ['doctor'] },
   { label: 'User Mgmt', path: '/users', icon: <Users className="w-5 h-5" />, roles: ['doctor'] },
-  { label: 'About', path: '/about', icon: <Info className="w-5 h-5" />, roles: ['nurse', 'doctor', 'printer'] },
+  { label: 'Help', path: '/help', icon: <HelpCircle className="w-5 h-5" />, roles: ['nurse', 'doctor', 'printer'] },
 ];
 
 export default function AppLayout({ children }: { children: ReactNode }) {

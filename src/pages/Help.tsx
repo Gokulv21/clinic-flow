@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Info, HelpCircle, LogIn, ClipboardPlus, Stethoscope, Printer, BarChart3, UserCog } from "lucide-react";
 
-export default function About() {
+export default function Help() {
   const faqSections = [
     {
       title: "Login & Access",
@@ -88,8 +88,8 @@ export default function About() {
     <div className="p-6 max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
       <div className="text-center space-y-2">
         <h1 className="text-3xl font-heading font-black tracking-tight text-slate-800 flex items-center justify-center gap-3">
-          <Info className="w-8 h-8 text-primary" />
-          About Clinic Flow
+          <HelpCircle className="w-8 h-8 text-primary" />
+          Help
         </h1>
         <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
           A high-performance digital healthcare platform optimized for GV Clinic.
@@ -113,8 +113,8 @@ export default function About() {
               <p className="text-slate-700 font-medium">+91 9488017536</p>
             </div>
             <div className="pt-4 border-t">
-              <p className="text-xs text-muted-foreground italic">
-                Version 2.0.0 (GV Clinic Official)
+              <p className="text-xs text-muted-foreground italic" style={{ textAlign: 'center' }}>
+                GV Clinic Official
               </p>
             </div>
           </CardContent>
@@ -123,8 +123,8 @@ export default function About() {
         <div className="md:col-span-2 space-y-4">
           <Accordion type="single" collapsible className="w-full space-y-4">
             {faqSections.map((section, idx) => (
-              <AccordionItem 
-                key={idx} 
+              <AccordionItem
+                key={idx}
                 value={`section-${idx}`}
                 className="border rounded-xl bg-white shadow-sm overflow-hidden px-4"
               >

@@ -134,7 +134,7 @@
   }
 
   /* Fallback: Hide common UI elements if not using is-printing logic */
-  nav, aside, .sidebar, .no-print, button, [role="dialog"] {
+  nav, aside, .sidebar, .no-print, button, [role="dialog"], [role="presentation"], .fixed.inset-0, [data-radix-portal] {
     display: none !important;
   }
 

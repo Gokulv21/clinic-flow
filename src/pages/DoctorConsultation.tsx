@@ -152,29 +152,22 @@ export default function DoctorConsultation() {
     
     // Determine if it's a handwritten prescription or typed advice
     if (rxImage && rxImage.startsWith('data:image')) {
-      // It's a drawing
       setPrescriptionImage(rxImage);
       setAdvice('');
-      setIsWritingMode(true);
     } else if (rxImage && rxImage.startsWith('[')) {
-      // It's a multi-page drawing (JSON array of data URLs)
       try {
         const parsed = JSON.parse(rxImage);
         setPrescriptionImage(parsed);
         setAdvice('');
-        setIsWritingMode(true);
       } catch (e) {
-        console.error("Error parsing multi-page images", e);
         setPrescriptionImage(rxImage);
-        setIsWritingMode(true);
       }
     } else {
-      // It's text advice or empty
       setPrescriptionImage(null);
       setAdvice(rxImage || '');
-      setIsWritingMode(false);
     }
 
+    setIsWritingMode(rxData?.is_writing_mode ?? (!!rxImage && (rxImage.startsWith('data:image') || rxImage.startsWith('['))));
     setPrescriptionPaths(rxPaths);
     
     // If there's a drawing, force writing mode
@@ -238,6 +231,7 @@ export default function DoctorConsultation() {
         medicines: finalMedicines as any,
         advice_image: finalAdviceImage,
         raw_paths: finalPaths as any,
+        is_writing_mode: isWritingMode
       });
       if (rxError) throw rxError;
 
@@ -400,7 +394,7 @@ export default function DoctorConsultation() {
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 text-sm">
                   <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100">
                     <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Age / Sex</p>
-                    <p className="text-base font-bold text-slate-700">{formatAge(patient?.age)} · {patient?.sex}</p>
+                    <p className="text-base font-bold text-slate-700">{formatAge(patient?.age)}/{patient?.sex?.charAt(0) ?? '—'}</p>
                   </div>
                   <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100">
                     <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Phone</p>
@@ -657,14 +651,19 @@ export default function DoctorConsultation() {
 
       {/* Preview Dialog */}
       <Dialog open={showPreview} onOpenChange={setShowPreview}>
-        <DialogContent className="max-w-[800px] p-0 overflow-hidden bg-slate-100">
-          <DialogHeader className="bg-white p-4 border-b flex flex-row items-center justify-between">
-            <DialogTitle>Prescription Preview</DialogTitle>
-            <Button variant="outline" size="sm" onClick={() => printPrescription()} className="gap-2">
-              <Printer className="w-4 h-4" /> Print
-            </Button>
+        <DialogContent className="max-w-[900px] w-[95vw] p-0 overflow-hidden bg-white">
+          <DialogHeader className="bg-white p-4 border-b relative">
+            <div className="flex items-center justify-between w-full">
+              <Button variant="outline" size="sm" onClick={() => printPrescription('#consultation-print-preview')} className="gap-2 z-10">
+                <Printer className="w-4 h-4" /> Print
+              </Button>
+              <DialogTitle className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap">
+                Prescription Preview
+              </DialogTitle>
+              <div className="w-20" /> {/* Spacer for symmetry with print button */}
+            </div>
           </DialogHeader>
-          <div className="p-4 md:p-8 overflow-auto max-h-[85vh] flex justify-center">
+          <div className="p-4 md:p-8 overflow-auto max-h-[85vh] flex justify-center bg-white" id="consultation-print-preview">
             <PrescriptionTemplate
               patient={patient}
               visit={selectedVisit}
@@ -673,6 +672,8 @@ export default function DoctorConsultation() {
               diagnosis={diagnosis}
               medicines={medicines.filter(m => m.name.trim())}
               advice={advice}
+              isWritingMode={isWritingMode}
+              isPrint={true}
             />
           </div>
         </DialogContent>
@@ -681,13 +682,18 @@ export default function DoctorConsultation() {
       {/* History Preview Dialog */}
       <Dialog open={!!viewingHistoryRx} onOpenChange={open => !open && setViewingHistoryRx(null)}>
         <DialogContent className="max-w-[800px] p-0 overflow-hidden bg-slate-100">
-          <div className="bg-white p-4 border-b flex items-center justify-between sticky top-0 z-10">
-            <h3 className="font-bold">Prescription History</h3>
-            <Button size="sm" onClick={() => printPrescription()} className="gap-2">
-              <Printer className="w-4 h-4" /> Print
-            </Button>
+          <div className="bg-white p-4 border-b relative sticky top-0 z-10">
+            <div className="flex items-center justify-between w-full">
+              <Button size="sm" onClick={() => printPrescription('#history-print-preview')} className="gap-2 z-10">
+                <Printer className="w-4 h-4" /> Print
+              </Button>
+              <h3 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 font-bold whitespace-nowrap">
+                Prescription History
+              </h3>
+              <div className="w-20" /> {/* Spacer */}
+            </div>
           </div>
-          <div className="p-4 md:p-8 overflow-auto max-h-[75vh] flex justify-center">
+          <div className="p-4 md:p-8 overflow-auto max-h-[75vh] flex justify-center bg-white" id="history-print-preview">
             {viewingHistoryRx && (
               <PrescriptionTemplate
                 patient={patient}
@@ -696,6 +702,8 @@ export default function DoctorConsultation() {
                 clinicalNotes={viewingHistoryRx.prescriptions?.[0]?.clinical_notes}
                 diagnosis={viewingHistoryRx.prescriptions?.[0]?.diagnosis || viewingHistoryRx.diagnosis}
                 medicines={viewingHistoryRx.prescriptions?.[0]?.medicines || []}
+                isWritingMode={viewingHistoryRx.prescriptions?.[0]?.is_writing_mode ?? false}
+                isPrint={true}
               />
             )}
           </div>

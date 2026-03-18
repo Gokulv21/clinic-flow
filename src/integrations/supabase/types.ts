@@ -22,6 +22,7 @@ export type Database = {
           id: string
           name: string
           phone: string
+          reg_no: number
           sex: string
           title: string | null
           updated_at: string
@@ -33,6 +34,7 @@ export type Database = {
           id?: string
           name: string
           phone: string
+          reg_no?: number
           sex: string
           title?: string | null
           updated_at?: string
@@ -44,6 +46,7 @@ export type Database = {
           id?: string
           name?: string
           phone?: string
+          reg_no?: number
           sex?: string
           title?: string | null
           updated_at?: string
@@ -58,6 +61,7 @@ export type Database = {
           diagnosis: string | null
           id: string
           is_printed: boolean
+          is_writing_mode: boolean
           medicines: Json
           patient_id: string
           pdf_url: string | null
@@ -73,6 +77,7 @@ export type Database = {
           diagnosis?: string | null
           id?: string
           is_printed?: boolean
+          is_writing_mode?: boolean
           medicines?: Json
           patient_id: string
           pdf_url?: string | null
@@ -88,6 +93,7 @@ export type Database = {
           diagnosis?: string | null
           id?: string
           is_printed?: boolean
+          is_writing_mode?: boolean
           medicines?: Json
           patient_id?: string
           pdf_url?: string | null

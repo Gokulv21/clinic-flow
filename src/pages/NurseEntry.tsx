@@ -90,9 +90,9 @@ export default function NurseEntry() {
         if (ageUnit === 'months') ageInYearsRaw = ageInYearsRaw / 12;
         if (ageUnit === 'days') ageInYearsRaw = ageInYearsRaw / 365;
 
-        // Ensure we store whole years if >= 1, or rounded decimals for babies (< 1)
-        // This avoids 400 Bad Request errors from high-precision floats in some DB configs
-        const ageInYears = ageInYearsRaw >= 1 ? Math.floor(ageInYearsRaw) : Number(ageInYearsRaw.toFixed(2));
+        // Ensure we store whole years if >= 1, but keep full decimal precision for babies (< 1)
+        // Note: The database column 'age' MUST be changed to NUMERIC (float) to support this.
+        const ageInYears = ageInYearsRaw >= 1 ? Math.floor(ageInYearsRaw) : ageInYearsRaw;
 
         const { data: newPatient, error } = await supabase
           .from('patients')

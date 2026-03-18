@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { supabase } from "@/integrations/supabase/client";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
+import { formatAge } from '@/lib/utils';
 import prescriptionLogo from '@/assets/prescriptionLogo.png';
 
 const EXPORT_W = 1240;
@@ -21,11 +22,13 @@ interface PrescriptionTemplateProps {
     medicines?: any[];
     advice?: string;
     isPrint?: boolean;
+    isWritingMode?: boolean;
 }
 
 const PrescriptionTemplate = React.memo(({
     patient, visit, handwrittenImage,
     diagnosis, clinicalNotes, medicines = [], advice, isPrint = false,
+    isWritingMode = false,
 }: PrescriptionTemplateProps) => {
 
     const today = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -41,6 +44,7 @@ const PrescriptionTemplate = React.memo(({
     ];
 
     const hasTyped = !!(diagnosis || clinicalNotes || (medicines && medicines.length > 0) || advice);
+    const showTyped = !isWritingMode && hasTyped;
 
     // Multi-page parsing logic
     let rawImages: (string | null)[] = [];
@@ -57,13 +61,14 @@ const PrescriptionTemplate = React.memo(({
     }
 
     // Filter out invalid image data to prevent broken image icons
-    const isValidImage = (src: any): src is string => 
+    const isValidImage = (src: any): src is string =>
         typeof src === 'string' && src.length > 5 && (src.startsWith('data:image') || src.startsWith('http'));
-    
-    const images = rawImages.filter(isValidImage);
 
-    // If no handwriting, we still need one "page" for typed content
-    const pagesToShow = images.length > 0 ? images : [null];
+    const images = rawImages.filter(isValidImage);
+    const showHandwritten = isWritingMode && images.length > 0;
+
+    // If no handwriting or not in writing mode, we still need one "page" for typed content
+    const pagesToShow = showHandwritten ? images : [null];
 
     return (
         <div className="flex flex-col items-center gap-8 w-full print-container">
@@ -81,7 +86,8 @@ const PrescriptionTemplate = React.memo(({
                         containerType: 'inline-size' as any,
                         position: 'relative',
                         overflow: 'hidden',
-                        background: '#fdfcfb',
+                        background: '#ffffff',
+                        backgroundColor: '#ffffff',
                         boxSizing: 'border-box',
                         boxShadow: isPrint ? 'none' : '0 10px 40px rgba(0,0,0,0.12)',
                         flexShrink: 0,
@@ -98,7 +104,7 @@ const PrescriptionTemplate = React.memo(({
                             diagnosis={diagnosis}
                             medicines={medicines}
                             advice={advice}
-                            hasTyped={hasTyped}
+                            hasTyped={showTyped}
                             vitals={vitals}
                         />
                     ) : (
@@ -112,7 +118,7 @@ const PrescriptionTemplate = React.memo(({
                         </div>
                     )}
 
-                    {isValidImage(img) && (
+                    {showHandwritten && isValidImage(img) && (
                         <img
                             src={img}
                             alt=""
@@ -158,14 +164,29 @@ function PageOne({ patient, visit, today, time, clinicalNotes, diagnosis, medici
                 overflow: 'hidden',
             }}
         >
+            <div className="margin-line margin-line-left" />
+            <div className="margin-line margin-line-right" />
             <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
                 
                 #prescription-template * { box-sizing: border-box; }
                 @media print {
-                    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-                    #rx-inner { font-size: 3.8mm !important; } // Further increased print font size
+                    #rx-inner { font-size: 3.8mm !important; background: white !important; background-color: #ffffff !important; }
+                    .single-page-prescription { background: white !important; background-color: #ffffff !important; }
+                    .no-print { display: none !important; }
                 }
+
+                .margin-line {
+                    position: absolute;
+                    top: 0;
+                    bottom: 0;
+                    width: 1px;
+                    background-color: #cbd5e1;
+                    opacity: 0.8;
+                    z-index: 10;
+                }
+                .margin-line-left { left: 0em; }
+                .margin-line-right { right: 0em; }
             `}</style>
 
             {/* ── HEADER ─────────────────────────────────────── */}
@@ -209,7 +230,7 @@ function PageOne({ patient, visit, today, time, clinicalNotes, diagnosis, medici
                     </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontWeight: 900, color: '#0284c7', fontSize: '3.2em', letterSpacing: '0.04em', lineHeight: 1 }}>
+                    <div style={{ fontWeight: 900, color: '#7d326cff', fontSize: '3.2em', letterSpacing: '0.04em', lineHeight: 1 }}>
                         GV Clinic
                     </div>
                     <div style={{ color: '#475569', fontSize: '0.8em', marginTop: '0.4em', letterSpacing: '0.2em', fontWeight: 800 }}>
@@ -235,10 +256,10 @@ function PageOne({ patient, visit, today, time, clinicalNotes, diagnosis, medici
             }}>
                 {[
                     { label: 'Patient Name', value: (patient?.title ? patient.title + ' ' : '') + (patient?.name ?? '—'), color: '#0f172a' },
-                    { label: 'Age / Sex', value: patient ? `${patient.age ?? '—'} / ${patient.sex?.charAt(0) ?? '—'}` : '—' },
+                    { label: 'Age / Sex', value: patient ? `${formatAge(patient.age)}/${patient.sex?.charAt(0) ?? '—'}` : '—' },
                     { label: 'Date', value: today },
                     { label: 'Time', value: time },
-                    { label: 'Reg. No', value: visit?.token_number ?? '—' },
+                    { label: 'Reg. No', value: patient?.reg_no ?? '—' },
                 ].map(({ label, value, color }) => (
                     <div key={label} style={{ overflow: 'hidden', minWidth: 0 }}>
                         <div style={{ fontSize: '0.75em', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</div>
@@ -272,7 +293,7 @@ function PageOne({ patient, visit, today, time, clinicalNotes, diagnosis, medici
                         </div>
                     )}
                     {/* Writing Grid */}
-                    <div style={{ position: 'absolute', top: '5em', left: '1.5em', right: '1.5em', bottom: 0, backgroundImage: 'radial-gradient(circle, #cbd5e1 0.8px, transparent 0.8px)', backgroundSize: '1.8em 1.8em', pointerEvents: 'none', zIndex: 0, opacity: 0.4 }} />
+                    <div className="no-print" style={{ position: 'absolute', top: '5em', left: '1.5em', right: '1.5em', bottom: 0, backgroundImage: 'radial-gradient(circle, #cbd5e1 0.8px, transparent 0.8px)', backgroundSize: '1.8em 1.8em', pointerEvents: 'none', zIndex: 0, opacity: 0.4 }} />
                 </div>
 
                 {/* RIGHT — Vitals sidebar (Compact/Opulent) */}

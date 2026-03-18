@@ -4,8 +4,8 @@
  * Renders multiple prescription pages by cloning them into a temporary container
  * and triggering the native print dialog. This approach is highly reliable on mobile/tablets.
  */
-export function printPrescription(): void {
-    const container = document.querySelector('.print-container');
+export function printPrescription(selector: string = '.print-container'): void {
+    const container = document.querySelector(selector);
     if (!container) {
         console.error('[printPrescription] .print-container not found');
         return;
@@ -15,7 +15,7 @@ export function printPrescription(): void {
     const printMount = document.createElement('div');
     printMount.id = 'print-mount';
     // Position it off-screen and hide it from visual view, but keep it 'visible' to the print engine
-    printMount.style.cssText = 'position:fixed;top:0;left:0;width:100%;opacity:0;z-index:-9999;pointer-events:none;';
+    printMount.style.cssText = 'position:fixed;top:0;left:0;width:100%;opacity:0;z-index:-9999;pointer-events:none;background:white;';
     
     // Clone the inner content
     printMount.innerHTML = container.innerHTML;

@@ -17,7 +17,7 @@ import PatientList from "@/pages/PatientList";
 import Analytics from "@/pages/Analytics";
 import UserManagement from "@/pages/UserManagement";
 import DoctorProfile from "@/pages/DoctorProfile";
-import About from "@/pages/About";
+import Help from "@/pages/Help";
 import NotFound from "./pages/NotFound.tsx";
 import { ReactNode } from "react";
 
@@ -29,9 +29,13 @@ function ProtectedRoute({ children, allowedRoles }: { children: ReactNode; allow
   const navigate = useNavigate();
 
   if (loading) return (
-    <div className="flex flex-col items-center justify-center min-h-screen text-muted-foreground gap-4">
-      <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      <p className="animate-pulse">Loading secure session...</p>
+    <div className="flex items-center justify-center min-h-screen bg-white">
+      <div className="relative">
+        <Loader2 className="w-10 h-10 animate-spin text-slate-200" />
+        <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-2 h-2 bg-primary rounded-full" />
+        </div>
+      </div>
     </div>
   );
 
@@ -121,7 +125,7 @@ const App = () => (
             <Route path="/analytics" element={<ProtectedRoute allowedRoles={['doctor']}><Analytics /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute allowedRoles={['doctor']}><DoctorProfile /></ProtectedRoute>} />
             <Route path="/users" element={<ProtectedRoute allowedRoles={['doctor']}><UserManagement /></ProtectedRoute>} />
-            <Route path="/about" element={<ProtectedRoute><About /></ProtectedRoute>} />
+            <Route path="/help" element={<ProtectedRoute><Help /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
