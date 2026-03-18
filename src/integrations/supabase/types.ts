@@ -53,6 +53,7 @@ export type Database = {
       prescriptions: {
         Row: {
           advice_image: string | null
+          clinical_notes: string | null
           created_at: string
           diagnosis: string | null
           id: string
@@ -67,6 +68,7 @@ export type Database = {
         }
         Insert: {
           advice_image?: string | null
+          clinical_notes?: string | null
           created_at?: string
           diagnosis?: string | null
           id?: string
@@ -81,6 +83,7 @@ export type Database = {
         }
         Update: {
           advice_image?: string | null
+          clinical_notes?: string | null
           created_at?: string
           diagnosis?: string | null
           id?: string

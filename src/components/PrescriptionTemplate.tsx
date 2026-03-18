@@ -42,26 +42,32 @@ const PrescriptionTemplate = React.memo(({
 
     const hasTyped = !!(diagnosis || clinicalNotes || (medicines && medicines.length > 0) || advice);
 
-    // Multi-page parsing logic: handles both raw arrays and JSON-stringified arrays from the DB
-    let images: (string | null)[] = [];
+    // Multi-page parsing logic
+    let rawImages: (string | null)[] = [];
     if (Array.isArray(handwrittenImage)) {
-        images = handwrittenImage;
+        rawImages = handwrittenImage;
     } else if (typeof handwrittenImage === 'string' && handwrittenImage.startsWith('[')) {
         try {
-            images = JSON.parse(handwrittenImage);
+            rawImages = JSON.parse(handwrittenImage);
         } catch (e) {
-            console.error("Failed to parse advice_image", e);
-            images = [handwrittenImage];
+            rawImages = [handwrittenImage];
         }
     } else {
-        images = [handwrittenImage as string | null];
+        rawImages = [handwrittenImage as string | null];
     }
 
-    if (images.length === 0) images = [null];
+    // Filter out invalid image data to prevent broken image icons
+    const isValidImage = (src: any): src is string => 
+        typeof src === 'string' && src.length > 5 && (src.startsWith('data:image') || src.startsWith('http'));
+    
+    const images = rawImages.filter(isValidImage);
+
+    // If no handwriting, we still need one "page" for typed content
+    const pagesToShow = images.length > 0 ? images : [null];
 
     return (
         <div className="flex flex-col items-center gap-8 w-full print-container">
-            {images.map((img, idx) => (
+            {pagesToShow.map((img, idx) => (
                 <div
                     key={idx}
                     id={idx === 0 ? "prescription-template" : undefined}
@@ -106,10 +112,10 @@ const PrescriptionTemplate = React.memo(({
                         </div>
                     )}
 
-                    {img && (
+                    {isValidImage(img) && (
                         <img
                             src={img}
-                            alt={`handwriting`}
+                            alt=""
                             draggable={false}
                             style={{
                                 position: 'absolute', top: 0, left: 0,
