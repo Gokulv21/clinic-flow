@@ -297,7 +297,7 @@ export default function DoctorConsultation() {
         {queue.map(visit => (
           <button
             key={visit.id}
-            onClick={() => selectVisit(visit)}
+            onClick={() => selectVisit(visit, true)}
             className={cn(
               "w-full text-left p-4 border-b border-border hover:bg-secondary/50 transition-colors",
               selectedVisit?.id === visit.id && "bg-secondary"
@@ -713,15 +713,27 @@ export default function DoctorConsultation() {
               <Label>Weight (kg)</Label>
               <Input 
                 type="number" 
+                step="0.1"
+                min="0"
+                max="300"
                 value={selectedVisit?.weight || ''} 
-                onChange={e => setSelectedVisit({...selectedVisit, weight: e.target.value})}
+                onChange={e => {
+                  const val = parseFloat(e.target.value);
+                  if (val > 300) return;
+                  setSelectedVisit({...selectedVisit, weight: e.target.value});
+                }}
               />
             </div>
             <div className="space-y-2">
               <Label>BP (mmHg)</Label>
               <Input 
                 value={selectedVisit?.blood_pressure || ''} 
-                onChange={e => setSelectedVisit({...selectedVisit, blood_pressure: e.target.value})}
+                onChange={e => {
+                  const val = e.target.value;
+                  // Basic validation: max length or pattern if needed
+                  if (val.length > 7) return; 
+                  setSelectedVisit({...selectedVisit, blood_pressure: val});
+                }}
                 placeholder="120/80"
               />
             </div>
@@ -729,32 +741,58 @@ export default function DoctorConsultation() {
               <Label>Pulse (bpm)</Label>
               <Input 
                 type="number" 
+                min="0"
+                max="250"
                 value={selectedVisit?.pulse_rate || ''} 
-                onChange={e => setSelectedVisit({...selectedVisit, pulse_rate: e.target.value})}
+                onChange={e => {
+                  const val = parseInt(e.target.value);
+                  if (val > 250) return;
+                  setSelectedVisit({...selectedVisit, pulse_rate: e.target.value});
+                }}
               />
             </div>
             <div className="space-y-2">
               <Label>SpO2 (%)</Label>
               <Input 
                 type="number" 
+                step="0.1"
+                min="0"
+                max="100"
                 value={selectedVisit?.spo2 || ''} 
-                onChange={e => setSelectedVisit({...selectedVisit, spo2: e.target.value})}
+                onChange={e => {
+                  const val = parseFloat(e.target.value);
+                  if (val > 100) return;
+                  setSelectedVisit({...selectedVisit, spo2: e.target.value});
+                }}
               />
             </div>
             <div className="space-y-2">
               <Label>Temp (°F)</Label>
               <Input 
                 type="number" 
+                step="0.1"
+                min="90"
+                max="115"
                 value={selectedVisit?.temperature || ''} 
-                onChange={e => setSelectedVisit({...selectedVisit, temperature: e.target.value})}
+                onChange={e => {
+                  const val = parseFloat(e.target.value);
+                  if (val > 115) return;
+                  setSelectedVisit({...selectedVisit, temperature: e.target.value});
+                }}
               />
             </div>
             <div className="space-y-2">
               <Label>CBG (mg/dL)</Label>
               <Input 
                 type="number" 
+                min="0"
+                max="800"
                 value={selectedVisit?.cbg || ''} 
-                onChange={e => setSelectedVisit({...selectedVisit, cbg: e.target.value})}
+                onChange={e => {
+                  const val = parseInt(e.target.value);
+                  if (val > 800) return;
+                  setSelectedVisit({...selectedVisit, cbg: e.target.value});
+                }}
               />
             </div>
           </div>
