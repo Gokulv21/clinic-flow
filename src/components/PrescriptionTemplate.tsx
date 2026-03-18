@@ -69,7 +69,7 @@ const PrescriptionTemplate = React.memo(({
                     style={{
                         width: isPrint ? '210mm' : '100%',
                         maxWidth: '100%',
-                        height: isPrint ? '296mm' : undefined,
+                        height: isPrint ? '290mm' : undefined,
                         maxHeight: isPrint ? '100%' : undefined,
                         aspectRatio: isPrint ? undefined : `${EXPORT_W} / ${EXPORT_H}`,
                         containerType: 'inline-size' as any,
@@ -79,6 +79,7 @@ const PrescriptionTemplate = React.memo(({
                         boxSizing: 'border-box',
                         boxShadow: isPrint ? 'none' : '0 10px 40px rgba(0,0,0,0.12)',
                         flexShrink: 0,
+                        pageBreakAfter: isPrint ? 'always' : undefined,
                     }}
                 >
                     {idx === 0 ? (

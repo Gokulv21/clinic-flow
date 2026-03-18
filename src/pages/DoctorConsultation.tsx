@@ -61,9 +61,14 @@ export default function DoctorConsultation() {
 
   useEffect(() => {
     fetchQueue();
+    
+    let debounceTimer: any;
     const channel = supabase
       .channel('visits-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'visits' }, () => fetchQueue())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'visits' }, () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(fetchQueue, 1000);
+      })
       .subscribe();
 
     // RESTORE STATE FROM LOCALSTORAGE
@@ -87,21 +92,25 @@ export default function DoctorConsultation() {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  // AUTO-SAVE DRAFT TO LOCALSTORAGE
+  // AUTO-SAVE DRAFT TO LOCALSTORAGE (DEBOUNCED)
   useEffect(() => {
     if (selectedVisit?.id && selectedVisit.id === lastLoadedVisitId.current) {
-      const draft = {
-        diagnosis,
-        clinicalNotes,
-        medicines,
-        advice,
-        prescriptionImage,
-        prescriptionPaths,
-        isWritingMode,
-        timestamp: Date.now()
-      };
-      localStorage.setItem(`draft_${selectedVisit.id}`, JSON.stringify(draft));
-      localStorage.setItem('active_consultation_id', selectedVisit.id);
+      const timer = setTimeout(() => {
+        const draft = {
+          diagnosis,
+          clinicalNotes,
+          medicines,
+          advice,
+          prescriptionImage,
+          prescriptionPaths,
+          isWritingMode,
+          timestamp: Date.now()
+        };
+        localStorage.setItem(`draft_${selectedVisit.id}`, JSON.stringify(draft));
+        localStorage.setItem('active_consultation_id', selectedVisit.id);
+      }, 1000); // 1 second debounce
+      
+      return () => clearTimeout(timer);
     }
   }, [selectedVisit?.id, diagnosis, clinicalNotes, medicines, advice, prescriptionImage, prescriptionPaths, isWritingMode]);
 

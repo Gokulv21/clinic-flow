@@ -33,7 +33,21 @@ export function printPrescription(): void {
     document.body.classList.add('is-printing');
 
     // ── 2. Trigger Print ────────────────────────────────────────────
-    const triggerPrint = () => {
+    const monitorImagesAndPrint = async () => {
+        const images = Array.from(printMount.querySelectorAll('img'));
+        
+        // Wait for all images to be 'complete'
+        await Promise.all(images.map(img => {
+            if (img.complete) return Promise.resolve();
+            return new Promise(resolve => {
+                img.onload = resolve;
+                img.onerror = resolve; // Continue regardless
+            });
+        }));
+
+        // Final buffer for rendering engine
+        await new Promise(r => setTimeout(r, 500));
+        
         window.print();
         
         // ── 3. Cleanup ─────────────────────────────────────────────
@@ -42,10 +56,9 @@ export function printPrescription(): void {
             if (document.getElementById('print-mount')) {
                 document.body.removeChild(printMount);
             }
-        }, 1500); // Slightly longer delay for mobile cleanup
+        }, 1500); 
     };
 
-    // Give it a moment (800ms) for the DOM and images to settle
-    // On mobile devices, this delay is crucial for the print engine to register the new content.
-    setTimeout(triggerPrint, 800);
+    // Initial settle time for DOM injection
+    setTimeout(monitorImagesAndPrint, 500);
 }
