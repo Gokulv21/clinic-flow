@@ -25,6 +25,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
     // Drawing State
     const [penColor, setPenColor] = useState('#1e293b');
     const [penSize, setPenSize] = useState(3);
+    const [eraserSize, setEraserSize] = useState(10);
     const [isEraser, setIsEraser] = useState(false);
 
 
@@ -75,8 +76,9 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
         ctx.fillStyle = isEraser ? '#ffffff' : color;
         ctx.globalCompositeOperation = isEraser ? 'destination-out' : 'source-over';
 
+        const strokeSize = isEraser ? size * 5 : size * 2;
         const stroke = getStroke(points.map(p => [p.x * canvasWidth, p.y * canvasHeight, (p as any).pressure || 0.5]), {
-            size: isEraser ? size * 5 : size * 2,
+            size: strokeSize,
             thinning: 0.5,
             smoothing: 0.5,
             streamline: 0.5,
@@ -211,17 +213,19 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
     // ── Global gesture/selection suppression (WebKit / iPad Chrome)
     useEffect(() => {
         const prevent = (e: Event) => e.preventDefault();
-        // Suppress iOS Safari/Chrome gesture events that trigger text selection
+        // Only prevent touchmove if we are actually drawing
+        const preventTouch = (e: TouchEvent) => {
+            if (isDrawingRef.current) e.preventDefault();
+        };
         document.addEventListener('gesturestart', prevent, { passive: false });
         document.addEventListener('gesturechange', prevent, { passive: false });
         document.addEventListener('gestureend', prevent, { passive: false });
-        // Prevent touchmove from scrolling while canvas is mounted
-        document.addEventListener('touchmove', prevent, { passive: false });
+        document.addEventListener('touchmove', preventTouch, { passive: false });
         return () => {
             document.removeEventListener('gesturestart', prevent);
             document.removeEventListener('gesturechange', prevent);
             document.removeEventListener('gestureend', prevent);
-            document.removeEventListener('touchmove', prevent);
+            document.removeEventListener('touchmove', preventTouch);
         };
     }, []);
 
@@ -296,7 +300,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
             const newPath = {
                 points: [...currentPathRef.current],
                 color: penColor,
-                size: penSize,
+                size: isEraser ? eraserSize : penSize,
                 isEraser: isEraser,
             };
             const updatedPages = [...pages];
@@ -457,13 +461,17 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                         </div>
 
                         <div className="flex items-center gap-2 px-2 border-l border-slate-200 h-6">
-                            <span className="text-[10px] font-bold text-slate-400 w-4">{penSize}</span>
+                            <span className="text-[10px] font-bold text-slate-400 w-4">{isEraser ? eraserSize : penSize}</span>
                             <input
                                 type="range"
                                 min="1"
                                 max="20"
-                                value={penSize}
-                                onChange={(e) => setPenSize(parseInt(e.target.value))}
+                                value={isEraser ? eraserSize : penSize}
+                                onChange={(e) => {
+                                    const val = parseInt(e.target.value);
+                                    if (isEraser) setEraserSize(val);
+                                    else setPenSize(val);
+                                }}
                                 className="w-12 md:w-16 h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                             />
                         </div>

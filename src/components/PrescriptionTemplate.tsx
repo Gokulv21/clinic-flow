@@ -31,7 +31,6 @@ const PrescriptionTemplate = React.memo(({
     const time = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
     const vitals = [
-        { label: 'Reg. No', value: visit?.token_number, unit: '' },
         { label: 'Weight', value: visit?.weight, unit: ' kg' },
         { label: 'BP', value: visit?.blood_pressure, unit: ' mmHg' },
         { label: 'Pulse', value: visit?.pulse_rate, unit: ' /min' },
@@ -183,7 +182,7 @@ function PageOne({ patient, visit, today, time, diagnosis, medicines, advice, ha
                     </div>
 
                     <div>
-                        <div style={{ fontWeight: 800, color: '#c21b1eff', fontSize: '2em', lineHeight: 1, letterSpacing: '0.01em' }}>
+                        <div style={{ fontWeight: 800, color: '#334155', fontSize: '2em', lineHeight: 1, letterSpacing: '0.01em' }}>
                             Dr. V. Aravind
                         </div>
                         <div style={{ color: '#475569', fontSize: '0.9em', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', marginTop: '0.3em' }}>
@@ -198,7 +197,7 @@ function PageOne({ patient, visit, today, time, diagnosis, medicines, advice, ha
                     </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontWeight: 900, color: '#205213ff', fontSize: '3.2em', letterSpacing: '0.04em', lineHeight: 1 }}>
+                    <div style={{ fontWeight: 900, color: '#0284c7', fontSize: '3.2em', letterSpacing: '0.04em', lineHeight: 1 }}>
                         GV Clinic
                     </div>
                     <div style={{ color: '#475569', fontSize: '0.8em', marginTop: '0.4em', letterSpacing: '0.2em', fontWeight: 800 }}>
@@ -219,7 +218,7 @@ function PageOne({ patient, visit, today, time, diagnosis, medicines, advice, ha
             <div style={{
                 background: '#fff',
                 borderBottom: '2px solid #e2e8f0',
-                display: 'grid', gridTemplateColumns: '2.4fr 1fr 1.1fr 0.9fr',
+                display: 'grid', gridTemplateColumns: '1.8fr 1fr 1fr 0.8fr 0.8fr',
                 padding: '0.8em 2em', gap: '1.2em', flexShrink: 0,
             }}>
                 {[
@@ -227,6 +226,7 @@ function PageOne({ patient, visit, today, time, diagnosis, medicines, advice, ha
                     { label: 'Age / Sex', value: patient ? `${patient.age ?? '—'} / ${patient.sex?.charAt(0) ?? '—'}` : '—' },
                     { label: 'Date', value: today },
                     { label: 'Time', value: time },
+                    { label: 'Reg. No', value: visit?.token_number ?? '—' },
                 ].map(({ label, value, color }) => (
                     <div key={label} style={{ overflow: 'hidden', minWidth: 0 }}>
                         <div style={{ fontSize: '0.75em', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</div>

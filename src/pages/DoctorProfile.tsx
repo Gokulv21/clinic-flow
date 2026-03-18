@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Users, Calendar, Activity, Clock, ShieldCheck, User, Loader2 } from 'lucide-react';
+import { Users, Calendar, Activity, Clock, ShieldCheck, User, Loader2, UserCheck } from 'lucide-react';
 import { startOfDay, endOfDay } from 'date-fns';
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
@@ -12,7 +12,7 @@ type ProfileData = {
 };
 
 export default function DoctorProfile() {
-    const { user } = useAuth();
+    const { user, roles } = useAuth();
     const [profile, setProfile] = useState<ProfileData | null>(null);
     const [totalPatients, setTotalPatients] = useState<number>(0);
     const [todayPatients, setTodayPatients] = useState<number>(0);
@@ -103,19 +103,30 @@ export default function DoctorProfile() {
 
             <Card className="bg-gradient-to-br from-slate-50 to-blue-50/30 border-slate-200 shadow-sm relative overflow-hidden">
                 <CardContent className="p-8 flex flex-col md:flex-row items-center gap-8">
-                    <Avatar className="w-24 h-24 border-4 border-white shadow-md">
-                        <AvatarFallback className="bg-blue-600 text-white text-3xl font-bold uppercase">
-                            {profile?.full_name?.charAt(0)}
-                        </AvatarFallback>
-                    </Avatar>
+                    <div className="relative group">
+                        <Avatar className="w-32 h-40 rounded-xl border-4 border-white shadow-2xl overflow-hidden bg-slate-100 flex items-center justify-center">
+                            <AvatarFallback className="bg-gradient-to-b from-blue-100 to-blue-200 w-full h-full flex flex-col items-center justify-end pt-4">
+                                <User className="w-24 h-24 text-blue-600/40 mb-[-10px]" strokeWidth={1.5} />
+                                <div className="w-full h-1/4 bg-blue-600/10 flex items-center justify-center">
+                                    <ShieldCheck className="w-5 h-5 text-blue-600/30" />
+                                </div>
+                            </AvatarFallback>
+                        </Avatar>
+                        <div className="absolute -bottom-2 -right-2 bg-emerald-500 text-white p-1.5 rounded-full border-4 border-white shadow-lg">
+                           <UserCheck className="w-4 h-4" />
+                        </div>
+                    </div>
 
-                    <div className="flex-1 text-center md:text-left">
-                        <h2 className="text-3xl font-bold text-slate-900">{profile?.full_name}</h2>
-                        <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mt-3">
-                            <span className="bg-slate-900 text-white text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                                Clinic Staff
-                            </span>
-                            <span className="text-slate-500 text-sm font-medium">{profile?.email}</span>
+                    <div className="flex-1 text-center md:text-left space-y-2">
+                        <h2 className="text-4xl font-black text-slate-900 tracking-tight">{profile?.full_name}</h2>
+                        <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
+                            {roles.map(role => (
+                                <span key={role} className="bg-blue-600 text-white text-[10px] px-3 py-1 rounded-md font-black uppercase tracking-[0.2em] shadow-md shadow-blue-200">
+                                    {role}
+                                </span>
+                            ))}
+                            <div className="h-4 w-[1px] bg-slate-300 mx-1 hidden md:block" />
+                            <span className="text-slate-500 text-sm font-bold tracking-tight">{profile?.email}</span>
                         </div>
                     </div>
                 </CardContent>

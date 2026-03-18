@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { User, Clock, CheckCircle, Plus, Trash2, Save, Loader2, PenTool, Eye, Menu, Printer, ArrowLeft, Activity, ClipboardList } from 'lucide-react';
+import { User, Clock, CheckCircle, Plus, Trash2, Save, Loader2, PenTool, Eye, Menu, Printer, ArrowLeft, Activity, ClipboardList, Scale, Heart, Wind, Thermometer, Droplet } from 'lucide-react';
 import DigitalPrescription from '@/components/DigitalPrescription';
 import PrescriptionTemplate from '@/components/PrescriptionTemplate';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -288,16 +288,19 @@ export default function DoctorConsultation() {
                   </div>
                   <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
                     {[
-                      { label: 'Weight', value: selectedVisit.weight, unit: 'kg' },
-                      { label: 'BP', value: selectedVisit.blood_pressure, unit: 'mmHg' },
-                      { label: 'Pulse', value: selectedVisit.pulse_rate, unit: 'bpm' },
-                      { label: 'SpO2', value: selectedVisit.spo2, unit: '%' },
-                      { label: 'Temp', value: selectedVisit.temperature, unit: '°F' },
-                      { label: 'CBG', value: selectedVisit.cbg, unit: 'mg/dL' },
+                      { label: 'Weight', value: selectedVisit.weight, unit: 'kg', icon: Scale, color: 'text-orange-500', bg: 'bg-orange-50' },
+                      { label: 'BP', value: selectedVisit.blood_pressure, unit: 'mmHg', icon: Heart, color: 'text-red-500', bg: 'bg-red-50' },
+                      { label: 'Pulse', value: selectedVisit.pulse_rate, unit: 'bpm', icon: Activity, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+                      { label: 'SpO2', value: selectedVisit.spo2, unit: '%', icon: Wind, color: 'text-sky-500', bg: 'bg-sky-50' },
+                      { label: 'Temp', value: selectedVisit.temperature, unit: '°F', icon: Thermometer, color: 'text-amber-500', bg: 'bg-amber-50' },
+                      { label: 'CBG', value: selectedVisit.cbg, unit: 'mg/dL', icon: Droplet, color: 'text-rose-500', bg: 'bg-rose-50' },
                     ].map(v => (
-                      <div key={v.label} className="text-center p-3 rounded-2xl bg-white border border-slate-100 shadow-sm hover:border-blue-200 transition-colors group">
-                        <p className="text-[10px] font-extrabold text-slate-400 mb-1 group-hover:text-blue-400 transition-colors uppercase">{v.label}</p>
-                        <p className="font-extrabold text-sm text-slate-700">{v.value ?? '—'}<span className="text-[10px] font-medium ml-0.5 opacity-60 font-sans">{v.value ? ` ${v.unit}` : ''}</span></p>
+                      <div key={v.label} className="text-center p-3 rounded-2xl bg-white border border-slate-100 shadow-sm hover:border-blue-200 transition-all group flex flex-col items-center gap-1.5">
+                        <div className={cn("p-2 rounded-xl transition-colors", v.bg)}>
+                          <v.icon className={cn("w-4 h-4", v.color)} />
+                        </div>
+                        <p className="text-[10px] font-extrabold text-slate-400 group-hover:text-blue-400 transition-colors uppercase">{v.label}</p>
+                        <p className="font-extrabold text-sm text-slate-700 leading-none">{v.value ?? '—'}<span className="text-[10px] font-medium ml-0.5 opacity-60 font-sans">{v.value ? ` ${v.unit}` : ''}</span></p>
                       </div>
                     ))}
                   </div>
