@@ -58,13 +58,13 @@ export default function NurseEntry() {
 
   const selectOldPatient = (p: any) => {
     setSelectedPatientId(p.id);
-    setPatient({ 
-      title: p.title || '', 
-      name: p.name, 
-      age: String(p.age), 
-      sex: p.sex, 
-      phone: p.phone, 
-      address: p.address || '' 
+    setPatient({
+      title: p.title || '',
+      name: p.name,
+      age: String(p.age),
+      sex: p.sex,
+      phone: p.phone,
+      address: p.address || ''
     });
     setStep('vitals');
   };
@@ -80,28 +80,38 @@ export default function NurseEntry() {
 
   const submitVisit = async () => {
     setLoading(true);
+    const loadingToast = toast.loading('Registering patient...');
     try {
+      console.log('[NurseEntry] Submitting patient data:', patient);
       let patientId = selectedPatientId;
 
       if (!patientId) {
-        let ageInYears = parseFloat(patient.age);
-        if (ageUnit === 'months') ageInYears = ageInYears / 12;
-        if (ageUnit === 'days') ageInYears = ageInYears / 365;
+        let ageInYearsRaw = parseFloat(patient.age);
+        if (ageUnit === 'months') ageInYearsRaw = ageInYearsRaw / 12;
+        if (ageUnit === 'days') ageInYearsRaw = ageInYearsRaw / 365;
+
+        // Ensure we store whole years if >= 1, or rounded decimals for babies (< 1)
+        // This avoids 400 Bad Request errors from high-precision floats in some DB configs
+        const ageInYears = ageInYearsRaw >= 1 ? Math.floor(ageInYearsRaw) : Number(ageInYearsRaw.toFixed(2));
 
         const { data: newPatient, error } = await supabase
           .from('patients')
-          .insert({ 
+          .insert({
             title: patient.title,
-            name: patient.name, 
-            age: ageInYears, 
-            sex: patient.sex, 
-            phone: patient.phone, 
-            address: patient.address || null 
+            name: patient.name,
+            age: ageInYears,
+            sex: patient.sex,
+            phone: patient.phone,
+            address: patient.address || null
           })
           .select()
           .single();
-        if (error) throw error;
+        if (error) {
+          console.error('[NurseEntry] Patient Insert Error:', error);
+          throw error;
+        }
         patientId = newPatient.id;
+        console.log('[NurseEntry] New patient created with ID:', patientId);
       }
 
       // Get next token
@@ -119,11 +129,18 @@ export default function NurseEntry() {
         cbg: vitals.cbg ? parseFloat(vitals.cbg) : null,
       });
 
-      if (visitError) throw visitError;
+      if (visitError) {
+        console.error('[NurseEntry] Visit Insert Error:', visitError);
+        throw visitError;
+      }
+
       setTokenNumber(token);
       setStep('done');
+      toast.dismiss(loadingToast);
       toast.success(`Patient added to queue — Token #${token}`);
     } catch (err: any) {
+      console.error('[NurseEntry] Critical Error:', err);
+      toast.dismiss();
       toast.error(err.message || 'Failed to submit');
     } finally {
       setLoading(false);
@@ -148,11 +165,12 @@ export default function NurseEntry() {
     if (unit === 'days') ageVal = ageVal / 365;
 
     if (ageVal < 2) {
-      setPatient(p => ({ ...p, title: 'Baby' }));
+      setPatient(p => ({ ...p, title: 'Baby.' }));
     } else if (sex === 'Male') {
-      setPatient(p => ({ ...p, title: 'Mr.' }));
+      const suggested = ageVal < 12 ? 'Mast.' : 'Mr.';
+      setPatient(p => ({ ...p, title: suggested }));
     } else if (sex === 'Female') {
-      setPatient(p => ({ ...p, title: 'Miss' }));
+      setPatient(p => ({ ...p, title: 'Miss.' }));
     }
   };
 
@@ -187,286 +205,287 @@ export default function NurseEntry() {
             <TabsTrigger value="old" className="gap-2"><Search className="w-4 h-4" />Existing Patient</TabsTrigger>
           </TabsList>
 
-        <TabsContent value="new">
-          {step === 'patient' && (
-            <Card className="animate-fade-in">
-              <CardHeader>
-                <CardTitle>Patient Details</CardTitle>
-                <CardDescription>Enter the new patient's information</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Title *</Label>
-                    <Select value={patient.title} onValueChange={v => setPatient(p => ({ ...p, title: v }))}>
-                      <SelectTrigger><SelectValue placeholder="Title" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Mr.">Mr.</SelectItem>
-                        <SelectItem value="Miss">Miss</SelectItem>
-                        <SelectItem value="Mrs.">Mrs.</SelectItem>
-                        <SelectItem value="Baby">Baby</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Name *</Label>
-                    <Input value={patient.name} onChange={e => setPatient(p => ({ ...p, name: e.target.value }))} placeholder="Patient name" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Age *</Label>
-                    <div className="flex gap-2">
-                      <Input 
-                        type="number" 
-                        step="0.1"
-                        value={patient.age} 
-                        onChange={e => {
-                          const val = parseFloat(e.target.value);
-                          if (val > 1000) return;
-                          setPatient(p => ({ ...p, age: e.target.value }));
-                          autoSetTitle(e.target.value, patient.sex, ageUnit);
-                        }} 
-                        placeholder="Age" 
-                        className="flex-1"
-                      />
-                      <Select value={ageUnit} onValueChange={(v: any) => {
-                        setAgeUnit(v);
-                        autoSetTitle(patient.age, patient.sex, v);
-                      }}>
-                        <SelectTrigger className="w-[110px]"><SelectValue /></SelectTrigger>
+          <TabsContent value="new">
+            {step === 'patient' && (
+              <Card className="animate-fade-in">
+                <CardHeader>
+                  <CardTitle>Patient Details</CardTitle>
+                  <CardDescription>Enter the new patient's information</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Title *</Label>
+                      <Select value={patient.title} onValueChange={v => setPatient(p => ({ ...p, title: v }))}>
+                        <SelectTrigger><SelectValue placeholder="Title" /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="years">Years</SelectItem>
-                          <SelectItem value="months">Months</SelectItem>
-                          <SelectItem value="days">Days</SelectItem>
+                          <SelectItem value="Mr.">Mr.</SelectItem>
+                          <SelectItem value="Mast.">Mast.</SelectItem>
+                          <SelectItem value="Miss.">Miss.</SelectItem>
+                          <SelectItem value="Mrs.">Mrs.</SelectItem>
+                          <SelectItem value="Baby.">Baby.</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
+                    <div className="space-y-2">
+                      <Label>Name *</Label>
+                      <Input value={patient.name} onChange={e => setPatient(p => ({ ...p, name: e.target.value }))} placeholder="Patient name" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Age *</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="number"
+                          step="0.1"
+                          value={patient.age}
+                          onChange={e => {
+                            const val = parseFloat(e.target.value);
+                            if (val > 1000) return;
+                            setPatient(p => ({ ...p, age: e.target.value }));
+                            autoSetTitle(e.target.value, patient.sex, ageUnit);
+                          }}
+                          placeholder="Age"
+                          className="flex-1"
+                        />
+                        <Select value={ageUnit} onValueChange={(v: any) => {
+                          setAgeUnit(v);
+                          autoSetTitle(patient.age, patient.sex, v);
+                        }}>
+                          <SelectTrigger className="w-[110px]"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="years">Years</SelectItem>
+                            <SelectItem value="months">Months</SelectItem>
+                            <SelectItem value="days">Days</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Sex *</Label>
+                      <Select
+                        value={patient.sex}
+                        onValueChange={v => {
+                          setPatient(p => ({ ...p, sex: v }));
+                          autoSetTitle(patient.age, v, ageUnit);
+                        }}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Male">Male</SelectItem>
+                          <SelectItem value="Female">Female</SelectItem>
+                          <SelectItem value="Other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Phone *</Label>
+                      <Input
+                        value={patient.phone}
+                        onChange={e => {
+                          const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                          setPatient(p => ({ ...p, phone: val }));
+                        }}
+                        placeholder="Phone number"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Address</Label>
+                      <Input value={patient.address} onChange={e => setPatient(p => ({ ...p, address: e.target.value }))} placeholder="Address" />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Sex *</Label>
-                    <Select 
-                      value={patient.sex} 
-                      onValueChange={v => {
-                        setPatient(p => ({ ...p, sex: v }));
-                        autoSetTitle(patient.age, v, ageUnit);
-                      }}
-                    >
-                      <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Male">Male</SelectItem>
-                        <SelectItem value="Female">Female</SelectItem>
-                        <SelectItem value="Other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Phone *</Label>
-                    <Input 
-                      value={patient.phone} 
-                      onChange={e => {
-                        const val = e.target.value.replace(/\D/g, '').slice(0, 10);
-                        setPatient(p => ({ ...p, phone: val }));
-                      }} 
-                      placeholder="Phone number" 
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Address</Label>
-                    <Input value={patient.address} onChange={e => setPatient(p => ({ ...p, address: e.target.value }))} placeholder="Address" />
-                  </div>
-                </div>
-                <Button onClick={handleNewPatientNext} className="w-full">Next — Enter Vitals</Button>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
+                  <Button onClick={handleNewPatientNext} className="w-full">Next — Enter Vitals</Button>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
 
-        <TabsContent value="old">
-          {step === 'patient' && (
-            <Card className="animate-fade-in">
-              <CardHeader>
-                <CardTitle>Search Patient</CardTitle>
-                <CardDescription>Search by name or phone number</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="relative">
-                  <div className="flex gap-2">
+          <TabsContent value="old">
+            {step === 'patient' && (
+              <Card className="animate-fade-in">
+                <CardHeader>
+                  <CardTitle>Search Patient</CardTitle>
+                  <CardDescription>Search by name or phone number</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="relative">
+                    <div className="flex gap-2">
+                      <Input
+                        value={searchQuery}
+                        onChange={e => {
+                          setSearchQuery(e.target.value);
+                          if (e.target.value.trim()) {
+                            // Simple real-time search
+                            supabase
+                              .from('patients')
+                              .select('*')
+                              .or(`phone.ilike.%${e.target.value}%,name.ilike.%${e.target.value}%`)
+                              .limit(10)
+                              .then(({ data }) => setSearchResults(data || []));
+                          } else {
+                            setSearchResults([]);
+                          }
+                        }}
+                        placeholder="Type name or phone to search..."
+                      />
+                      <Button onClick={searchPatients} variant="secondary">
+                        <Search className="w-4 h-4 ml-[-4px]" />
+                      </Button>
+                    </div>
+
+                    {searchQuery && (
+                      <div className="absolute z-10 top-full left-0 right-14 mt-1 bg-white border border-border rounded-md shadow-lg overflow-hidden max-h-64 overflow-y-auto">
+                        {searchResults.map(p => (
+                          <button
+                            key={p.id}
+                            onClick={() => selectOldPatient(p)}
+                            className="w-full text-left p-3 hover:bg-slate-100 transition-colors border-b last:border-b-0"
+                          >
+                            <div className="font-medium text-slate-800">{p.name}</div>
+                            <div className="text-xs text-slate-500">{p.phone} · {formatAge(p.age)} · {p.sex}</div>
+                          </button>
+                        ))}
+                        {searchResults.length === 0 && (
+                          <div className="p-3 text-sm text-slate-500 text-center">No patients found.</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+        </Tabs>
+
+        {step === 'vitals' && (
+          <Card className="animate-fade-in">
+            <CardHeader>
+              <CardTitle>Vitals — {patient.name}</CardTitle>
+              <CardDescription>Record the patient's vital signs</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Weight (kg)</Label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="300"
+                    value={vitals.weight}
+                    onChange={e => {
+                      const val = parseFloat(e.target.value);
+                      if (val > 300) return;
+                      setVitals(v => ({ ...v, weight: e.target.value }));
+                    }}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Blood Pressure (mmHg)</Label>
+                  <div className="flex items-center gap-2">
                     <Input
-                      value={searchQuery}
+                      placeholder="Sys"
+                      inputMode="numeric"
+                      value={vitals.blood_pressure.split('/')[0] || ''}
                       onChange={e => {
-                        setSearchQuery(e.target.value);
-                        if (e.target.value.trim()) {
-                          // Simple real-time search
-                          supabase
-                            .from('patients')
-                            .select('*')
-                            .or(`phone.ilike.%${e.target.value}%,name.ilike.%${e.target.value}%`)
-                            .limit(10)
-                            .then(({ data }) => setSearchResults(data || []));
-                        } else {
-                          setSearchResults([]);
+                        const sbp = e.target.value.replace(/\D/g, '').slice(0, 3);
+                        if (parseInt(sbp) > 300) return;
+                        const dbp = vitals.blood_pressure.split('/')[1] || '';
+                        setVitals(v => ({ ...v, blood_pressure: `${sbp}/${dbp}`.replace(/^\/|\/$/g, '') }));
+                        if (sbp.length >= 3) {
+                          document.getElementById('dbp-input')?.focus();
                         }
                       }}
-                      placeholder="Type name or phone to search..."
+                      className="text-center"
                     />
-                    <Button onClick={searchPatients} variant="secondary">
-                      <Search className="w-4 h-4 ml-[-4px]" />
-                    </Button>
+                    <span className="text-muted-foreground font-bold">/</span>
+                    <Input
+                      id="dbp-input"
+                      placeholder="Dia"
+                      inputMode="numeric"
+                      value={vitals.blood_pressure.split('/')[1] || ''}
+                      onChange={e => {
+                        const sbp = vitals.blood_pressure.split('/')[0] || '';
+                        const dbp = e.target.value.replace(/\D/g, '').slice(0, 3);
+                        if (parseInt(dbp) > 300) return;
+                        setVitals(v => ({ ...v, blood_pressure: `${sbp}/${dbp}`.replace(/^\/|\/$/g, '') }));
+                        if (dbp.length >= 3) {
+                          document.getElementById('pulse-input')?.focus();
+                        }
+                      }}
+                      className="text-center"
+                    />
                   </div>
-
-                  {searchQuery && (
-                    <div className="absolute z-10 top-full left-0 right-14 mt-1 bg-white border border-border rounded-md shadow-lg overflow-hidden max-h-64 overflow-y-auto">
-                      {searchResults.map(p => (
-                        <button
-                          key={p.id}
-                          onClick={() => selectOldPatient(p)}
-                          className="w-full text-left p-3 hover:bg-slate-100 transition-colors border-b last:border-b-0"
-                        >
-                          <div className="font-medium text-slate-800">{p.name}</div>
-                          <div className="text-xs text-slate-500">{p.phone} · {formatAge(p.age)} · {p.sex}</div>
-                        </button>
-                      ))}
-                      {searchResults.length === 0 && (
-                        <div className="p-3 text-sm text-slate-500 text-center">No patients found.</div>
-                      )}
-                    </div>
-                  )}
                 </div>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-      </Tabs>
-
-      {step === 'vitals' && (
-        <Card className="animate-fade-in">
-          <CardHeader>
-            <CardTitle>Vitals — {patient.name}</CardTitle>
-            <CardDescription>Record the patient's vital signs</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Weight (kg)</Label>
-                <Input 
-                  type="number" 
-                  step="0.1" 
-                  min="0" 
-                  max="300"
-                  value={vitals.weight} 
-                  onChange={e => {
-                    const val = parseFloat(e.target.value);
-                    if (val > 300) return;
-                    setVitals(v => ({ ...v, weight: e.target.value }));
-                  }} 
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Blood Pressure (mmHg)</Label>
-                <div className="flex items-center gap-2">
+                <div className="space-y-2">
+                  <Label>Pulse Rate (bpm)</Label>
                   <Input
-                    placeholder="Sys"
-                    inputMode="numeric"
-                    value={vitals.blood_pressure.split('/')[0] || ''}
+                    id="pulse-input"
+                    type="number"
+                    min="0"
+                    max="250"
+                    value={vitals.pulse_rate}
                     onChange={e => {
-                      const sbp = e.target.value.replace(/\D/g, '').slice(0, 3);
-                      if (parseInt(sbp) > 300) return;
-                      const dbp = vitals.blood_pressure.split('/')[1] || '';
-                      setVitals(v => ({ ...v, blood_pressure: `${sbp}/${dbp}`.replace(/^\/|\/$/g, '') }));
-                      if (sbp.length >= 3) {
-                        document.getElementById('dbp-input')?.focus();
-                      }
+                      const val = parseInt(e.target.value);
+                      if (val > 250) return;
+                      setVitals(v => ({ ...v, pulse_rate: e.target.value }));
                     }}
-                    className="text-center"
                   />
-                  <span className="text-muted-foreground font-bold">/</span>
+                </div>
+                <div className="space-y-2">
+                  <Label>SpO2 (%)</Label>
                   <Input
-                    id="dbp-input"
-                    placeholder="Dia"
-                    inputMode="numeric"
-                    value={vitals.blood_pressure.split('/')[1] || ''}
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="100"
+                    value={vitals.spo2}
                     onChange={e => {
-                      const sbp = vitals.blood_pressure.split('/')[0] || '';
-                      const dbp = e.target.value.replace(/\D/g, '').slice(0, 3);
-                      if (parseInt(dbp) > 300) return;
-                      setVitals(v => ({ ...v, blood_pressure: `${sbp}/${dbp}`.replace(/^\/|\/$/g, '') }));
-                      if (dbp.length >= 3) {
-                        document.getElementById('pulse-input')?.focus();
-                      }
+                      const val = parseFloat(e.target.value);
+                      if (val > 100) return;
+                      setVitals(v => ({ ...v, spo2: e.target.value }));
                     }}
-                    className="text-center"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Temperature (°F)</Label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    min="90"
+                    max="110"
+                    value={vitals.temperature}
+                    onChange={e => {
+                      const val = parseFloat(e.target.value);
+                      if (val > 110) return;
+                      setVitals(v => ({ ...v, temperature: e.target.value }));
+                    }}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>CBG (mg/dL)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="600"
+                    value={vitals.cbg}
+                    onChange={e => {
+                      const val = parseInt(e.target.value);
+                      if (val > 600) return;
+                      setVitals(v => ({ ...v, cbg: e.target.value }));
+                    }}
                   />
                 </div>
               </div>
-               <div className="space-y-2">
-                <Label>Pulse Rate (bpm)</Label>
-                <Input 
-                  id="pulse-input" 
-                  type="number" 
-                  min="0"
-                  max="250"
-                  value={vitals.pulse_rate} 
-                  onChange={e => {
-                    const val = parseInt(e.target.value);
-                    if (val > 250) return;
-                    setVitals(v => ({ ...v, pulse_rate: e.target.value }));
-                  }} 
-                />
+              <div className="flex gap-3">
+                <Button variant="outline" onClick={() => setStep('patient')} className="flex-1">Back</Button>
+                <Button onClick={submitVisit} disabled={loading} className="flex-1">
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  Submit & Queue Patient
+                </Button>
               </div>
-              <div className="space-y-2">
-                <Label>SpO2 (%)</Label>
-                <Input 
-                  type="number" 
-                  step="0.1" 
-                  min="0"
-                  max="100"
-                  value={vitals.spo2} 
-                  onChange={e => {
-                    const val = parseFloat(e.target.value);
-                    if (val > 100) return;
-                    setVitals(v => ({ ...v, spo2: e.target.value }));
-                  }} 
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Temperature (°F)</Label>
-                <Input 
-                  type="number" 
-                  step="0.1" 
-                  min="90"
-                  max="110"
-                  value={vitals.temperature} 
-                  onChange={e => {
-                    const val = parseFloat(e.target.value);
-                    if (val > 110) return;
-                    setVitals(v => ({ ...v, temperature: e.target.value }));
-                  }} 
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>CBG (mg/dL)</Label>
-                <Input 
-                  type="number" 
-                  min="0"
-                  max="600"
-                  value={vitals.cbg} 
-                  onChange={e => {
-                    const val = parseInt(e.target.value);
-                    if (val > 600) return;
-                    setVitals(v => ({ ...v, cbg: e.target.value }));
-                  }} 
-                />
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <Button variant="outline" onClick={() => setStep('patient')} className="flex-1">Back</Button>
-              <Button onClick={submitVisit} disabled={loading} className="flex-1">
-                {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                Submit & Queue Patient
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );
