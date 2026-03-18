@@ -27,8 +27,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
     const [penSize, setPenSize] = useState(3);
     const [isEraser, setIsEraser] = useState(false);
 
-    // NEW: Precision Mode (Pen Only)
-    const [precisionMode, setPrecisionMode] = useState(false);
+
 
     // Multi-page State
     type PathPoint = { x: number; y: number };
@@ -52,6 +51,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
     const currentPathRef = useRef<any[]>([]); // Points with pressure
     const isDirtyRef = useRef(false);
     const requestRef = useRef<number>();
+    const activePointerIdRef = useRef<number | null>(null);
 
     // Pinch-to-zoom state
     const lastTouchDistanceRef = useRef<number | null>(null);
@@ -177,19 +177,10 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
         redrawPage();
     }, [currentPageIndex, isEnlarged, fitCanvas, redrawStatic, redrawPage]);
 
-    // ── Advanced Pointer Tracking
-    const activePointersRef = useRef(new Map<number, { x: number, y: number, screenX: number, screenY: number, type: string }>());
-    const lastPenTapRef = useRef<number>(0);
-    const isPenActiveRef = useRef(false);
-    // Track if the last pen interaction was an actual drawing stroke (not just a tap)
-    const didDrawOnLastPenDownRef = useRef(false);
-    // Track pen barrel double-tap (simulated via rapid tap without movement)
-    const lastPenTapPositionRef = useRef<{ x: number, y: number } | null>(null);
-
     // ── Gesture State
     const [canvasTransform, setCanvasTransform] = useState({ x: 0, y: 0, scale: 1 });
 
-    // Bind gestures
+    // Bind gestures (touch/finger only — pen is handled separately)
     useGesture(
         {
             onDrag: ({ offset: [x, y], event }) => {
@@ -199,7 +190,6 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
             },
             onPinch: ({ offset: [d, a], event }) => {
                 if ((event as any).pointerType === 'touch') {
-                    // Normalize distance to scale (base scale 1)
                     setCanvasTransform(t => ({ ...t, scale: Math.max(0.5, Math.min(4, d)) }));
                 }
             },
@@ -218,6 +208,23 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
         }
     );
 
+    // ── Global gesture/selection suppression (WebKit / iPad Chrome)
+    useEffect(() => {
+        const prevent = (e: Event) => e.preventDefault();
+        // Suppress iOS Safari/Chrome gesture events that trigger text selection
+        document.addEventListener('gesturestart', prevent, { passive: false });
+        document.addEventListener('gesturechange', prevent, { passive: false });
+        document.addEventListener('gestureend', prevent, { passive: false });
+        // Prevent touchmove from scrolling while canvas is mounted
+        document.addEventListener('touchmove', prevent, { passive: false });
+        return () => {
+            document.removeEventListener('gesturestart', prevent);
+            document.removeEventListener('gesturechange', prevent);
+            document.removeEventListener('gestureend', prevent);
+            document.removeEventListener('touchmove', prevent);
+        };
+    }, []);
+
     // ── Writing Restriction Check (Only first page has bounds)
     const isInWritingArea = (pos: { x: number, y: number }) => {
         return true; // Doctors can now draw everywhere (strike out vitals, etc.)
@@ -234,129 +241,88 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
     };
 
     const onPointerDown = (e: React.PointerEvent) => {
-        // Prevent scrolling/zoom during pen/touch start
         e.preventDefault();
+
+        // Only handle Apple Pencil (pen) input
+        if (e.pointerType !== 'pen') return;
+
+        // If another pen stroke is already active, ignore
+        if (isDrawingRef.current) return;
 
         const pos = getCanvasPos(e.clientX, e.clientY);
-        activePointersRef.current.set(e.pointerId, { ...pos, screenX: e.clientX, screenY: e.clientY, type: e.pointerType });
+        if (!isInWritingArea(pos)) return;
 
-        // Double-Tap Detection (Pencil barrel sim)
-        // Only trigger if previous tap was NOT a drawing stroke (just a tap)
-        if (e.pointerType === 'pen') {
-            const now = Date.now();
-            const timeDiff = now - lastPenTapRef.current;
+        // Capture all future events for this pointer (critical for iPad Chrome)
+        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+        activePointerIdRef.current = e.pointerId;
 
-            // Check for double tap - but only if no drawing occurred on last pen down
-            if (timeDiff > 20 && timeDiff < 300 && !didDrawOnLastPenDownRef.current) {
-                setIsEraser(prev => !prev);
-                lastPenTapRef.current = 0;
-                didDrawOnLastPenDownRef.current = false;
-                onPointerUp();
-                return;
-            }
-            lastPenTapRef.current = now;
-            isPenActiveRef.current = true;
-            // Reset the drawing flag at start of new stroke
-            didDrawOnLastPenDownRef.current = false;
-        }
-
-        // PALM REJECTION: If a pen is active, ignore finger drawing but allow gestures
-        if (isPenActiveRef.current && e.pointerType === 'touch') {
-            return;
-        }
-
-        // START DRAWING: Only if not already drawing and it's a pen OR touch (if pen not active)
-        if (!isDrawingRef.current && (e.pointerType === 'pen' || !isPenActiveRef.current)) {
-            // Respect precision mode
-            if (precisionMode && e.pointerType !== 'pen') return;
-
-            if (!isInWritingArea(pos)) return;
-
-            (e.target as HTMLElement).setPointerCapture(e.pointerId);
-            isDrawingRef.current = true;
-            const pressure = (e as any).pressure || 0.5;
-            currentPathRef.current = [{ ...pos, pressure }];
-            isDirtyRef.current = true;
-        } else if (activePointersRef.current.size > 1) {
-            // Multiple pointers -> Stop any active drawing to avoid stray marks during zoom
-            onPointerUp();
-        }
+        isDrawingRef.current = true;
+        const pressure = e.pressure || 0.5;
+        currentPathRef.current = [{ ...pos, pressure }];
+        isDirtyRef.current = true;
     };
+
     const onPointerMove = (e: React.PointerEvent) => {
-        // Prevent default browser behavior (scroll/zoom)
         e.preventDefault();
 
-        const touchCount = activePointersRef.current.size;
-
-        // Multi-touch gestures are handled by @use-gesture, but we still track for palm rejection
-        if (touchCount >= 2) {
-            return;
-        }
-
+        // Only track the active pen pointer
+        if (e.pointerType !== 'pen') return;
         if (!isDrawingRef.current) return;
+        if (e.pointerId !== activePointerIdRef.current) return;
 
-        // Strict Palm Rejection: If pen is active, ignore this touch move
-        if (isPenActiveRef.current && e.pointerType === 'touch') return;
+        // Process all coalesced (high-frequency) events for smooth strokes
+        const coalescedEvents = (e.nativeEvent as any).getCoalescedEvents
+            ? (e.nativeEvent as any).getCoalescedEvents()
+            : [e.nativeEvent];
 
-        const pressure = (e as any).pressure || 0.5;
-
-        // High-frequency optimization: Use coalesced events to get all intermediate points
-        // This is critical for high-speed pencil movements
-        const coalescedEvents = (e.nativeEvent as any).getCoalescedEvents ? (e.nativeEvent as any).getCoalescedEvents() : [e.nativeEvent];
-
-        let pointsAdded = false;
         for (const ce of coalescedEvents) {
             const cPos = getCanvasPos(ce.clientX, ce.clientY);
-            if (isInWritingArea(cPos)) {
-                currentPathRef.current.push({ ...cPos, pressure: ce.pressure || 0.5 });
-                pointsAdded = true;
-            }
-        }
-
-        // Mark that actual drawing occurred (more than just the initial point)
-        if (pointsAdded && currentPathRef.current.length > 2) {
-            didDrawOnLastPenDownRef.current = true;
+            currentPathRef.current.push({ ...cPos, pressure: ce.pressure || 0.5 });
         }
 
         isDirtyRef.current = true;
     };
 
-    const onPointerUp = (e?: React.PointerEvent) => {
-        if (e) {
-            activePointersRef.current.delete(e.pointerId);
-            if (e.pointerType === 'pen') isPenActiveRef.current = false;
-        } else {
-            activePointersRef.current.clear();
-            isPenActiveRef.current = false;
-        }
+    // Shared commit logic for pointerup / pointercancel / pointerleave
+    const commitStroke = (e?: React.PointerEvent) => {
+        if (e && e.pointerType !== 'pen') return;
 
-        if (activePointersRef.current.size === 0) {
-            lastTouchDistanceRef.current = null;
-        }
+        // Always reset drawing state immediately (critical for pointercancel)
+        const wasDrawing = isDrawingRef.current;
+        isDrawingRef.current = false;
+        activePointerIdRef.current = null;
 
-        if (isDrawingRef.current && (currentPathRef.current.length > 0)) {
+        if (wasDrawing && currentPathRef.current.length > 0) {
             const newPath = {
-                points: [...currentPathRef.current], // Snapshot the points
+                points: [...currentPathRef.current],
                 color: penColor,
                 size: penSize,
-                isEraser: isEraser
+                isEraser: isEraser,
             };
             const updatedPages = [...pages];
             updatedPages[currentPageIndex] = [...(updatedPages[currentPageIndex] || []), newPath];
 
-            // CRITICAL: Use appendToStatic instead of redrawStatic for zero lag!
             appendToStatic(newPath);
-
             setPages(updatedPages);
 
-            // Add to history
             const newHistory = history.slice(0, historyStep + 1);
             newHistory.push(updatedPages);
             setHistory(newHistory);
             setHistoryStep(newHistory.length - 1);
         }
+
         currentPathRef.current = [];
+        lastTouchDistanceRef.current = null;
+        isDirtyRef.current = true;
+    };
+
+    const onPointerUp = (e?: React.PointerEvent) => commitStroke(e);
+    const onPointerCancel = (e: React.PointerEvent) => {
+        // Immediately discard any in-progress stroke — do NOT commit it
         isDrawingRef.current = false;
+        activePointerIdRef.current = null;
+        currentPathRef.current = [];
+        lastTouchDistanceRef.current = null;
         isDirtyRef.current = true;
     };
 
@@ -503,16 +469,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                         </div>
                     </div>
 
-                    {/* Precision Mode Toggle */}
-                    <Button
-                        variant={precisionMode ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setPrecisionMode(!precisionMode)}
-                        className={cn("h-8 gap-1 md:gap-2 px-2", precisionMode ? "bg-blue-600 text-white" : "text-slate-500")}
-                    >
-                        <Tablet className="w-4 h-4" />
-                        <span className="text-xs md:text-sm">{precisionMode ? 'Pen Only' : 'Finger On'}</span>
-                    </Button>
+
                 </div>
 
                 <div className="flex items-center gap-2 ml-auto pl-2">
@@ -533,7 +490,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                 ref={scrollContainerRef}
                 style={{
                     flex: 1,
-                    overflow: 'auto',
+                    overflow: 'hidden',
                     background: '#0f172a',
                     display: 'flex',
                     flexDirection: 'column',
@@ -542,11 +499,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                     WebkitUserSelect: 'none',
                     userSelect: 'none',
                     WebkitTouchCallout: 'none',
-                }}
-                onTouchEnd={() => {
-                    activePointersRef.current.clear();
-                    isPenActiveRef.current = false;
-                    lastTouchDistanceRef.current = null;
+                    overscrollBehavior: 'none',
                 }}
             >
                 <div
@@ -564,6 +517,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                         WebkitUserSelect: 'none',
                         userSelect: 'none',
                         WebkitTouchCallout: 'none',
+                        overscrollBehavior: 'none',
                     }}
                 >
                     <div style={{
@@ -609,7 +563,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                         onPointerMove={onPointerMove}
                         onPointerUp={onPointerUp}
                         onPointerLeave={onPointerUp}
-                        onPointerCancel={onPointerUp}
+                        onPointerCancel={onPointerCancel}
                     />
                 </div>
             </div>
