@@ -107,13 +107,23 @@
 
 /* ── Global Print Shield ─────────────────────────────────────────── */
 @media print {
-  /* Hide main UI siblings of the print container */
-  #root > *:not(.print-container) {
+  /* When is-printing class is present on body, hide everything EXCEPT the print mount */
+  body.is-printing #root {
     display: none !important;
   }
 
-  /* Hide other non-essential UI */
-  nav, aside, .sidebar, .no-print, button {
+  body.is-printing #print-mount {
+    display: block !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    visibility: visible !important;
+    overflow: visible !important;
+  }
+
+  /* Fallback: Hide common UI elements */
+  nav, aside, .sidebar, .no-print, button, [role="dialog"] {
     display: none !important;
   }
 
@@ -122,6 +132,8 @@
     display: flex !important;
     visibility: visible !important;
     position: relative !important;
+    flex-direction: column !important;
+    align-items: center !important;
   }
 
   /* Reset body/html for a clean background */
