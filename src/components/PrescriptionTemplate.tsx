@@ -71,7 +71,7 @@ const PrescriptionTemplate = React.memo(({
     const pagesToShow = showHandwritten ? images : [null];
 
     return (
-        <div className="flex flex-col items-center gap-8 w-full print-container">
+        <div className="flex flex-col items-center gap-8 w-full print-container print:gap-0">
             {pagesToShow.map((img, idx) => (
                 <div
                     key={idx}
@@ -179,19 +179,21 @@ function PageOne({ patient, visit, today, time, clinicalNotes, diagnosis, medici
                         background-color: #ffffff !important; 
                         -webkit-print-color-adjust: exact !important; 
                         print-color-adjust: exact !important;
-                        height: 297mm !important;
+                        height: 296mm !important;
                         width: 210mm !important;
+                        page-break-inside: avoid !important;
                     }
                     .single-page-prescription { 
                         background: white !important; 
                         background-color: #ffffff !important; 
                         -webkit-print-color-adjust: exact !important; 
                         print-color-adjust: exact !important;
-                        height: 297mm !important;
+                        height: 296mm !important;
                         width: 210mm !important;
                         margin: 0 !important;
                         border: none !important;
                         box-shadow: none !important;
+                        page-break-after: always !important;
                     }
                     .no-print { display: none !important; }
                 }

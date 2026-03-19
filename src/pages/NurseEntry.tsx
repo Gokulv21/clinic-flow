@@ -82,11 +82,17 @@ export default function NurseEntry() {
     setStep('vitals');
   };
 
-  const generateRegId = () => {
-    // Basic unique ID: REG + last 6 digits of timestamp + random
-    const timestamp = Date.now().toString().slice(-6);
-    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-    return `REG-${timestamp}-${random}`;
+  const getNextRegId = async () => {
+    const { data, error } = await (supabase.rpc as any)('get_next_registration_id');
+    if (error) {
+        console.error('Error generating Reg ID, falling back:', error);
+        // Fallback to random if RPC fails
+        const timestamp = Date.now().toString().slice(-6);
+        const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+        const yy = new Date().getFullYear().toString().slice(-2);
+        return `${yy}${timestamp}${random}`;
+    }
+    return data;
   };
 
   const submitVisit = async () => {
@@ -103,7 +109,7 @@ export default function NurseEntry() {
 
         const ageInYears = ageInYearsRaw >= 1 ? Math.floor(ageInYearsRaw) : ageInYearsRaw;
         
-        finalRegId = generateRegId();
+        finalRegId = await getNextRegId();
 
         const { data: newPatient, error } = await supabase
           .from('patients')
@@ -114,7 +120,7 @@ export default function NurseEntry() {
             sex: patient.sex,
             phone: patient.phone,
             address: patient.address || null,
-            registration_id: finalRegId
+            registration_id: String(finalRegId)
           })
           .select()
           .single();
