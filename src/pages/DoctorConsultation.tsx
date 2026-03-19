@@ -56,7 +56,9 @@ export default function DoctorConsultation() {
       .gte('created_at', today)
       .in('status', ['waiting', 'in_consultation'])
       .order('token_number', { ascending: true });
-    setQueue(data || []);
+    
+    // Filter out ghost visits that don't have a valid patient attached
+    setQueue((data || []).filter(v => v.patients));
   };
 
   useEffect(() => {
@@ -75,15 +77,19 @@ export default function DoctorConsultation() {
     const restoreState = async () => {
       const savedVisitId = localStorage.getItem('active_consultation_id');
       if (savedVisitId) {
-        // Find visit in queue if possible or fetch fresh
         const { data } = await supabase
           .from('visits')
           .select('*, patients(*), prescriptions(*)')
           .eq('id', savedVisitId)
           .single();
         
-        if (data) {
+        if (data && (data.status === 'waiting' || data.status === 'in_consultation')) {
           selectVisit(data, true); // true = check for drafts
+        } else {
+          // If the visit is completed or not found, clear the active consultation
+          localStorage.removeItem('active_consultation_id');
+          setSelectedVisit(null);
+          setPatient(null);
         }
       }
     };
@@ -283,7 +289,11 @@ export default function DoctorConsultation() {
       <div className="p-4 border-b border-border bg-card sticky top-0 z-10 flex items-center justify-between">
         <div>
           <h2 className="font-heading font-bold text-lg">Patient Queue</h2>
-          <p className="text-sm text-muted-foreground">{queue.length} patients today</p>
+          {queue.length > 0 ? (
+            <p className="text-sm text-muted-foreground">{queue.length} patients today</p>
+          ) : (
+            <p className="text-xs text-muted-foreground/60 uppercase tracking-widest font-bold">Queue is Empty</p>
+          )}
         </div>
         {/* Mobile-only refresh or count indicator if needed */}
       </div>

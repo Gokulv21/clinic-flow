@@ -19,8 +19,39 @@ export default function UserManagement() {
   const [creating, setCreating] = useState(false);
 
   const fetchUsers = async () => {
-    const { data } = await supabase.from('profiles').select('*, user_roles(role)');
-    setUsers(data || []);
+    try {
+      const [{ data: profilesData, error: profError }, { data: rolesData, error: rolesError }] = await Promise.all([
+        supabase.from('profiles').select('*'),
+        supabase.from('user_roles').select('*')
+      ]);
+
+      if (profError) throw profError;
+      if (rolesError) throw rolesError;
+
+      // Base the list on user_roles to ensure all staff are visible
+      const merged = (rolesData || []).map(r => {
+        const p = profilesData?.find(prof => prof.user_id === r.user_id);
+        
+        // Better name fallback: Use full_name if it's not the generic default, 
+        // otherwise try toExtract name from email or just use email.
+        const displayName = (p?.full_name && p.full_name !== 'Staff Member') 
+          ? p.full_name 
+          : (p?.email || 'Staff Member');
+
+        return {
+          id: r.user_id,
+          registration_id: r.id, 
+          full_name: displayName,
+          email: p?.email || 'No email synced',
+          role: r.role
+        };
+      });
+
+      setUsers(merged);
+    } catch (err: any) {
+      console.error("Error fetching staff:", err);
+      toast.error("Failed to load staff list");
+    }
   };
 
   useEffect(() => { fetchUsers(); }, []);
@@ -57,9 +88,17 @@ export default function UserManagement() {
       });
       if (roleError) throw roleError;
 
+      // Manually insert into profiles to ensure visibility in the staff list
+      const { error: profileError } = await supabase.from('profiles').insert({
+        user_id: data.user.id,
+        full_name: fullName.trim(),
+        email: email.trim(),
+        id: data.user.id
+      });
+      // We don't throw for profileError because the user is already created in auth,
+      // and we want to allow the process to continue even if profile exists.
+
       // If the admin's session was overwritten by the new user's session
-      // (because email confirmations are disabled), we must log the new user out 
-      // so they don't get the "Access Pending" screen, and tell the admin to re-login.
       const { data: { session: currentSession } } = await supabase.auth.getSession();
 
       if (currentSession?.user?.id === data.user.id) {
@@ -158,15 +197,14 @@ export default function UserManagement() {
         <CardHeader><CardTitle className="flex items-center gap-2"><Shield className="w-5 h-5" />Staff Members</CardTitle></CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {users.map(u => (
-              <div key={u.id} className="flex items-center justify-between p-3 rounded-lg border border-border">
-                <div>
-                  <p className="font-medium">{u.full_name}</p>
+            {users.map((u, i) => (
+              <div key={u.id || i} className="flex items-center justify-between p-4 rounded-xl border border-border bg-card hover:bg-muted/30 transition-all group">
+                <div className="space-y-1">
+                  <p className="font-bold text-slate-900">{u.full_name || 'Staff Member'}</p>
+                  <p className="text-xs text-muted-foreground font-medium">{u.email || 'No email provided'}</p>
                 </div>
                 <div className="flex gap-2">
-                  {u.user_roles?.map((r: any) => (
-                    <Badge key={r.role} variant="outline" className={roleBadgeClass(r.role)}>{r.role}</Badge>
-                  ))}
+                  <Badge variant="outline" className={roleBadgeClass(u.role || u.user_roles?.[0]?.role)}>{u.role || u.user_roles?.[0]?.role}</Badge>
                 </div>
               </div>
             ))}

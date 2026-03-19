@@ -498,30 +498,31 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                 ref={scrollContainerRef}
                 style={{
                     flex: 1,
-                    overflow: 'auto',
+                    overflowY: 'auto',
+                    overflowX: 'hidden',
                     background: '#0f172a',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
-                    touchAction: 'none',
+                    padding: '2rem 0', // More padding for better feel
+                    touchAction: 'pan-y pinch-zoom', // Allow native-like scroll and zoom
                     WebkitUserSelect: 'none',
                     userSelect: 'none',
                     WebkitTouchCallout: 'none',
-                    overscrollBehavior: 'none',
                 }}
             >
                 <div
                     ref={containerRef}
                     style={{
-                        width: '100%',
-                        maxWidth: 700,
+                        width: 'min(95vw, 800px)', // Robust width
+                        minHeight: '1130px', // Force A4 height to ensure scrolling
                         aspectRatio: '1 / 1.414',
                         position: 'relative',
                         flexShrink: 0,
                         boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
                         transform: `translate3d(${canvasTransform.x}px, ${canvasTransform.y}px, 0) scale(${canvasTransform.scale})`,
                         transformOrigin: 'top center',
-                        touchAction: 'none',
+                        touchAction: 'none', // Drawing area still needs touchAction: none
                         WebkitUserSelect: 'none',
                         userSelect: 'none',
                         WebkitTouchCallout: 'none',

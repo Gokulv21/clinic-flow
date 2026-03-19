@@ -29,9 +29,9 @@ export default function PatientList() {
       // Check if search looks like a UUID for ID search
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(search.trim());
       if (isUuid) {
-        query = query.or(`id.eq.${search.trim()},name.ilike.%${search}%,phone.ilike.%${search}%`);
+        query = query.or(`id.eq.${search.trim()},name.ilike.%${search}%,phone.ilike.%${search}%,registration_id.ilike.%${search}%`);
       } else {
-        query = query.or(`name.ilike.%${search}%,phone.ilike.%${search}%`);
+        query = query.or(`name.ilike.%${search}%,phone.ilike.%${search}%,registration_id.ilike.%${search}%`);
       }
     }
     const { data } = await query;
@@ -98,13 +98,21 @@ export default function PatientList() {
           <Card key={p.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => viewPatient(p)}>
             <CardContent className="py-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <User className="w-5 h-5 text-primary" />
+                <div className="p-2 bg-slate-100 rounded-full">
+                  <User className="w-5 h-5 text-slate-500" />
                 </div>
                 <div>
-                  <p className="font-medium">{(p.title ? p.title + ' ' : '') + p.name}</p>
-                  <p className="text-sm text-muted-foreground">{p.phone} · {formatAge(p.age)} · {p.sex}</p>
-                  <p className="text-[10px] text-muted-foreground/50 font-mono mt-0.5">ID: {p.id}</p>
+                  <div className="font-heading font-bold text-slate-800 flex items-center gap-2">
+                    {p.title} {p.name}
+                    {p.registration_id && (
+                        <span className="text-[10px] items-center bg-primary/10 text-primary px-2 py-0.5 rounded-full uppercase tracking-widest font-black">
+                            {p.registration_id}
+                        </span>
+                    )}
+                  </div>
+                  <div className="text-sm text-slate-500 font-medium">
+                    {p.phone} · {formatAge(p.age)} · {p.sex}
+                  </div>
                 </div>
               </div>
               <History className="w-4 h-4 text-muted-foreground" />

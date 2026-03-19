@@ -80,7 +80,7 @@ const PrescriptionTemplate = React.memo(({
                     style={{
                         width: isPrint ? '210mm' : '100%',
                         maxWidth: '100%',
-                        height: isPrint ? '290mm' : undefined,
+                        height: isPrint ? '296mm' : undefined,
                         maxHeight: isPrint ? '100%' : undefined,
                         aspectRatio: isPrint ? undefined : `${EXPORT_W} / ${EXPORT_H}`,
                         containerType: 'inline-size' as any,
@@ -91,7 +91,7 @@ const PrescriptionTemplate = React.memo(({
                         boxSizing: 'border-box',
                         boxShadow: isPrint ? 'none' : '0 10px 40px rgba(0,0,0,0.12)',
                         flexShrink: 0,
-                        pageBreakAfter: isPrint ? 'always' : undefined,
+                        pageBreakAfter: (isPrint && idx < pagesToShow.length - 1) ? 'always' : undefined,
                     }}
                 >
                     {idx === 0 ? (
@@ -171,8 +171,28 @@ function PageOne({ patient, visit, today, time, clinicalNotes, diagnosis, medici
                 
                 #prescription-template * { box-sizing: border-box; }
                 @media print {
-                    #rx-inner { font-size: 3.8mm !important; background: white !important; background-color: #ffffff !important; }
-                    .single-page-prescription { background: white !important; background-color: #ffffff !important; }
+                    @page { margin: 0; size: A4; }
+                    body { margin: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                    #rx-inner { 
+                        font-size: 3.8mm !important; 
+                        background: white !important; 
+                        background-color: #ffffff !important; 
+                        -webkit-print-color-adjust: exact !important; 
+                        print-color-adjust: exact !important;
+                        height: 297mm !important;
+                        width: 210mm !important;
+                    }
+                    .single-page-prescription { 
+                        background: white !important; 
+                        background-color: #ffffff !important; 
+                        -webkit-print-color-adjust: exact !important; 
+                        print-color-adjust: exact !important;
+                        height: 297mm !important;
+                        width: 210mm !important;
+                        margin: 0 !important;
+                        border: none !important;
+                        box-shadow: none !important;
+                    }
                     .no-print { display: none !important; }
                 }
 
@@ -259,7 +279,7 @@ function PageOne({ patient, visit, today, time, clinicalNotes, diagnosis, medici
                     { label: 'Age / Sex', value: patient ? `${formatAge(patient.age)}/${patient.sex?.charAt(0) ?? '—'}` : '—' },
                     { label: 'Date', value: today },
                     { label: 'Time', value: time },
-                    { label: 'Reg. No', value: patient?.reg_no ?? '—' },
+                    { label: 'Reg. ID', value: patient?.registration_id || (patient?.reg_no ? `REG-${patient.reg_no}` : '—') },
                 ].map(({ label, value, color }) => (
                     <div key={label} style={{ overflow: 'hidden', minWidth: 0 }}>
                         <div style={{ fontSize: '0.75em', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</div>
@@ -296,8 +316,8 @@ function PageOne({ patient, visit, today, time, clinicalNotes, diagnosis, medici
                     <div style={{
                         position: 'absolute', top: '50%', left: '50%',
                         transform: 'translate(-50%, -50%) rotate(-45deg)',
-                        fontSize: '8cqw', fontWeight: 900, color: '#000',
-                        opacity: 0.03, pointerEvents: 'none', zIndex: 5,
+                        fontSize: '10cqw', fontWeight: 900, color: '#f8fafc',
+                        pointerEvents: 'none', zIndex: 5,
                         whiteSpace: 'nowrap', textTransform: 'uppercase',
                         letterSpacing: '0.2em'
                     }}>
@@ -323,15 +343,13 @@ function PageOne({ patient, visit, today, time, clinicalNotes, diagnosis, medici
             </div>
 
             {/* ── FOOTER ──────────────────────────────────────── */}
-            <div style={{ background: '#fff', borderTop: '2px solid #0f172a', padding: '1em 2em', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, gap: '1em' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2em' }}>
-                    <span style={{ color: '#475569', fontSize: '1em', fontWeight: 700, letterSpacing: '0.02em', textAlign: 'center' }}>
-                        அடுத்த முறை வரும்போது இந்த மருந்துச்சீட்டை கொண்டு வரவும்
-                    </span>
-                    <span style={{ color: '#94a3b8', fontSize: '0.6em', fontWeight: 600, letterSpacing: '1em', textTransform: 'uppercase', marginTop: '0.3em' }}>
-                        Developed by Prescripto
-                    </span>
-                </div>
+            <div style={{ background: '#fff', borderTop: '2px solid #0f172a', padding: '1em 2em', display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+                <span style={{ color: '#475569', fontSize: '1em', fontWeight: 700, letterSpacing: '0.02em', textAlign: 'center' }}>
+                    அடுத்த முறை வரும்போது இந்த மருந்துச்சீட்டை கொண்டு வரவும்
+                </span>
+                <span style={{ color: '#94a3b8', fontSize: '0.6em', fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase', alignSelf: 'flex-end', marginTop: '0.3em' }}>
+                    Developed by Prescripto
+                </span>
             </div>
         </div>
     );

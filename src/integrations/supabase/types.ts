@@ -23,6 +23,7 @@ export type Database = {
           name: string
           phone: string
           reg_no: number
+          registration_id: string | null
           sex: string
           title: string | null
           updated_at: string
@@ -35,6 +36,7 @@ export type Database = {
           name: string
           phone: string
           reg_no?: number
+          registration_id?: string | null
           sex: string
           title?: string | null
           updated_at?: string
@@ -47,6 +49,7 @@ export type Database = {
           name?: string
           phone?: string
           reg_no?: number
+          registration_id?: string | null
           sex?: string
           title?: string | null
           updated_at?: string
@@ -122,6 +125,7 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string
+          email: string | null
           full_name: string
           id: string
           updated_at: string
@@ -129,6 +133,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          email?: string | null
           full_name: string
           id?: string
           updated_at?: string
@@ -136,6 +141,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          email?: string | null
           full_name?: string
           id?: string
           updated_at?: string
