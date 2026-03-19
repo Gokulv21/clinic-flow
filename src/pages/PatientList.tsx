@@ -246,15 +246,22 @@ export default function PatientList() {
             </Button>
           </div>
           <div className="p-4 md:p-8 overflow-auto max-h-[75vh] flex justify-center">
-            {viewingRx && (
-              <PrescriptionTemplate
-                patient={selectedPatient}
-                visit={viewingRx}
-                handwrittenImage={viewingRx.prescriptions?.[0]?.advice_image}
-                diagnosis={viewingRx.prescriptions?.[0]?.diagnosis || viewingRx.diagnosis}
-                medicines={viewingRx.prescriptions?.[0]?.medicines || []}
-              />
-            )}
+            {viewingRx && (() => {
+              const rx = viewingRx.prescriptions?.[0];
+              const isWritingMode = rx?.is_writing_mode ?? (!!rx?.advice_image && (rx.advice_image.startsWith('data:image') || rx.advice_image.startsWith('[')));
+              return (
+                <PrescriptionTemplate
+                  patient={selectedPatient}
+                  visit={viewingRx}
+                  handwrittenImage={rx?.advice_image}
+                  clinicalNotes={rx?.clinical_notes}
+                  diagnosis={rx?.diagnosis || viewingRx.diagnosis}
+                  medicines={rx?.medicines || []}
+                  advice={!isWritingMode ? rx?.advice_image : null}
+                  isWritingMode={isWritingMode}
+                />
+              );
+            })()}
           </div>
         </DialogContent>
       </Dialog>

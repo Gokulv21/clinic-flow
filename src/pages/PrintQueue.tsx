@@ -67,14 +67,22 @@ export default function PrintQueue() {
       {/* Hidden print container */}
       {printData && (
         <div className="fixed inset-0 opacity-0 pointer-events-none z-[-1]">
-          <PrescriptionTemplate
-            patient={printData.patients}
-            visit={printData.visits}
-            diagnosis={printData.diagnosis}
-            medicines={printData.medicines}
-            handwrittenImage={printData.advice_image || null}
-            isPrint={true}
-          />
+          {(() => {
+            const isWritingMode = printData.is_writing_mode ?? (!!printData.advice_image && (printData.advice_image.startsWith('data:image') || printData.advice_image.startsWith('[')));
+            return (
+              <PrescriptionTemplate
+                patient={printData.patients}
+                visit={printData.visits}
+                diagnosis={printData.diagnosis}
+                clinicalNotes={printData.clinical_notes}
+                medicines={printData.medicines}
+                advice={!isWritingMode ? printData.advice_image : null}
+                handwrittenImage={printData.advice_image || null}
+                isWritingMode={isWritingMode}
+                isPrint={true}
+              />
+            );
+          })()}
         </div>
       )}
 

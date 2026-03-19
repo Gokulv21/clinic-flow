@@ -694,18 +694,23 @@ export default function DoctorConsultation() {
             </div>
           </div>
           <div className="p-4 md:p-8 overflow-auto max-h-[75vh] flex justify-center bg-white" id="history-print-preview">
-            {viewingHistoryRx && (
-              <PrescriptionTemplate
-                patient={patient}
-                visit={viewingHistoryRx}
-                handwrittenImage={viewingHistoryRx.prescriptions?.[0]?.advice_image}
-                clinicalNotes={viewingHistoryRx.prescriptions?.[0]?.clinical_notes}
-                diagnosis={viewingHistoryRx.prescriptions?.[0]?.diagnosis || viewingHistoryRx.diagnosis}
-                medicines={viewingHistoryRx.prescriptions?.[0]?.medicines || []}
-                isWritingMode={viewingHistoryRx.prescriptions?.[0]?.is_writing_mode ?? false}
-                isPrint={true}
-              />
-            )}
+            {viewingHistoryRx && (() => {
+              const rx = viewingHistoryRx.prescriptions?.[0];
+              const isWritingMode = rx?.is_writing_mode ?? (!!rx?.advice_image && (rx.advice_image.startsWith('data:image') || rx.advice_image.startsWith('[')));
+              return (
+                <PrescriptionTemplate
+                  patient={patient}
+                  visit={viewingHistoryRx}
+                  handwrittenImage={rx?.advice_image}
+                  clinicalNotes={rx?.clinical_notes}
+                  diagnosis={rx?.diagnosis || viewingHistoryRx.diagnosis}
+                  medicines={rx?.medicines || []}
+                  advice={!isWritingMode ? rx?.advice_image : null}
+                  isWritingMode={isWritingMode}
+                  isPrint={true}
+                />
+              );
+            })()}
           </div>
         </DialogContent>
       </Dialog>

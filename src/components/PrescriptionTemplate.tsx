@@ -25,6 +25,10 @@ interface PrescriptionTemplateProps {
     isWritingMode?: boolean;
 }
 
+// Filter out invalid image data to prevent broken image icons
+const isValidImage = (src: any): src is string =>
+    typeof src === 'string' && src.length > 5 && (src.startsWith('data:image') || src.startsWith('http'));
+
 const PrescriptionTemplate = React.memo(({
     patient, visit, handwrittenImage,
     diagnosis, clinicalNotes, medicines = [], advice, isPrint = false,
@@ -60,12 +64,8 @@ const PrescriptionTemplate = React.memo(({
         rawImages = [handwrittenImage as string | null];
     }
 
-    // Filter out invalid image data to prevent broken image icons
-    const isValidImage = (src: any): src is string =>
-        typeof src === 'string' && src.length > 5 && (src.startsWith('data:image') || src.startsWith('http'));
-
     const images = rawImages.filter(isValidImage);
-    const showHandwritten = isWritingMode && images.length > 0;
+    const showHandwritten = images.length > 0;
 
     // If no handwriting or not in writing mode, we still need one "page" for typed content
     const pagesToShow = showHandwritten ? images : [null];
@@ -289,7 +289,7 @@ function PageOne({ patient, visit, today, time, clinicalNotes, diagnosis, medici
                                     <strong style={{ fontWeight: 700 }}>{i + 1}. {m.name}</strong>&nbsp;&nbsp;{m.dosage} × {m.frequency} × {m.duration}
                                 </div>
                             ))}
-                            {advice && <div style={{ marginTop: '1em', fontStyle: 'italic', color: '#475569', fontSize: '1em', fontWeight: 500 }}>Advice: {advice}</div>}
+                            {advice && !isValidImage(advice) && <div style={{ marginTop: '1em', fontStyle: 'italic', color: '#475569', fontSize: '1em', fontWeight: 500 }}>Advice: {advice}</div>}
                         </div>
                     )}
                     {/* Watermark */}
