@@ -22,8 +22,14 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [roles, setRoles] = useState<AppRole[]>([]);
-  const [profile, setProfile] = useState<{ full_name: string } | null>(null);
+  const [roles, setRoles] = useState<AppRole[]>(() => {
+    const saved = sessionStorage.getItem('app_roles');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [profile, setProfile] = useState<{ full_name: string } | null>(() => {
+    const saved = sessionStorage.getItem('user_profile');
+    return saved ? JSON.parse(saved) : null;
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastFetchedId, setLastFetchedId] = useState<string | null>(null);
@@ -45,6 +51,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setRoles((rolesRes.data || []).map(r => r.role as AppRole));
       setProfile(profileRes.data || null);
+      
+      // Cache for faster subsequent loads
+      sessionStorage.setItem('app_roles', JSON.stringify((rolesRes.data || []).map(r => r.role)));
+      sessionStorage.setItem('user_profile', JSON.stringify(profileRes.data));
+      
       setLastFetchedId(userId);
     } catch (err: any) {
       console.error('Error fetching user data:', err);
@@ -107,6 +118,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(null);
     setError(null);
     setLastFetchedId(null);
+    sessionStorage.removeItem('app_roles');
+    sessionStorage.removeItem('user_profile');
     setLoading(false);
   };
 

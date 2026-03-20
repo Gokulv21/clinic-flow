@@ -3,17 +3,19 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { ClipboardPlus, Stethoscope, Printer, BarChart3, Users, Activity, TrendingUp, CalendarDays, UserCheck } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { useState, useEffect } from 'react';
 import { startOfDay, endOfDay } from 'date-fns';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function Dashboard() {
   const { profile, roles, hasRole } = useAuth();
   const navigate = useNavigate();
-  const [stats, setStats] = useState({ total: 0, today: 0, completed: 0 });
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    async function fetchStats() {
+  const { data: stats = { total: 0, today: 0, completed: 0 }, isLoading } = useQuery({
+    queryKey: ['dashboardStats'],
+    queryFn: async () => {
       const todayStart = startOfDay(new Date()).toISOString();
       const todayEnd = endOfDay(new Date()).toISOString();
 
@@ -23,14 +25,34 @@ export default function Dashboard() {
         supabase.from('visits').select('*', { count: 'exact', head: true }).gte('created_at', todayStart).lte('created_at', todayEnd).eq('status', 'completed')
       ]);
 
-      setStats({
+      return {
         total: totalPatients.count || 0,
         today: todayVisits.count || 0,
         completed: completedToday.count || 0
-      });
-    }
-    fetchStats();
-  }, []);
+      };
+    },
+    staleTime: 30000, // Stats can be slightly stale
+  });
+
+  useEffect(() => {
+    let debounceTimer: any;
+    const channel = supabase
+      .channel('dashboard-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'visits' }, () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
+        }, 5000); // Longer debounce for dashboard stats
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'patients' }, () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
+        }, 5000);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [queryClient]);
 
   const modules = [
     { label: 'Patient Entry', desc: 'Register & record vitals', icon: <ClipboardPlus className="w-6 h-6" />, path: '/nurse', roles: ['nurse', 'doctor'] as const, color: 'from-blue-500 to-cyan-500' },

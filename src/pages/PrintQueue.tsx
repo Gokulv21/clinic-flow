@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,45 +13,62 @@ import PrescriptionTemplate from '@/components/PrescriptionTemplate';
 import { printPrescription as renderAndPrintPrescription } from '@/lib/printPrescription';
 
 export default function PrintQueue() {
-  const [prescriptions, setPrescriptions] = useState<any[]>([]);
+  const queryClient = useQueryClient();
 
-  const fetchPrescriptions = async () => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+  // 1. Fetch Today's Prescriptions via React Query
+  const { data: prescriptions = [], isLoading, refetch: refetchPrescriptions } = useQuery({
+    queryKey: ['prescriptionsToday'],
+    queryFn: async () => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
 
-    const { data } = await supabase
-      .from('prescriptions')
-      .select('*, patients(*), visits(*)')
-      .gte('created_at', today.toISOString())
-      .order('created_at', { ascending: false });
-    setPrescriptions(data || []);
-  };
+      const { data, error } = await supabase
+        .from('prescriptions')
+        .select('*, patients(*), visits(*)')
+        .gte('created_at', today.toISOString())
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 10000,
+  });
 
   useEffect(() => {
-    fetchPrescriptions();
+    let debounceTimer: any;
     const channel = supabase
       .channel('prescriptions-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'prescriptions' }, () => fetchPrescriptions())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'prescriptions' }, () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ['prescriptionsToday'] });
+        }, 2000);
+      })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, []);
+  }, [queryClient]);
 
   const [printData, setPrintData] = useState<any>(null);
 
   useEffect(() => {
     if (printData) {
-      setTimeout(() => {
+      // Reduced delay for faster responsiveness
+      const timer = setTimeout(() => {
         renderAndPrintPrescription();
         markPrinted(printData.id);
         setPrintData(null);
-      }, 500); // Wait for the image/component to render
+      }, 100); 
+      return () => clearTimeout(timer);
     }
   }, [printData]);
 
   const markPrinted = async (id: string) => {
     const { error } = await supabase.from('prescriptions').update({ is_printed: true }).eq('id', id);
     if (error) toast.error('Failed to update');
-    else toast.success('Marked as printed');
+    else {
+      toast.success('Marked as printed');
+      queryClient.invalidateQueries({ queryKey: ['prescriptionsToday'] });
+    }
   };
 
   const printPrescription = (rx: any) => {
@@ -114,10 +132,11 @@ export default function PrintQueue() {
           <Button 
             variant="outline" 
             size="sm" 
-            onClick={fetchPrescriptions}
+            onClick={() => refetchPrescriptions()}
+            disabled={isLoading}
             className="gap-2 h-9"
           >
-            <RefreshCw className="w-4 h-4" /> Refresh
+            {isLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Refresh
           </Button>
         </div>
 

@@ -75,6 +75,8 @@ export default function NurseEntry() {
         setSearchResults([]);
         return;
     }
+    
+    // Simple debounce to prevent overwhelming the DB during rapid typing
     const { data } = await supabase
       .from('patients')
       .select('*')
@@ -82,6 +84,18 @@ export default function NurseEntry() {
       .limit(10);
     setSearchResults(data || []);
   };
+
+  // Add a dedicated effect for debounced search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchQuery.trim()) {
+        searchPatients(searchQuery);
+      } else {
+        setSearchResults([]);
+      }
+    }, 400); // 400ms debounce for search
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const selectOldPatient = (p: any) => {
     setSelectedPatientId(p.id);
@@ -123,16 +137,22 @@ export default function NurseEntry() {
     const loadingToast = toast.loading('Registering patient...');
     try {
       let patientId = selectedPatientId;
-      let finalRegId = '';
+      let token: number;
 
+      // Parallelize identifying the patient and getting the next token for speed
       if (!patientId) {
+        // NEW PATIENT PATH: Need to create patient first, but can get token in parallel
+        const [regId, nextToken] = await Promise.all([
+          getNextRegId(),
+          supabase.rpc('get_next_token')
+        ]);
+        
+        token = nextToken.data || 1;
+        
         let ageInYearsRaw = parseFloat(patient.age);
         if (ageUnit === 'months') ageInYearsRaw = ageInYearsRaw / 12;
         if (ageUnit === 'days') ageInYearsRaw = ageInYearsRaw / 365;
-
         const ageInYears = ageInYearsRaw >= 1 ? Math.floor(ageInYearsRaw) : ageInYearsRaw;
-        
-        finalRegId = await getNextRegId();
 
         const { data: newPatient, error } = await supabase
           .from('patients')
@@ -143,19 +163,21 @@ export default function NurseEntry() {
             sex: patient.sex,
             phone: patient.phone,
             address: patient.address || null,
-            registration_id: String(finalRegId),
+            registration_id: String(regId),
             last_opened_at: new Date().toISOString()
           })
           .select()
           .single();
+        
         if (error) throw error;
         patientId = newPatient.id;
+      } else {
+        // EXISTING PATIENT PATH: Just get token
+        const { data: tokenData } = await supabase.rpc('get_next_token');
+        token = tokenData || 1;
       }
 
-      // Get next token
-      const { data: tokenData } = await supabase.rpc('get_next_token');
-      const token = tokenData || 1;
-
+      // Now insert the visit
       const { error: visitError } = await supabase.from('visits').insert({
         patient_id: patientId!,
         token_number: token,
@@ -174,7 +196,7 @@ export default function NurseEntry() {
       toast.dismiss(loadingToast);
       toast.success(`Patient added to queue — Token #${token}`);
     } catch (err: any) {
-      toast.dismiss();
+      toast.dismiss(loadingToast);
       toast.error(err.message || 'Failed to submit');
     } finally {
       setLoading(false);
@@ -313,7 +335,6 @@ export default function NurseEntry() {
                                         onFocus={() => setShowSearch(true)}
                                         onChange={(e) => {
                                             setSearchQuery(e.target.value);
-                                            searchPatients(e.target.value);
                                             setShowSearch(true);
                                         }}
                                     />

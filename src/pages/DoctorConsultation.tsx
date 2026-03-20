@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,8 +30,25 @@ interface Medicine {
 }
 
 export default function DoctorConsultation() {
+  const queryClient = useQueryClient();
   const { user } = useAuth();
-  const [queue, setQueue] = useState<any[]>([]);
+
+  // 1. Fetch Queue via React Query
+  const { data: queue = [], isLoading: isLoadingQueue, refetch: refetchQueue } = useQuery({
+    queryKey: ['visitQueue'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('visits')
+        .select('*, patients(*), prescriptions(*)')
+        .in('status', ['waiting', 'in_consultation'])
+        .order('token_number', { ascending: true });
+      if (error) throw error;
+      return (data || []).filter(v => v.patients);
+    },
+    staleTime: 30000, // Consider data fresh for 30s
+    refetchOnWindowFocus: true,
+  });
+
   const [selectedVisit, setSelectedVisit] = useState<any>(null);
   const [patient, setPatient] = useState<any>(null);
   const [history, setHistory] = useState<any[]>([]);
@@ -48,27 +66,17 @@ export default function DoctorConsultation() {
   const [showVitalsEdit, setShowVitalsEdit] = useState(false);
   const lastLoadedVisitId = useRef<string | null>(null);
 
-  const fetchQueue = async () => {
-    const { data } = await supabase
-      .from('visits')
-      .select('*, patients(*), prescriptions(*)')
-      .in('status', ['waiting', 'in_consultation'])
-      .order('token_number', { ascending: true });
-    
-    // Filter out ghost visits that don't have a valid patient attached
-    setQueue((data || []).filter(v => v.patients));
-  };
-
   useEffect(() => {
-    fetchQueue();
-    
+
     let debounceTimer: any;
     const channel = supabase
       .channel('visits-realtime-doctor')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'visits' }, (payload) => {
-        console.log('Realtime update received:', payload);
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'visits' }, () => {
+        // Debounce invalidation to prevent "request storms" under high traffic
         clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(fetchQueue, 500); // Faster debounce
+        debounceTimer = setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ['visitQueue'] });
+        }, 2000); 
       })
       .subscribe((status) => {
         console.log('Realtime subscription status:', status);
@@ -214,6 +222,13 @@ export default function DoctorConsultation() {
   const updateMedicine = (i: number, field: keyof Medicine, value: string) =>
     setMedicines(m => m.map((med, idx) => idx === i ? { ...med, [field]: value } : med));
 
+  // Memoize status color helper to prevent re-calculations during re-renders
+  const getStatusColor = (s: string) => {
+    if (s === 'waiting') return 'bg-warning/10 text-warning border-warning/30';
+    if (s === 'in_consultation') return 'bg-info/10 text-info border-info/30';
+    return 'bg-success/10 text-success border-success/30';
+  };
+
   const savePrescription = async () => {
     if (!selectedVisit || !patient) return;
     
@@ -237,24 +252,26 @@ export default function DoctorConsultation() {
 
     setSaving(true);
     try {
-      // Save prescription
-      const { error: rxError } = await supabase.from('prescriptions').insert({
-        visit_id: selectedVisit.id,
-        patient_id: patient.id,
-        diagnosis: finalDiagnosis,
-        clinical_notes: finalClinicalNotes,
-        medicines: finalMedicines as any,
-        advice_image: finalAdviceImage,
-        raw_paths: finalPaths as any,
-        is_writing_mode: isWritingMode
-      });
-      if (rxError) throw rxError;
+      // Parallelize database operations for speed under high traffic
+      const [rxResult, visitResult] = await Promise.all([
+        supabase.from('prescriptions').insert({
+          visit_id: selectedVisit.id,
+          patient_id: patient.id,
+          diagnosis: finalDiagnosis,
+          clinical_notes: finalClinicalNotes,
+          medicines: finalMedicines as any,
+          advice_image: finalAdviceImage,
+          raw_paths: finalPaths as any,
+          is_writing_mode: isWritingMode
+        }),
+        supabase.from('visits').update({ 
+          status: 'completed', 
+          diagnosis: finalDiagnosis
+        }).eq('id', selectedVisit.id)
+      ]);
 
-      // Mark visit completed
-      await supabase.from('visits').update({ 
-        status: 'completed', 
-        diagnosis: finalDiagnosis
-      }).eq('id', selectedVisit.id);
+      if (rxResult.error) throw rxResult.error;
+      if (visitResult.error) throw visitResult.error;
 
       toast.success('Prescription saved & sent to print queue');
       
@@ -262,6 +279,9 @@ export default function DoctorConsultation() {
       localStorage.removeItem(`draft_${selectedVisit.id}`);
       localStorage.removeItem('active_consultation_id');
       
+      setAdvice('');
+      
+      // OPTIMISTIC CLEAR: Clear selection and data immediately for snappier feel
       setSelectedVisit(null);
       setPatient(null);
       setPrescriptionImage(null);
@@ -269,8 +289,8 @@ export default function DoctorConsultation() {
       setDiagnosis('');
       setClinicalNotes('');
       setMedicines([{ name: '', dosage: '', frequency: '', duration: '' }]);
-      setAdvice('');
-      fetchQueue();
+
+      queryClient.invalidateQueries({ queryKey: ['visitQueue'] });
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -285,12 +305,6 @@ export default function DoctorConsultation() {
     setIsWritingMode(true);
     // Clear typed advice since we are in writing mode
     setAdvice('');
-  };
-
-  const statusColor = (s: string) => {
-    if (s === 'waiting') return 'bg-warning/10 text-warning border-warning/30';
-    if (s === 'in_consultation') return 'bg-info/10 text-info border-info/30';
-    return 'bg-success/10 text-success border-success/30';
   };
 
   const queuePanel = (
@@ -308,11 +322,12 @@ export default function DoctorConsultation() {
            <Button 
             variant="ghost" 
             size="icon" 
-            onClick={fetchQueue}
+            onClick={() => refetchQueue()}
+            disabled={isLoadingQueue}
             className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors"
             title="Refresh Queue"
           >
-            <RefreshCw className="w-4 h-4" />
+            {isLoadingQueue ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
           </Button>
         </div>
       </div>
@@ -336,7 +351,7 @@ export default function DoctorConsultation() {
                   <p className="text-xs text-muted-foreground">{visit.patients?.age}y · {visit.patients?.sex}</p>
                 </div>
               </div>
-              <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0 h-5 shrink-0 ml-2", statusColor(visit.status))}>
+              <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0 h-5 shrink-0 ml-2", getStatusColor(visit.status))}>
                 {visit.status === 'waiting' ? 'Wait' : visit.status === 'in_consultation' ? 'Active' : 'Done'}
               </Badge>
             </div>
@@ -398,7 +413,7 @@ export default function DoctorConsultation() {
                   <p className="text-xs text-muted-foreground">Token #{selectedVisit.token_number} · {(patient?.title ? patient.title + ' ' : '') + patient?.name}</p>
                 </div>
               </div>
-              <Badge variant="outline" className={cn("text-[10px]", statusColor(selectedVisit.status))}>
+              <Badge variant="outline" className={cn("text-[10px]", getStatusColor(selectedVisit.status))}>
                 {selectedVisit.status === 'waiting' ? 'Wait' : selectedVisit.status === 'in_consultation' ? 'Active' : 'Done'}
               </Badge>
             </div>
