@@ -120,7 +120,8 @@ export default function NurseEntry() {
             sex: patient.sex,
             phone: patient.phone,
             address: patient.address || null,
-            registration_id: String(finalRegId)
+            registration_id: String(finalRegId),
+            last_opened_at: new Date().toISOString()
           })
           .select()
           .single();

@@ -13,6 +13,13 @@ import { toast } from 'sonner';
 import PrescriptionTemplate from '@/components/PrescriptionTemplate';
 import { printPrescription } from '@/lib/printPrescription';
 import { formatAge } from '@/lib/utils';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 export default function PatientList() {
   const [patients, setPatients] = useState<any[]>([]);
@@ -22,26 +29,43 @@ export default function PatientList() {
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({ title: '', name: '', age: '', ageUnit: 'years', phone: '', address: '' });
   const [viewingRx, setViewingRx] = useState<any>(null);
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const pageSize = 25;
 
   const fetchPatients = async () => {
-    let query = supabase.from('patients').select('*').order('created_at', { ascending: false });
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize - 1;
+
+    let query = supabase.from('patients').select('*', { count: 'exact' }).order('last_opened_at', { ascending: false }).range(start, end);
     if (search.trim()) {
       // Check if search looks like a UUID for ID search
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(search.trim());
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(search.trim());
       if (isUuid) {
         query = query.or(`id.eq.${search.trim()},name.ilike.%${search}%,phone.ilike.%${search}%,registration_id.ilike.%${search}%`);
       } else {
         query = query.or(`name.ilike.%${search}%,phone.ilike.%${search}%,registration_id.ilike.%${search}%`);
       }
     }
-    const { data } = await query;
+    const { data, count } = await query;
     setPatients(data || []);
+    setTotalCount(count || 0);
   };
 
-  useEffect(() => { fetchPatients(); }, [search]);
+  useEffect(() => { 
+    setPage(1); // Reset page on search
+    fetchPatients(); 
+  }, [search]);
+
+  useEffect(() => {
+    fetchPatients();
+  }, [page]);
 
   const viewPatient = async (p: any) => {
     setSelectedPatient(p);
+    // Update last_opened_at in background
+    supabase.from('patients').update({ last_opened_at: new Date().toISOString() }).eq('id', p.id).then();
+
     setEditForm({ 
       title: p.title || '', 
       name: p.name, 
@@ -120,6 +144,32 @@ export default function PatientList() {
           </Card>
         ))}
       </div>
+
+      {totalCount > pageSize && (
+        <div className="flex justify-center mt-8 pb-4">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious 
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  className={page === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+              
+              <div className="flex items-center gap-2 px-4 text-sm font-medium">
+                Page {page} of {Math.ceil(totalCount / pageSize)}
+              </div>
+
+              <PaginationItem>
+                <PaginationNext 
+                  onClick={() => setPage(p => Math.min(Math.ceil(totalCount / pageSize), p + 1))}
+                  className={page >= Math.ceil(totalCount / pageSize) ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
 
       {/* Patient detail dialog */}
       <Dialog open={!!selectedPatient} onOpenChange={open => !open && setSelectedPatient(null)}>

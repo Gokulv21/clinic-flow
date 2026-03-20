@@ -15,9 +15,13 @@ export default function PrintQueue() {
   const [prescriptions, setPrescriptions] = useState<any[]>([]);
 
   const fetchPrescriptions = async () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     const { data } = await supabase
       .from('prescriptions')
       .select('*, patients(*), visits(*)')
+      .gte('created_at', today.toISOString())
       .order('created_at', { ascending: false });
     setPrescriptions(data || []);
   };

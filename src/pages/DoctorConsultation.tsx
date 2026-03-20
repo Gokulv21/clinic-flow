@@ -124,6 +124,11 @@ export default function DoctorConsultation() {
     setSelectedVisit(visit);
     setPatient(visit.patients);
     
+    // Update last_opened_at for the patient
+    if (visit.patients?.id) {
+      supabase.from('patients').update({ last_opened_at: new Date().toISOString() }).eq('id', visit.patients.id).then();
+    }
+    
     // Check for drafts in localStorage
     const savedDraft = localStorage.getItem(`draft_${visit.id}`);
     if (checkForDrafts && savedDraft) {

@@ -15,7 +15,7 @@ export default function UserManagement() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [role, setRole] = useState<string>('nurse');
+  const [role, setRole] = useState<string>('staff');
   const [creating, setCreating] = useState(false);
 
   const fetchUsers = async () => {
@@ -128,8 +128,7 @@ export default function UserManagement() {
 
   const roleBadgeClass = (r: string) => {
     if (r === 'doctor') return 'bg-doctor/10 text-doctor';
-    if (r === 'nurse') return 'bg-nurse/10 text-nurse';
-    return 'bg-printer/10 text-printer';
+    return 'bg-secondary text-secondary-foreground';
   };
 
   return (
@@ -180,8 +179,7 @@ export default function UserManagement() {
                 <SelectTrigger className="h-11 border-primary/10 shadow-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="doctor">Doctor (Full Access)</SelectItem>
-                  <SelectItem value="nurse">Nurse (Patient Entry Only)</SelectItem>
-                  <SelectItem value="printer">Printer Staff</SelectItem>
+                  <SelectItem value="staff">Clinic Staff (Entry, Print, Directory)</SelectItem>
                 </SelectContent>
               </Select>
             </div>

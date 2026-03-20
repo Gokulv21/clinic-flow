@@ -18,14 +18,14 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { label: 'Dashboard', path: '/', icon: <Home className="w-5 h-5" />, roles: ['doctor'] },
-  { label: 'Patient Entry', path: '/nurse', icon: <ClipboardPlus className="w-5 h-5" />, roles: ['nurse', 'doctor'] },
+  { label: 'Patient Entry', path: '/nurse', icon: <ClipboardPlus className="w-5 h-5" />, roles: ['staff', 'doctor'] },
   { label: 'Consultation', path: '/consultation', icon: <Stethoscope className="w-5 h-5" />, roles: ['doctor'] },
-  { label: 'Print Queue', path: '/print', icon: <Printer className="w-5 h-5" />, roles: ['printer', 'doctor'] },
-  { label: 'Patients', path: '/patients', icon: <Users className="w-5 h-5" />, roles: ['doctor'] },
+  { label: 'Print Queue', path: '/print', icon: <Printer className="w-5 h-5" />, roles: ['staff', 'doctor'] },
+  { label: 'Patients', path: '/patients', icon: <Users className="w-5 h-5" />, roles: ['doctor', 'staff'] },
   { label: 'Analytics', path: '/analytics', icon: <BarChart3 className="w-5 h-5" />, roles: ['doctor'] },
   { label: 'Profile', path: '/profile', icon: <Users className="w-5 h-5" />, roles: ['doctor'] },
   { label: 'User Mgmt', path: '/users', icon: <Users className="w-5 h-5" />, roles: ['doctor'] },
-  { label: 'Help', path: '/help', icon: <HelpCircle className="w-5 h-5" />, roles: ['nurse', 'doctor', 'printer'] },
+  { label: 'Help', path: '/help', icon: <HelpCircle className="w-5 h-5" />, roles: ['staff', 'doctor'] },
 ];
 
 export default function AppLayout({ children }: { children: ReactNode }) {
