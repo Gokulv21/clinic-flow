@@ -223,9 +223,6 @@ export default function NurseEntry() {
                 <Button onClick={reset} className="w-full h-12 text-lg font-bold shadow-lg shadow-primary/25 hover:scale-[1.02] transition-transform">
                     Next Patient
                 </Button>
-                <Button variant="ghost" onClick={() => window.print()} className="w-full text-slate-500 font-bold">
-                    Print Ticket
-                </Button>
             </div>
           </CardContent>
         </Card>
@@ -429,9 +426,9 @@ export default function NurseEntry() {
                                                 <SelectContent>
                                                     <SelectItem value="Mr.">Mr.</SelectItem>
                                                     <SelectItem value="Mast.">Mast.</SelectItem>
-                                                    <SelectItem value="Miss.">Miss.</SelectItem>
+                                                    <SelectItem value="Miss">Miss</SelectItem>
                                                     <SelectItem value="Mrs.">Mrs.</SelectItem>
-                                                    <SelectItem value="Baby.">Baby.</SelectItem>
+                                                    <SelectItem value="Baby">Baby</SelectItem>
                                                 </SelectContent>
                                             </Select>
                                         </div>
