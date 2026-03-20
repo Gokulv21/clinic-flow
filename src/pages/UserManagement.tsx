@@ -7,8 +7,24 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { UserPlus, Loader2, Shield } from 'lucide-react';
+import { UserPlus, Loader2, Shield, RefreshCw } from 'lucide-react';
 import type { AppRole } from '@/lib/auth';
+import { createClient } from '@supabase/supabase-js';
+import type { Database } from '@/integrations/supabase/types';
+
+// Create a separate client for registration that DOES NOT persist session.
+// This prevents Supabase from automatically logging out the admin when a new user is created.
+const registerClient = createClient<Database>(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+  {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false
+    }
+  }
+);
 
 export default function UserManagement() {
   const [users, setUsers] = useState<any[]>([]);
@@ -28,22 +44,20 @@ export default function UserManagement() {
       if (profError) throw profError;
       if (rolesError) throw rolesError;
 
-      // Base the list on user_roles to ensure all staff are visible
-      const merged = (rolesData || []).map(r => {
-        const p = profilesData?.find(prof => prof.user_id === r.user_id);
+      // Base the list on profiles to show everyone, even if they lack a role
+      const merged = (profilesData || []).map(p => {
+        const r = rolesData?.find(role => role.user_id === p.user_id);
         
-        // Better name fallback: Use full_name if it's not the generic default, 
-        // otherwise try toExtract name from email or just use email.
         const displayName = (p?.full_name && p.full_name !== 'Staff Member') 
           ? p.full_name 
           : (p?.email || 'Staff Member');
 
         return {
-          id: r.user_id,
-          registration_id: r.id, 
+          id: p.user_id,
+          registration_id: r?.id || 'NO-ROLE', 
           full_name: displayName,
           email: p?.email || 'No email synced',
-          role: r.role
+          role: r?.role || null // Null means pending role assignment
         };
       });
 
@@ -67,13 +81,8 @@ export default function UserManagement() {
     }
     setCreating(true);
     try {
-      // Keep track of the current admin session so we know who is logged in
-      const { data: { session: adminSession } } = await supabase.auth.getSession();
-
-      // Sign up user via supabase.auth.signUp 
-      // WARNING: In Supabase v2, if email confirmation is OFF, signUp() automatically 
-      // mutates the local session to the NEW user.
-      const { data, error } = await supabase.auth.signUp({
+      // Sign up user via the non-persistent registerClient 
+      const { data, error } = await registerClient.auth.signUp({
         email: email.trim(),
         password,
         options: { data: { full_name: fullName.trim() } }
@@ -81,38 +90,20 @@ export default function UserManagement() {
       if (error) throw error;
       if (!data.user) throw new Error('User creation failed');
 
-      // Assign role (can still do this because we have the explicit user ID)
+      // Assign role (using the main supabase client to affect the DB)
       const { error: roleError } = await supabase.from('user_roles').insert({
         user_id: data.user.id,
         role: role as AppRole,
       });
       if (roleError) throw roleError;
 
-      // Manually insert into profiles to ensure visibility in the staff list
-      const { error: profileError } = await supabase.from('profiles').insert({
+      // Manually insert into profiles
+      const { error: profileError } = await supabase.from('profiles').upsert({
         user_id: data.user.id,
         full_name: fullName.trim(),
         email: email.trim(),
         id: data.user.id
       });
-      // We don't throw for profileError because the user is already created in auth,
-      // and we want to allow the process to continue even if profile exists.
-
-      // If the admin's session was overwritten by the new user's session
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
-
-      if (currentSession?.user?.id === data.user.id) {
-        // We got auto-logged in as the NEW user!
-        await supabase.auth.signOut();
-        toast.success(`User ${fullName} created successfully!`, { duration: 5000 });
-        toast.info(`Security Notice: You have been signed out. Please log back in.`, { duration: 8000 });
-
-        // Force reload to dump the state and go to login
-        setTimeout(() => {
-          window.location.href = '/clinic-flow/login';
-        }, 1500);
-        return;
-      }
 
       toast.success(`User ${fullName} created with role: ${role}`);
       setEmail('');
@@ -120,9 +111,32 @@ export default function UserManagement() {
       setFullName('');
       fetchUsers();
     } catch (err: any) {
-      toast.error(err.message);
+        if (err.message?.includes('already registered')) {
+            toast.warning("This user already exists in Auth. Check the list below to 'Activate' them if they are missing a role.");
+            fetchUsers();
+        } else {
+            toast.error(err.message);
+        }
     } finally {
       setCreating(false);
+    }
+  };
+
+  const assignMissingRole = async (userId: string, name: string) => {
+    const loadingToast = toast.loading(`Assigning role to ${name}...`);
+    try {
+      const { error } = await supabase.from('user_roles').insert({
+        user_id: userId,
+        role: 'staff' as AppRole
+      });
+      if (error) throw error;
+      toast.success(`Role assigned to ${name}`);
+      fetchUsers();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(`Database Error: ${err.message}. Make sure you ran BOTH SQL migration steps!`);
+    } finally {
+      toast.dismiss(loadingToast);
     }
   };
 
@@ -192,7 +206,14 @@ export default function UserManagement() {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="flex items-center gap-2"><Shield className="w-5 h-5" />Staff Members</CardTitle></CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="w-5 h-5" />Staff Members
+          </CardTitle>
+          <Button variant="ghost" size="sm" onClick={fetchUsers} className="h-8 gap-2">
+            <RefreshCw className="w-4 h-4" /> Refresh
+          </Button>
+        </CardHeader>
         <CardContent>
           <div className="space-y-3">
             {users.map((u, i) => (
@@ -202,7 +223,18 @@ export default function UserManagement() {
                   <p className="text-xs text-muted-foreground font-medium">{u.email || 'No email provided'}</p>
                 </div>
                 <div className="flex gap-2">
-                  <Badge variant="outline" className={roleBadgeClass(u.role || u.user_roles?.[0]?.role)}>{u.role || u.user_roles?.[0]?.role}</Badge>
+                  {u.role ? (
+                    <Badge variant="outline" className={roleBadgeClass(u.role)}>{u.role}</Badge>
+                  ) : (
+                    <Button 
+                        size="sm" 
+                        variant="destructive" 
+                        className="animate-pulse font-bold h-8"
+                        onClick={() => assignMissingRole(u.id, u.full_name)}
+                    >
+                        Activate Account
+                    </Button>
+                  )}
                 </div>
               </div>
             ))}

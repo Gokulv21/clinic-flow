@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from "react-router-dom";
 import PageBanner from "@/components/PageBanner";
 import patientEntryBanner from "@/assets/patient_entry_banner.png";
@@ -46,6 +46,18 @@ export default function NurseEntry() {
   const [selectedPatientFull, setSelectedPatientFull] = useState<any>(null); // To show full details in confirmation
   const [ageUnit, setAgeUnit] = useState<'years' | 'months' | 'days'>('years');
   const [tokenNumber, setTokenNumber] = useState<number | null>(null);
+  const [showSearch, setShowSearch] = useState(false);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setShowSearch(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const searchPatients = async (query: string = searchQuery) => {
     if (!query.trim()) {
@@ -281,7 +293,7 @@ export default function NurseEntry() {
         {step === 'patient' && (
             <div className="space-y-8">
                 {/* Search Header Interface */}
-                <div className="relative group">
+                <div className="relative group" ref={searchContainerRef}>
                     <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-sky-400/20 rounded-2xl blur opacity-25 group-hover:opacity-100 transition duration-1000 group-hover:duration-200"></div>
                     <Card className="relative border-primary/10 shadow-xl overflow-visible">
                         <CardContent className="pt-6">
@@ -292,12 +304,14 @@ export default function NurseEntry() {
                                         className="h-14 pl-12 text-lg border-slate-200 focus:border-primary focus:ring-primary/20 transition-all rounded-xl shadow-sm"
                                         placeholder="Search by Name, Phone, or Reg ID..."
                                         value={searchQuery}
+                                        onFocus={() => setShowSearch(true)}
                                         onChange={(e) => {
                                             setSearchQuery(e.target.value);
                                             searchPatients(e.target.value);
+                                            setShowSearch(true);
                                         }}
                                     />
-                                    {searchQuery && (
+                                    {showSearch && searchQuery && (
                                         <div className="absolute z-50 top-full left-0 right-0 mt-3 bg-white border border-slate-100 rounded-2xl shadow-2xl overflow-hidden max-h-[400px] overflow-y-auto animate-in fade-in zoom-in-95 duration-200">
                                             <div className="p-2 space-y-1">
                                                 {searchResults.map(p => (

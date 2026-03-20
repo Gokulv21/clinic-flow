@@ -89,13 +89,13 @@ function ProtectedRoute({ children, allowedRoles }: { children: ReactNode; allow
   }
 
   // Strict role redirection for Dashboard access
-  if (location.pathname === '/' && roles.includes('nurse') && !roles.includes('doctor')) {
+  if (location.pathname === '/' && roles.includes('staff') && !roles.includes('doctor')) {
     return <Navigate to="/nurse" replace />;
   }
 
   if (allowedRoles && !allowedRoles.some(r => roles.includes(r as any))) {
     // Redirect to home or specific entry point based on role
-    const fallbackPath = roles.includes('nurse') ? '/nurse' : (roles.includes('printer') ? '/print' : '/');
+    const fallbackPath = roles.includes('staff') ? '/nurse' : '/';
     return <Navigate to={fallbackPath} replace />;
   }
   return <AppLayout>{children}</AppLayout>;
@@ -118,10 +118,10 @@ const App = () => (
           <Routes>
             <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
             <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/nurse" element={<ProtectedRoute allowedRoles={['nurse', 'doctor']}><NurseEntry /></ProtectedRoute>} />
+            <Route path="/nurse" element={<ProtectedRoute allowedRoles={['staff', 'doctor']}><NurseEntry /></ProtectedRoute>} />
             <Route path="/consultation" element={<ProtectedRoute allowedRoles={['doctor']}><DoctorConsultation /></ProtectedRoute>} />
-            <Route path="/print" element={<ProtectedRoute allowedRoles={['printer', 'doctor']}><PrintQueue /></ProtectedRoute>} />
-            <Route path="/patients" element={<ProtectedRoute allowedRoles={['doctor']}><PatientList /></ProtectedRoute>} />
+            <Route path="/print" element={<ProtectedRoute allowedRoles={['staff', 'doctor']}><PrintQueue /></ProtectedRoute>} />
+            <Route path="/patients" element={<ProtectedRoute allowedRoles={['staff', 'doctor']}><PatientList /></ProtectedRoute>} />
             <Route path="/analytics" element={<ProtectedRoute allowedRoles={['doctor']}><Analytics /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute allowedRoles={['doctor']}><DoctorProfile /></ProtectedRoute>} />
             <Route path="/users" element={<ProtectedRoute allowedRoles={['doctor']}><UserManagement /></ProtectedRoute>} />

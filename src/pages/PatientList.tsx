@@ -37,7 +37,7 @@ export default function PatientList() {
     const start = (page - 1) * pageSize;
     const end = start + pageSize - 1;
 
-    let query = supabase.from('patients').select('*', { count: 'exact' }).order('last_opened_at', { ascending: false }).range(start, end);
+    let query = supabase.from('patients').select('*', { count: 'exact' }).order('last_opened_at', { ascending: false, nullsFirst: false }).range(start, end);
     if (search.trim()) {
       // Check if search looks like a UUID for ID search
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(search.trim());

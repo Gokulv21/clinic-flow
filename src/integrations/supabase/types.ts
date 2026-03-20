@@ -20,6 +20,7 @@ export type Database = {
           age: number
           created_at: string
           id: string
+          last_opened_at: string | null
           name: string
           phone: string
           reg_no: number
@@ -33,6 +34,7 @@ export type Database = {
           age: number
           created_at?: string
           id?: string
+          last_opened_at?: string | null
           name: string
           phone: string
           reg_no?: number
@@ -46,6 +48,7 @@ export type Database = {
           age?: number
           created_at?: string
           id?: string
+          last_opened_at?: string | null
           name?: string
           phone?: string
           reg_no?: number
@@ -239,7 +242,7 @@ export type Database = {
       is_clinic_staff: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      app_role: "doctor" | "nurse" | "printer"
+      app_role: "doctor" | "staff" | "nurse" | "printer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -367,7 +370,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["doctor", "nurse", "printer"],
+      app_role: ["doctor", "staff", "nurse", "printer"],
     },
   },
 } as const

@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import PageBanner from '@/components/PageBanner';
 import printQueueBanner from '@/assets/print_queue_banner.png';
-import { Printer, CheckCircle, Clock } from 'lucide-react';
+import { Printer, CheckCircle, Clock, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import PrescriptionTemplate from '@/components/PrescriptionTemplate';
 import { printPrescription as renderAndPrintPrescription } from '@/lib/printPrescription';
@@ -101,14 +101,25 @@ export default function PrintQueue() {
         </div>
 
       <Tabs defaultValue="unprinted" className="print:hidden">
-        <TabsList>
-          <TabsTrigger value="unprinted" className="gap-2">
-            <Clock className="w-4 h-4" />Unprinted ({unprinted.length})
-          </TabsTrigger>
-          <TabsTrigger value="printed" className="gap-2">
-            <CheckCircle className="w-4 h-4" />Printed ({printed.length})
-          </TabsTrigger>
-        </TabsList>
+        <div className="flex items-center justify-between">
+          <TabsList>
+            <TabsTrigger value="unprinted" className="gap-2">
+              <Clock className="w-4 h-4" />Unprinted ({unprinted.length})
+            </TabsTrigger>
+            <TabsTrigger value="printed" className="gap-2">
+              <CheckCircle className="w-4 h-4" />Printed ({printed.length})
+            </TabsTrigger>
+          </TabsList>
+          
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={fetchPrescriptions}
+            className="gap-2 h-9"
+          >
+            <RefreshCw className="w-4 h-4" /> Refresh
+          </Button>
+        </div>
 
         <TabsContent value="unprinted" className="space-y-3">
           {unprinted.map(rx => (
