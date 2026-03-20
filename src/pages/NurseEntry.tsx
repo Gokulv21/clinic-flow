@@ -48,6 +48,17 @@ export default function NurseEntry() {
   const [tokenNumber, setTokenNumber] = useState<number | null>(null);
   const [showSearch, setShowSearch] = useState(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
+  const ageRef = useRef<HTMLInputElement>(null);
+  const phoneRef = useRef<HTMLInputElement>(null);
+  const addressRef = useRef<HTMLInputElement>(null);
+  const weightRef = useRef<HTMLInputElement>(null);
+  const sbpRef = useRef<HTMLInputElement>(null);
+  const dbpRef = useRef<HTMLInputElement>(null);
+  const pulseRef = useRef<HTMLInputElement>(null);
+  const spo2Ref = useRef<HTMLInputElement>(null);
+  const tempRef = useRef<HTMLInputElement>(null);
+  const cbgRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -182,22 +193,20 @@ export default function NurseEntry() {
     setAgeUnit('years');
     setTab('new'); // Keep for internal logic if needed
   };
-
-  const autoSetTitle = (age: string, sex: string, unit: 'years' | 'months' | 'days') => {
-    if (!age || !sex) return;
-    let ageVal = parseFloat(age);
-    if (unit === 'months') ageVal = ageVal / 12;
-    if (unit === 'days') ageVal = ageVal / 365;
-
-    if (ageVal < 2) {
-      setPatient(p => ({ ...p, title: 'Baby.' }));
-    } else if (sex === 'Male') {
-      const suggested = ageVal < 12 ? 'Mast.' : 'Mr.';
-      setPatient(p => ({ ...p, title: suggested }));
-    } else if (sex === 'Female') {
-      setPatient(p => ({ ...p, title: 'Miss.' }));
+  
+  const handleKeyDown = (e: React.KeyboardEvent, nextRef?: React.RefObject<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (nextRef && nextRef.current) {
+        nextRef.current.focus();
+      } else if (!nextRef) {
+        // Last field of the current step
+        if (step === 'patient') handleNewPatientNext();
+        else if (step === 'vitals') submitVisit();
+      }
     }
   };
+
 
   if (step === 'done') {
     return (
@@ -434,9 +443,11 @@ export default function NurseEntry() {
                                         </div>
                                         <div className="col-span-3">
                                             <Input 
+                                                ref={nameRef}
                                                 className="h-12 rounded-xl focus:ring-primary/10 border-slate-200 placeholder:text-slate-300 font-medium" 
                                                 value={patient.name} 
                                                 onChange={e => setPatient(p => ({ ...p, name: e.target.value }))} 
+                                                onKeyDown={(e) => handleKeyDown(e, ageRef)}
                                                 placeholder="Full Name" 
                                             />
                                         </div>
@@ -451,6 +462,7 @@ export default function NurseEntry() {
                                         <div className="flex flex-col gap-2">
                                             <div className="flex gap-2">
                                                 <Input
+                                                    ref={ageRef}
                                                     type="number"
                                                     step="0.1"
                                                     value={patient.age}
@@ -458,14 +470,13 @@ export default function NurseEntry() {
                                                         const val = parseFloat(e.target.value);
                                                         if (val > 1000) return;
                                                         setPatient(p => ({ ...p, age: e.target.value }));
-                                                        autoSetTitle(e.target.value, patient.sex, ageUnit);
                                                     }}
+                                                    onKeyDown={(e) => handleKeyDown(e, phoneRef)}
                                                     placeholder="Age"
                                                     className="h-12 rounded-xl focus:ring-primary/10 border-slate-200 font-medium flex-1"
                                                 />
                                                 <Select value={ageUnit} onValueChange={(v: any) => {
                                                     setAgeUnit(v);
-                                                    autoSetTitle(patient.age, patient.sex, v);
                                                 }}>
                                                     <SelectTrigger className="h-12 w-[85px] rounded-xl focus:ring-primary/10 border-slate-200"><SelectValue /></SelectTrigger>
                                                     <SelectContent>
@@ -480,7 +491,6 @@ export default function NurseEntry() {
                                             value={patient.sex}
                                             onValueChange={v => {
                                                 setPatient(p => ({ ...p, sex: v }));
-                                                autoSetTitle(patient.age, v, ageUnit);
                                             }}
                                         >
                                             <SelectTrigger className="h-12 rounded-xl focus:ring-primary/10 border-slate-200 font-medium">
@@ -502,6 +512,7 @@ export default function NurseEntry() {
                                         <div className="w-1.5 h-1.5 bg-primary rounded-full"></div> Contact Information
                                     </Label>
                                     <Input
+                                        ref={phoneRef}
                                         type="tel"
                                         inputMode="tel"
                                         className="h-12 rounded-xl focus:ring-primary/10 border-slate-200 font-medium placeholder:text-slate-300"
@@ -510,6 +521,7 @@ export default function NurseEntry() {
                                             const val = e.target.value.replace(/\D/g, '').slice(0, 10);
                                             setPatient(p => ({ ...p, phone: val }));
                                         }}
+                                        onKeyDown={(e) => handleKeyDown(e, addressRef)}
                                         placeholder="Phone Number (10 digits)"
                                     />
                                 </div>
@@ -519,9 +531,11 @@ export default function NurseEntry() {
                                         <div className="w-1.5 h-1.5 bg-primary rounded-full"></div> Location
                                     </Label>
                                     <Input 
+                                        ref={addressRef}
                                         className="h-12 rounded-xl focus:ring-primary/10 border-slate-200 font-medium placeholder:text-slate-300" 
                                         value={patient.address} 
                                         onChange={e => setPatient(p => ({ ...p, address: e.target.value }))} 
+                                        onKeyDown={(e) => handleKeyDown(e)}
                                         placeholder="Full Address" 
                                     />
                                 </div>
@@ -553,6 +567,7 @@ export default function NurseEntry() {
                 <div className="space-y-3">
                   <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">Weight <span className="text-slate-300">(kg)</span></Label>
                   <Input
+                    ref={weightRef}
                     className="h-14 rounded-2xl text-xl font-bold border-slate-200 focus:ring-primary/10"
                     type="number"
                     step="0.1"
@@ -564,12 +579,14 @@ export default function NurseEntry() {
                         if (val > 300) return;
                         setVitals(v => ({ ...v, weight: e.target.value }));
                     }}
+                    onKeyDown={(e) => handleKeyDown(e, sbpRef)}
                   />
                 </div>
                 <div className="space-y-3">
                   <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">Blood Pressure <span className="text-slate-300">(mmHg)</span></Label>
                   <div className="flex items-center gap-3">
                     <Input
+                      ref={sbpRef}
                       placeholder="Sys"
                       inputMode="numeric"
                       value={vitals.blood_pressure.split('/')[0] || ''}
@@ -579,13 +596,15 @@ export default function NurseEntry() {
                         const dbp = vitals.blood_pressure.split('/')[1] || '';
                         setVitals(v => ({ ...v, blood_pressure: `${sbp}/${dbp}`.replace(/^\/|\/$/g, '') }));
                         if (sbp.length >= 3) {
-                          document.getElementById('dbp-input')?.focus();
+                          dbpRef.current?.focus();
                         }
                       }}
+                      onKeyDown={(e) => handleKeyDown(e, dbpRef)}
                       className="h-14 rounded-2xl text-xl font-bold text-center border-slate-200 focus:ring-primary/10"
                     />
                     <span className="text-primary font-black text-2xl">/</span>
                     <Input
+                      ref={dbpRef}
                       id="dbp-input"
                       placeholder="Dia"
                       inputMode="numeric"
@@ -596,9 +615,10 @@ export default function NurseEntry() {
                         if (parseInt(dbp) > 300) return;
                         setVitals(v => ({ ...v, blood_pressure: `${sbp}/${dbp}`.replace(/^\/|\/$/g, '') }));
                         if (dbp.length >= 3) {
-                          document.getElementById('pulse-input')?.focus();
+                          pulseRef.current?.focus();
                         }
                       }}
+                      onKeyDown={(e) => handleKeyDown(e, pulseRef)}
                       className="h-14 rounded-2xl text-xl font-bold text-center border-slate-200 focus:ring-primary/10"
                     />
                   </div>
@@ -606,6 +626,7 @@ export default function NurseEntry() {
                 <div className="space-y-3">
                   <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">Pulse Rate <span className="text-slate-300">(bpm)</span></Label>
                   <Input
+                    ref={pulseRef}
                     id="pulse-input"
                     className="h-14 rounded-2xl text-xl font-bold border-slate-200 focus:ring-primary/10"
                     type="number"
@@ -617,11 +638,13 @@ export default function NurseEntry() {
                         if (val > 250) return;
                         setVitals(v => ({ ...v, pulse_rate: e.target.value }));
                     }}
+                    onKeyDown={(e) => handleKeyDown(e, spo2Ref)}
                   />
                 </div>
                 <div className="space-y-3">
                   <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">SpO2 <span className="text-slate-300">(%)</span></Label>
                   <Input
+                    ref={spo2Ref}
                     className="h-14 rounded-2xl text-xl font-bold border-slate-200 focus:ring-primary/10"
                     type="number"
                     step="0.1"
@@ -633,11 +656,13 @@ export default function NurseEntry() {
                         if (val > 100) return;
                         setVitals(v => ({ ...v, spo2: e.target.value }));
                     }}
+                    onKeyDown={(e) => handleKeyDown(e, tempRef)}
                   />
                 </div>
                 <div className="space-y-3">
                   <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">Temperature <span className="text-slate-300">(°F)</span></Label>
                   <Input
+                    ref={tempRef}
                     className="h-14 rounded-2xl text-xl font-bold border-slate-200 focus:ring-primary/10"
                     type="number"
                     step="0.1"
@@ -649,11 +674,13 @@ export default function NurseEntry() {
                         if (val > 110) return;
                         setVitals(v => ({ ...v, temperature: e.target.value }));
                     }}
+                    onKeyDown={(e) => handleKeyDown(e, cbgRef)}
                   />
                 </div>
                 <div className="space-y-3">
                   <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">CBG <span className="text-slate-300">(mg/dL)</span></Label>
                   <Input
+                    ref={cbgRef}
                     className="h-14 rounded-2xl text-xl font-bold border-slate-200 focus:ring-primary/10"
                     type="number"
                     min="0"
@@ -664,6 +691,7 @@ export default function NurseEntry() {
                         if (val > 600) return;
                         setVitals(v => ({ ...v, cbg: e.target.value }));
                     }}
+                    onKeyDown={(e) => handleKeyDown(e)}
                   />
                 </div>
               </div>

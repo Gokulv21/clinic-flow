@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { cn, formatAge } from '@/lib/utils';
-import { User, Clock, CheckCircle, Plus, Trash2, Save, Loader2, PenTool, Eye, Menu, Printer, ArrowLeft, Activity, ClipboardList, Scale, Heart, Wind, Thermometer, Droplet, Pencil, Calendar } from 'lucide-react';
+import { User, Clock, CheckCircle, Plus, Trash2, Save, Loader2, PenTool, Eye, Menu, Printer, ArrowLeft, Activity, ClipboardList, Scale, Heart, Wind, Thermometer, Droplet, Pencil, Calendar, RefreshCw } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import DigitalPrescription from '@/components/DigitalPrescription';
 import PrescriptionTemplate from '@/components/PrescriptionTemplate';
@@ -49,11 +49,9 @@ export default function DoctorConsultation() {
   const lastLoadedVisitId = useRef<string | null>(null);
 
   const fetchQueue = async () => {
-    const today = new Date().toISOString().split('T')[0];
     const { data } = await supabase
       .from('visits')
       .select('*, patients(*), prescriptions(*)')
-      .gte('created_at', today)
       .in('status', ['waiting', 'in_consultation'])
       .order('token_number', { ascending: true });
     
@@ -66,12 +64,18 @@ export default function DoctorConsultation() {
     
     let debounceTimer: any;
     const channel = supabase
-      .channel('visits-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'visits' }, () => {
+      .channel('visits-realtime-doctor')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'visits' }, (payload) => {
+        console.log('Realtime update received:', payload);
         clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(fetchQueue, 1000);
+        debounceTimer = setTimeout(fetchQueue, 500); // Faster debounce
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Realtime subscription status:', status);
+        if (status === 'CHANNEL_ERROR') {
+          toast.error('Realtime connection issue. Check your internet.');
+        }
+      });
 
     // RESTORE STATE FROM LOCALSTORAGE
     const restoreState = async () => {
@@ -300,7 +304,17 @@ export default function DoctorConsultation() {
             <p className="text-xs text-muted-foreground/60 uppercase tracking-widest font-bold">Queue is Empty</p>
           )}
         </div>
-        {/* Mobile-only refresh or count indicator if needed */}
+        <div className="flex items-center gap-2">
+           <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={fetchQueue}
+            className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors"
+            title="Refresh Queue"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </Button>
+        </div>
       </div>
       <div className="flex-1 overflow-auto">
         {queue.map(visit => (
