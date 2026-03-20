@@ -502,6 +502,8 @@ export default function NurseEntry() {
                                         <div className="w-1.5 h-1.5 bg-primary rounded-full"></div> Contact Information
                                     </Label>
                                     <Input
+                                        type="tel"
+                                        inputMode="tel"
                                         className="h-12 rounded-xl focus:ring-primary/10 border-slate-200 font-medium placeholder:text-slate-300"
                                         value={patient.phone}
                                         onChange={e => {
