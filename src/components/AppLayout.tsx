@@ -40,6 +40,8 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   };
 
   const visibleItems = navItems.filter(item => item.roles.some(r => roles.includes(r)));
+  console.log("Current Roles:", roles);
+  console.log("Visible Items:", visibleItems.map(i => i.label));
 
   return (
     <div className="min-h-screen flex bg-background">

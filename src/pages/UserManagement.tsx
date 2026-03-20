@@ -44,6 +44,9 @@ export default function UserManagement() {
       if (profError) throw profError;
       if (rolesError) throw rolesError;
 
+      console.log("Raw Profiles Data:", profilesData);
+      console.log("Raw Roles Data:", rolesData);
+
       // Base the list on profiles to show everyone, even if they lack a role
       const merged = (profilesData || []).map(p => {
         const r = rolesData?.find(role => role.user_id === p.user_id);
@@ -104,6 +107,10 @@ export default function UserManagement() {
         email: email.trim(),
         id: data.user.id
       });
+      if (profileError) {
+          console.error("Profile Error:", profileError);
+          // Don't throw yet, verify if role assigned
+      }
 
       toast.success(`User ${fullName} created with role: ${role}`);
       setEmail('');
