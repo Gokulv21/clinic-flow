@@ -23,7 +23,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
     const [scale, setScale] = useState(1);
 
     // Drawing State
-    const [penColor, setPenColor] = useState('#4169E1');
+    const [penColor, setPenColor] = useState('#00009F');
     const [penSize, setPenSize] = useState(1);
     const [eraserSize, setEraserSize] = useState(7);
     const [isEraser, setIsEraser] = useState(false);
