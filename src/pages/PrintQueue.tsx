@@ -41,7 +41,9 @@ export default function PrintQueue() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'prescriptions' }, () => {
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
-          queryClient.invalidateQueries({ queryKey: ['prescriptionsToday'] });
+          if (!document.hidden) {
+            queryClient.invalidateQueries({ queryKey: ['prescriptionsToday'] });
+          }
         }, 2000);
       })
       .subscribe();

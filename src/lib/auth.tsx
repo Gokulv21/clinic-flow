@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { User, Session } from '@supabase/supabase-js';
 
@@ -32,12 +32,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [lastFetchedId, setLastFetchedId] = useState<string | null>(null);
+  const lastFetchedId = useRef<string | null>(null);
+  const isFetching = useRef(false);
 
-  const fetchUserData = async (userId: string) => {
-    if (userId === lastFetchedId && roles.length > 0) return;
+  const fetchUserData = async (userId: string, force = false) => {
+    if (isFetching.current && !force) return;
     
-    console.log('Fetching user data for:', userId);
+    // Prevent redundant fetches if we already have the data
+    if (userId === lastFetchedId.current && roles.length > 0 && !force) {
+      setLoading(false);
+      return;
+    }
+    
+    console.log('[Auth] Fetching user data for:', userId);
+    isFetching.current = true;
     setLoading(true);
     setError(null);
     try {
@@ -46,62 +54,104 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         supabase.from('profiles').select('full_name').eq('user_id', userId).maybeSingle(),
       ]);
 
-      if (rolesRes.error) throw new Error(rolesRes.error.message);
-      if (profileRes.error) throw new Error(profileRes.error.message);
+      if (rolesRes.error) throw rolesRes.error;
+      if (profileRes.error) throw profileRes.error;
 
-      setRoles((rolesRes.data || []).map(r => r.role as AppRole));
+      const newRoles = (rolesRes.data || []).map(r => r.role as AppRole);
+      setRoles(newRoles);
       setProfile(profileRes.data || null);
       
       // Cache for faster subsequent loads
-      sessionStorage.setItem('app_roles', JSON.stringify((rolesRes.data || []).map(r => r.role)));
+      sessionStorage.setItem('app_roles', JSON.stringify(newRoles));
       sessionStorage.setItem('user_profile', JSON.stringify(profileRes.data));
       
-      setLastFetchedId(userId);
+      lastFetchedId.current = userId;
+      setError(null); // Clear errors if we successfully fetched
     } catch (err: any) {
-      console.error('Error fetching user data:', err);
-      setError(err.message || 'Failed to connect to security service');
+      console.error('[Auth] Error fetching user data (might be offline):', err);
+      // If we have cached roles, don't set a global error that blocks the whole app
+      if (roles.length === 0) {
+        setError(err.message || 'Failed to connect to security service');
+      }
     } finally {
+      isFetching.current = false;
       setLoading(false);
     }
   };
 
   const refresh = async () => {
     if (user) {
-      setLastFetchedId(null);
-      await fetchUserData(user.id);
+      lastFetchedId.current = null;
+      await fetchUserData(user.id, true);
     }
   };
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state change:', event);
-      setSession(session);
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      
-      if (currentUser) {
-        fetchUserData(currentUser.id);
-      } else {
-        setRoles([]);
-        setProfile(null);
-        setError(null);
-        setLastFetchedId(null);
-        setLoading(false);
-      }
-    });
+    let mounted = true;
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      if (currentUser) {
-        fetchUserData(currentUser.id);
-      } else {
-        setLoading(false);
-      }
-    });
+    const initAuth = async () => {
+      // Safety timeout: ensure loading screen clears within 5 seconds regardless of network
+      const timeoutId = setTimeout(() => {
+        if (mounted) {
+          console.warn('[Auth] Hydration timeout reached. Forcing loading false.');
+          setLoading(false);
+        }
+      }, 5000);
 
-    return () => subscription.unsubscribe();
+      try {
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        if (!mounted) return;
+
+        if (initialSession) {
+          setSession(initialSession);
+          setUser(initialSession.user);
+          
+          // OFFLINE-FIRST: Unblock the UI immediately if we have cached roles
+          if (roles.length > 0) {
+            setLoading(false);
+          }
+          
+          await fetchUserData(initialSession.user.id);
+        } else {
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error('[Auth] Init error:', err);
+        // Even if session lookup fails (e.g. offline), let the app mount
+        // ProtectedRoute will handle !user by redirecting to login later
+        setLoading(false);
+      } finally {
+        if (mounted) clearTimeout(timeoutId);
+      }
+
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+        if (!mounted) return;
+        console.log('[Auth] State change:', event);
+        
+        setSession(currentSession);
+        const currentUser = currentSession?.user ?? null;
+        setUser(currentUser);
+        
+        if (currentUser) {
+          fetchUserData(currentUser.id);
+        } else {
+          setRoles([]);
+          setProfile(null);
+          setError(null);
+          lastFetchedId.current = null;
+          setLoading(false);
+        }
+      });
+
+      return subscription;
+    };
+
+    const subPromise = initAuth();
+
+    return () => {
+      mounted = false;
+      subPromise.then(sub => sub?.unsubscribe());
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
@@ -113,14 +163,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     setLoading(true);
-    await supabase.auth.signOut();
-    setRoles([]);
-    setProfile(null);
-    setError(null);
-    setLastFetchedId(null);
-    sessionStorage.removeItem('app_roles');
-    sessionStorage.removeItem('user_profile');
-    setLoading(false);
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.error('[Auth] Sign out error:', e);
+    } finally {
+      setUser(null);
+      setSession(null);
+      setRoles([]);
+      setProfile(null);
+      setError(null);
+      lastFetchedId.current = null;
+      sessionStorage.clear();
+      localStorage.clear();
+      setLoading(false);
+    }
   };
 
   const hasRole = (role: AppRole) => roles.includes(role);

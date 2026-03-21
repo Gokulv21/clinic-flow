@@ -42,7 +42,7 @@ export default function Dashboard() {
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
           queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
-        }, 5000); // Longer debounce for dashboard stats
+        }, 5000); // Drastically increased for resource relief
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'patients' }, () => {
         clearTimeout(debounceTimer);

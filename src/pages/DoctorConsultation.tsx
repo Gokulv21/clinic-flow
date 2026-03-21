@@ -75,7 +75,9 @@ export default function DoctorConsultation() {
         // Debounce invalidation to prevent "request storms" under high traffic
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
-          queryClient.invalidateQueries({ queryKey: ['visitQueue'] });
+          if (!document.hidden) {
+            queryClient.invalidateQueries({ queryKey: ['visitQueue'] });
+          }
         }, 2000); 
       })
       .subscribe((status) => {

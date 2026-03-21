@@ -21,7 +21,16 @@ import Help from "@/pages/Help";
 import NotFound from "./pages/NotFound.tsx";
 import { ReactNode } from "react";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      gcTime: 1000 * 60 * 30, // 30 minutes
+      refetchOnWindowFocus: false, // Prevent lag when switching tabs
+      retry: 1,
+    },
+  },
+});
 
 function ProtectedRoute({ children, allowedRoles }: { children: ReactNode; allowedRoles?: string[] }) {
   const { user, roles, loading, error, refresh, signOut } = useAuth();
@@ -39,7 +48,9 @@ function ProtectedRoute({ children, allowedRoles }: { children: ReactNode; allow
     </div>
   );
 
-  if (error) {
+  // Only show the full-page blocking error if we HAVE NO ROLES IN CACHE. 
+  // If we have roles, we let the user in "Offline Mode".
+  if (error && roles.length === 0) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4 text-center">
         <div className="space-y-6 max-w-sm animate-in fade-in zoom-in duration-300">
@@ -47,18 +58,20 @@ function ProtectedRoute({ children, allowedRoles }: { children: ReactNode; allow
             <WifiOff className="w-8 h-8" />
           </div>
           <div className="space-y-2">
-            <h1 className="text-xl font-bold">Connection Error</h1>
-            <p className="text-muted-foreground text-sm">We're having trouble connecting to the security server. This might be due to a poor internet connection.</p>
-            <p className="text-[10px] font-mono text-destructive/70 bg-destructive/5 p-2 rounded border border-destructive/10">{error}</p>
+            <h1 className="text-xl font-bold">Network Connectivity Issue</h1>
+            <p className="text-muted-foreground text-sm">We're unable to reach the security server (DNS/CORS Block). This happens during high traffic or local network issues.</p>
+            <p className="text-[10px] font-mono text-destructive/70 bg-destructive/5 p-2 rounded border border-destructive/10 leading-tight break-all">{error}</p>
           </div>
           <div className="flex flex-col gap-2">
-            <Button onClick={refresh} className="w-full gap-2 font-bold">
+            <Button onClick={refresh} className="w-full gap-2 font-bold bg-primary text-white">
               <RefreshCw className="w-4 h-4" /> Retry Connection
             </Button>
-            <Button variant="ghost" size="sm" onClick={async () => {
+            <Button variant="outline" size="sm" onClick={async () => {
               await signOut();
-              navigate('/login');
-            }}>Sign Out</Button>
+              window.location.reload();
+            }} className="text-xs">
+              Deep Reset & Clear Cache
+            </Button>
           </div>
         </div>
       </div>
@@ -103,7 +116,7 @@ function ProtectedRoute({ children, allowedRoles }: { children: ReactNode; allow
 
 function PublicRoute({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
-  if (loading) return <div className="flex items-center justify-center min-h-screen text-muted-foreground">Loading...</div>;
+  if (loading) return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
   if (user) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
