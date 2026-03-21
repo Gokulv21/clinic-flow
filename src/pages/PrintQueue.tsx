@@ -15,18 +15,19 @@ import { printPrescription as renderAndPrintPrescription } from '@/lib/printPres
 export default function PrintQueue() {
   const queryClient = useQueryClient();
 
-  // 1. Fetch Today's Prescriptions via React Query
+  // 1. Fetch Active Print Requests via React Query
   const { data: prescriptions = [], isLoading, refetch: refetchPrescriptions } = useQuery({
-    queryKey: ['prescriptionsToday'],
+    queryKey: ['prescriptionsToPrint'],
     queryFn: async () => {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
       const { data, error } = await supabase
         .from('prescriptions')
-        .select('*, patients(*), visits(*)')
+        .select('*, patients(*), visits(*) ')
+        .eq('is_printed', false) // FOCUS ONLY on unprinted for less server load
         .gte('created_at', today.toISOString())
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: true }); // Process oldest first
       
       if (error) throw error;
       return data || [];
@@ -37,14 +38,19 @@ export default function PrintQueue() {
   useEffect(() => {
     let debounceTimer: any;
     const channel = supabase
-      .channel('prescriptions-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'prescriptions' }, () => {
+      .channel('prescriptions-realtime-v2')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'prescriptions',
+        filter: 'is_printed=eq.false' // Listen ONLY for new unprinted items
+      }, () => {
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
           if (!document.hidden) {
-            queryClient.invalidateQueries({ queryKey: ['prescriptionsToday'] });
+            queryClient.invalidateQueries({ queryKey: ['prescriptionsToPrint'] });
           }
-        }, 2000);
+        }, 1500); 
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
@@ -68,8 +74,9 @@ export default function PrintQueue() {
     const { error } = await supabase.from('prescriptions').update({ is_printed: true }).eq('id', id);
     if (error) toast.error('Failed to update');
     else {
-      toast.success('Marked as printed');
-      queryClient.invalidateQueries({ queryKey: ['prescriptionsToday'] });
+      toast.success('Printed & Cleared');
+      // Optimistically remove from list
+      queryClient.setQueryData(['prescriptionsToPrint'], (old: any) => old?.filter((p: any) => p.id !== id));
     }
   };
 
@@ -77,8 +84,6 @@ export default function PrintQueue() {
     setPrintData(rx);
   };
 
-  const unprinted = prescriptions.filter(p => !p.is_printed);
-  const printed = prescriptions.filter(p => p.is_printed);
 
   return (
     <div className="max-w-[1600px] mx-auto animate-in fade-in duration-500 pb-12">
@@ -111,26 +116,11 @@ export default function PrintQueue() {
       )}
 
       <div className="px-4 md:px-8 space-y-8">
-        <div className="print:hidden">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-heading font-bold">Print Queue Status</h1>
-              <p className="text-muted-foreground">{unprinted.length} prescriptions waiting to be processed</p>
-            </div>
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-heading font-bold text-slate-800">Prescriptions To Print</h1>
+            <p className="text-muted-foreground">{prescriptions.length} items currently waiting</p>
           </div>
-        </div>
-
-      <Tabs defaultValue="unprinted" className="print:hidden">
-        <div className="flex items-center justify-between">
-          <TabsList>
-            <TabsTrigger value="unprinted" className="gap-2">
-              <Clock className="w-4 h-4" />Unprinted ({unprinted.length})
-            </TabsTrigger>
-            <TabsTrigger value="printed" className="gap-2">
-              <CheckCircle className="w-4 h-4" />Printed ({printed.length})
-            </TabsTrigger>
-          </TabsList>
-          
           <Button 
             variant="outline" 
             size="sm" 
@@ -138,56 +128,43 @@ export default function PrintQueue() {
             disabled={isLoading}
             className="gap-2 h-9"
           >
-            {isLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Refresh
+            {isLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Manual Refresh
           </Button>
         </div>
 
-        <TabsContent value="unprinted" className="space-y-3">
-          {unprinted.map(rx => (
-            <Card key={rx.id} className="animate-fade-in">
+        <div className="grid grid-cols-1 gap-3 max-w-4xl mx-auto">
+          {prescriptions.map(rx => (
+            <Card key={rx.id} className="animate-fade-in border-blue-50 hover:border-blue-200 transition-colors shadow-sm">
               <CardContent className="py-4 flex items-center justify-between">
                 <div>
-                  <p className="font-medium">{(rx.patients?.title ? rx.patients.title + ' ' : '') + rx.patients?.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    Token #{rx.visits?.token_number} · {new Date(rx.created_at).toLocaleTimeString()}
-                    {rx.diagnosis ? ` · ${rx.diagnosis}` : ''}
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-bold text-lg text-slate-900">{(rx.patients?.title ? rx.patients.title + ' ' : '') + rx.patients?.name}</span>
+                    <Badge variant="secondary" className="bg-blue-50 text-blue-600 font-bold">TOKEN #{rx.visits?.token_number}</Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground flex items-center gap-2">
+                    <Clock className="w-3.5 h-3.5" />
+                    {new Date(rx.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {rx.diagnosis && <span className="text-slate-400">· {rx.diagnosis}</span>}
                   </p>
                 </div>
-                <Button onClick={() => printPrescription(rx)} className="gap-2">
-                  <Printer className="w-4 h-4" />Print
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-          {unprinted.length === 0 && (
-            <div className="text-center py-12 text-muted-foreground">
-              <CheckCircle className="w-12 h-12 mx-auto mb-3 opacity-30" />
-              <p>All prescriptions have been printed</p>
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="printed" className="space-y-3">
-          {printed.map(rx => (
-            <Card key={rx.id} className="opacity-70">
-              <CardContent className="py-4 flex items-center justify-between">
-                <div>
-                  <p className="font-medium">{(rx.patients?.title ? rx.patients.title + ' ' : '') + rx.patients?.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    Token #{rx.visits?.token_number} · {new Date(rx.created_at).toLocaleTimeString()}
-                  </p>
-                </div>
-                <div className="flex flex-col items-end gap-2">
-                  <Badge variant="secondary" className="gap-1"><CheckCircle className="w-3 h-3" />Printed</Badge>
-                  <Button onClick={() => printPrescription(rx)} variant="outline" size="sm" className="gap-1">
-                    <Printer className="w-3 h-3" /> Re-Print
+                <div className="flex items-center gap-3">
+                   <Button onClick={() => printPrescription(rx)} className="gap-2 px-6 shadow-md hover:shadow-lg transition-all" size="lg">
+                    <Printer className="w-4 h-4" />Print Prescription
                   </Button>
                 </div>
               </CardContent>
             </Card>
           ))}
-        </TabsContent>
-        </Tabs>
+          {prescriptions.length === 0 && !isLoading && (
+            <div className="text-center py-20 bg-white rounded-3xl border-2 border-dashed border-slate-100">
+              <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle className="w-10 h-10 text-emerald-500" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-800">All Caught Up!</h3>
+              <p className="text-muted-foreground mt-1">There are no prescriptions waiting in the queue.</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

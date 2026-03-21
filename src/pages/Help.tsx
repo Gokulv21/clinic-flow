@@ -10,7 +10,7 @@ export default function Help() {
       questions: [
         {
           q: "How do I login to the system?",
-          a: "You can login using your registered email and password at the login page. Each user (Doctor, Nurse, or Staff) must have an account created by the administrator."
+          a: "You can login using your registered email and password at the login page. Each user (Doctor or Staff) must have an account created by the administrator."
         },
         {
           q: "What is the official login link?",
@@ -23,7 +23,7 @@ export default function Help() {
       ]
     },
     {
-      title: "Patient Entry (For Nurses)",
+      title: "Patient Entry (For Staff)",
       icon: <ClipboardPlus className="w-5 h-5 text-emerald-500" />,
       questions: [
         {
@@ -78,7 +78,7 @@ export default function Help() {
         },
         {
           q: "How do I manage clinic users?",
-          a: "Administrators can use the 'User Mgmt' tab to invite new staff members and assign roles (Doctor, Nurse, Printer)."
+          a: "Administrators can use the 'User Mgmt' tab to invite new staff members and assign roles (Doctor, Staff)."
         }
       ]
     }

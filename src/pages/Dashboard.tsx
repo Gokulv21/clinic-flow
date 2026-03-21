@@ -55,10 +55,10 @@ export default function Dashboard() {
   }, [queryClient]);
 
   const modules = [
-    { label: 'Patient Entry', desc: 'Register & record vitals', icon: <ClipboardPlus className="w-6 h-6" />, path: '/nurse', roles: ['nurse', 'doctor'] as const, color: 'from-blue-500 to-cyan-500' },
+    { label: 'Patient Entry', desc: 'Register & record vitals', icon: <ClipboardPlus className="w-6 h-6" />, path: '/nurse', roles: ['staff', 'doctor'] as const, color: 'from-blue-500 to-cyan-500' },
     { label: 'Consultation', desc: 'Queue & prescriptions', icon: <Stethoscope className="w-6 h-6" />, path: '/consultation', roles: ['doctor'] as const, color: 'from-indigo-500 to-purple-500' },
-    { label: 'Print Queue', desc: 'Print records', icon: <Printer className="w-6 h-6" />, path: '/print', roles: ['printer', 'doctor'] as const, color: 'from-emerald-500 to-teal-500' },
-    { label: 'Patient Records', desc: 'Manage health data', icon: <Users className="w-6 h-6" />, path: '/patients', roles: ['doctor'] as const, color: 'from-slate-700 to-slate-900' },
+    { label: 'Print Queue', desc: 'Print records', icon: <Printer className="w-6 h-6" />, path: '/print', roles: ['staff', 'doctor'] as const, color: 'from-emerald-500 to-teal-500' },
+    { label: 'Patient Records', desc: 'Manage health data', icon: <Users className="w-6 h-6" />, path: '/patients', roles: ['doctor', 'staff'] as const, color: 'from-slate-700 to-slate-900' },
   ];
 
   const visibleModules = modules.filter(m => m.roles.some(r => hasRole(r)));
