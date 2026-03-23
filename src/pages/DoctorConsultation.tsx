@@ -234,14 +234,35 @@ export default function DoctorConsultation() {
     
     setSaving(true);
     try {
-      const { error } = await supabase
+      const patientId = selectedVisit.patient_id;
+
+      // 1. Delete the visit entirely
+      const { error: deleteError } = await supabase
         .from('visits')
-        .update({ status: 'no_show' })
+        .delete()
         .eq('id', selectedVisit.id);
 
-      if (error) throw error;
+      if (deleteError) throw deleteError;
 
-      toast.success('Patient marked as No Show');
+      // 2. Check if this patient has ANY other visits (completed, no_show, etc.)
+      const { data: otherVisits } = await supabase
+        .from('visits')
+        .select('id')
+        .eq('patient_id', patientId)
+        .limit(1);
+
+      let patientRemoved = false;
+      if (!otherVisits || otherVisits.length === 0) {
+        // No other visits, delete the patient too to keep the directory clean
+        const { error: patientDeleteError } = await supabase
+          .from('patients')
+          .delete()
+          .eq('id', patientId);
+        
+        if (!patientDeleteError) patientRemoved = true;
+      }
+
+      toast.success(patientRemoved ? 'Patient record removed' : 'Visit cancelled');
       
       // Clear selection
       localStorage.removeItem(`draft_${selectedVisit.id}`);

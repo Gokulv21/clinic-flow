@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useNavigate } from 'react-router-dom';
@@ -8,7 +8,7 @@ import {
     UserCheck, BarChart3, PieChart, Settings, Mail, Phone, MapPin, 
     Medal, FileSignature, Save, RefreshCw, Plus, Stethoscope, Printer,
     ArrowRight, CheckCircle2, Circle, PanelLeft, LayoutDashboard,
-    Group, Info, Moon, Sun, HeartPulse, TrendingUp, Search, UserPlus
+    Group, Info, Moon, Sun, HeartPulse, TrendingUp, Search, UserPlus, Camera
 } from 'lucide-react';
 import { startOfDay, endOfDay, subDays, format, isSameDay, parseISO } from 'date-fns';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -27,6 +27,7 @@ import {
     Dialog, DialogContent, DialogHeader, DialogTitle, 
     DialogDescription, DialogFooter 
 } from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
 
 type ProfileData = {
     full_name: string;
@@ -61,6 +62,8 @@ export default function DoctorProfile() {
     const [profile, setProfile] = useState<ProfileData | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [uploading, setUploading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     
     // Stats & Analytics State
     const [stats, setStats] = useState({
@@ -195,6 +198,62 @@ export default function DoctorProfile() {
         }
     };
 
+    const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !user?.id) return;
+
+        // Validate file type and size (5MB max)
+        if (!file.type.startsWith('image/')) {
+            toast.error('Please upload an image file');
+            return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+            toast.error('Image size must be less than 5MB');
+            return;
+        }
+
+        setUploading(true);
+        try {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${user.id}-${Math.random()}.${fileExt}`;
+            const filePath = `${fileName}`;
+
+            // Upload to Supabase Storage (Assumes 'avatars' bucket exists)
+            const { error: uploadError } = await supabase.storage
+                .from('avatars')
+                .upload(filePath, file);
+
+            if (uploadError) {
+                // If bucket doesn't exist, this might fail. Let's provide a helpful error.
+                if (uploadError.message.includes('bucket not found')) {
+                    throw new Error('Please create a storage bucket named "avatars" in your Supabase dashboard.');
+                }
+                throw uploadError;
+            }
+
+            // Get Public URL
+            const { data: { publicUrl } } = supabase.storage
+                .from('avatars')
+                .getPublicUrl(filePath);
+
+            // Update Profile
+            const { error: updateError } = await supabase
+                .from('profiles')
+                .update({ avatar_url: publicUrl })
+                .eq('user_id', user.id);
+
+            if (updateError) throw updateError;
+
+            setProfile(prev => prev ? { ...prev, avatar_url: publicUrl } : null);
+            toast.success('Profile photo updated');
+        } catch (err: any) {
+            console.error(err);
+            toast.error(err.message || 'Failed to upload photo');
+        } finally {
+            setUploading(false);
+        }
+    };
+
     async function fetchAllProfiles() {
         try {
             const { data } = await supabase
@@ -254,7 +313,30 @@ export default function DoctorProfile() {
                         <div className="w-28 h-36 md:w-32 md:h-44 rounded-[2rem] bg-gradient-to-b from-blue-500 to-blue-700 shadow-2xl overflow-hidden flex items-center justify-center transform transition-all duration-500 group-hover:rotate-y-12 group-hover:scale-105 border-4 border-white">
                                 <img src={getAvatarUrl(profile?.avatar_url)} className="w-full h-full object-cover" alt="Profile" />
                             <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/20 to-transparent" />
+                            
+                            {/* Upload Overlay */}
+                            <button 
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={uploading}
+                                className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white gap-2 cursor-pointer"
+                            >
+                                {uploading ? (
+                                    <Loader2 className="w-8 h-8 animate-spin" />
+                                ) : (
+                                    <>
+                                        <Camera className="w-8 h-8" />
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-center px-2">Update Photo</span>
+                                    </>
+                                )}
+                            </button>
                         </div>
+                        <input 
+                            type="file" 
+                            ref={fileInputRef} 
+                            onChange={handlePhotoUpload} 
+                            className="hidden" 
+                            accept="image/*" 
+                        />
                         <div className="absolute -bottom-3 -right-3 bg-emerald-500 text-white p-2 rounded-2xl border-4 border-white shadow-xl">
                             <CheckCircle2 className="w-5 h-5" />
                         </div>
@@ -515,7 +597,7 @@ export default function DoctorProfile() {
                                             <div className="w-3 h-3 rounded-full" style={{ background: d.color }} />
                                             <span className="text-sm font-bold text-slate-700">{d.name}</span>
                                         </div>
-                                        <span className="text-sm font-black text-slate-900">{Math.round((d.value / stats.totalPatients) * 100)}%</span>
+                                        <span className="text-sm font-black text-slate-900">{stats.totalPatients > 0 ? Math.round((d.value / stats.totalPatients) * 100) : 0}%</span>
                                     </div>
                                 ))}
                             </div>
@@ -536,7 +618,7 @@ export default function DoctorProfile() {
                                         fetchAllProfiles();
                                         setShowAddStaffDialog(true);
                                     }}
-                                    className="bg-slate-900 text-white font-black uppercase text-[10px] tracking-widest px-8 rounded-full h-12 shadow-lg h-auto py-3"
+                                    className="bg-slate-900 text-white font-black uppercase text-[10px] tracking-widest px-8 rounded-full h-auto py-3 shadow-lg"
                                 >
                                     <Plus className="w-3.5 h-3.5 mr-2" /> Add Staff Member
                                 </Button>
@@ -810,9 +892,4 @@ export default function DoctorProfile() {
             </Dialog>
         </div>
     );
-}
-
-// Helper to check role if not defined
-function cn(...classes: any[]) {
-    return classes.filter(Boolean).join(' ');
 }
