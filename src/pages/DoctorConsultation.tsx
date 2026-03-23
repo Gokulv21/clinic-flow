@@ -244,25 +244,35 @@ export default function DoctorConsultation() {
 
       if (deleteError) throw deleteError;
 
-      // 2. Check if this patient has ANY other visits (completed, no_show, etc.)
+      // 2. Check if this patient has ANY other visits
       const { data: otherVisits } = await supabase
         .from('visits')
         .select('id')
         .eq('patient_id', patientId)
         .limit(1);
 
-      let patientRemoved = false;
+      let regIdUpdated = false;
       if (!otherVisits || otherVisits.length === 0) {
-        // No other visits, delete the patient too to keep the directory clean
-        const { error: patientDeleteError } = await supabase
+        // No other visits, keep the patient but refresh their Registration ID
+        const { data: regId, error: regError } = await (supabase.rpc as any)('get_next_registration_id');
+        
+        let newRegId = regId;
+        if (regError) {
+          const timestamp = Date.now().toString().slice(-6);
+          const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+          const yy = new Date().getFullYear().toString().slice(-2);
+          newRegId = `${yy}${timestamp}${random}`;
+        }
+
+        const { error: updateError } = await supabase
           .from('patients')
-          .delete()
+          .update({ registration_id: String(newRegId) })
           .eq('id', patientId);
         
-        if (!patientDeleteError) patientRemoved = true;
+        if (!updateError) regIdUpdated = true;
       }
 
-      toast.success(patientRemoved ? 'Patient record removed' : 'Visit cancelled');
+      toast.success(regIdUpdated ? 'Patient saved with new Reg ID' : 'Visit cancelled');
       
       // Clear selection
       localStorage.removeItem(`draft_${selectedVisit.id}`);
