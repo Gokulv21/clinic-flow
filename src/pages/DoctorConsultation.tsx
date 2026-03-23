@@ -1100,18 +1100,20 @@ export default function DoctorConsultation() {
               <div className="w-20" /> {/* Spacer for symmetry with print button */}
             </div>
           </DialogHeader>
-          <div className="p-4 md:p-8 overflow-auto max-h-[85vh] flex justify-center bg-muted/30" id="consultation-print-preview">
-            <PrescriptionTemplate
-              patient={patient}
-              visit={selectedVisit}
-              handwrittenImage={prescriptionImage}
-              clinicalNotes={clinicalNotes}
-              diagnosis={diagnosis}
-              medicines={medicines.filter(m => m.name.trim())}
-              advice={advice}
-              isWritingMode={lastInputWay === 'writing'}
-              isPrint={true}
-            />
+          <div className="p-4 md:p-8 overflow-auto max-h-[85vh] flex justify-center bg-slate-200/20 dark:bg-slate-800/50" id="consultation-print-preview">
+            <div className="bg-white shadow-2xl">
+              <PrescriptionTemplate
+                patient={patient}
+                visit={selectedVisit}
+                handwrittenImage={prescriptionImage}
+                clinicalNotes={clinicalNotes}
+                diagnosis={diagnosis}
+                medicines={medicines.filter(m => m.name.trim())}
+                advice={advice}
+                isWritingMode={lastInputWay === 'writing'}
+                isPrint={true}
+              />
+            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -1130,24 +1132,26 @@ export default function DoctorConsultation() {
               <div className="w-20" /> {/* Spacer */}
             </div>
           </div>
-          <div className="p-4 md:p-8 overflow-auto max-h-[75vh] flex justify-center bg-muted/30" id="history-print-preview">
-            {viewingHistoryRx && (() => {
-              const rx = viewingHistoryRx.prescriptions?.[0];
-              const isWritingMode = rx?.is_writing_mode ?? (!!rx?.advice_image && (rx.advice_image.startsWith('data:image') || rx.advice_image.startsWith('[')));
-              return (
-                <PrescriptionTemplate
-                  patient={patient}
-                  visit={viewingHistoryRx}
-                  handwrittenImage={rx?.advice_image}
-                  clinicalNotes={rx?.clinical_notes}
-                  diagnosis={rx?.diagnosis || viewingHistoryRx.diagnosis}
-                  medicines={rx?.medicines || []}
-                  advice={!isWritingMode ? rx?.advice_image : null}
-                  isWritingMode={isWritingMode}
-                  isPrint={true}
-                />
-              );
-            })()}
+          <div className="p-4 md:p-8 overflow-auto max-h-[75vh] flex justify-center bg-slate-200/20 dark:bg-slate-800/50" id="history-print-preview">
+            <div className="bg-white shadow-2xl">
+              {viewingHistoryRx && (() => {
+                const rx = viewingHistoryRx.prescriptions?.[0];
+                const isWritingMode = rx?.is_writing_mode ?? (!!rx?.advice_image && (rx.advice_image.startsWith('data:image') || rx.advice_image.startsWith('[')));
+                return (
+                  <PrescriptionTemplate
+                    patient={patient}
+                    visit={viewingHistoryRx}
+                    handwrittenImage={rx?.advice_image}
+                    clinicalNotes={rx?.clinical_notes}
+                    diagnosis={rx?.diagnosis || viewingHistoryRx.diagnosis}
+                    medicines={rx?.medicines || []}
+                    advice={!isWritingMode ? rx?.advice_image : null}
+                    isWritingMode={isWritingMode}
+                    isPrint={true}
+                  />
+                );
+              })()}
+            </div>
           </div>
         </DialogContent>
       </Dialog>

@@ -308,7 +308,7 @@ export default function PatientList() {
               const rx = viewingRx.prescriptions?.[0];
               const isWritingMode = rx?.is_writing_mode ?? (!!rx?.advice_image && (rx.advice_image.startsWith('data:image') || rx.advice_image.startsWith('[')));
               return (
-                <div className="print-container">
+                <div className="print-container bg-white shadow-2xl">
                   <PrescriptionTemplate
                     patient={selectedPatient}
                     visit={viewingRx}

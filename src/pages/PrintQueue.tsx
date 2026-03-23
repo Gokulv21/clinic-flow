@@ -118,7 +118,7 @@ export default function PrintQueue() {
       <div className="px-4 md:px-8 space-y-8">
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-heading font-bold text-slate-800">Prescriptions To Print</h1>
+            <h1 className="text-2xl font-heading font-bold text-foreground">Prescriptions To Print</h1>
             <p className="text-muted-foreground">{prescriptions.length} items currently waiting</p>
           </div>
           <Button 
@@ -126,7 +126,7 @@ export default function PrintQueue() {
             size="sm" 
             onClick={() => refetchPrescriptions()}
             disabled={isLoading}
-            className="gap-2 h-9"
+            className="gap-2 h-9 border-border hover:bg-muted"
           >
             {isLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Manual Refresh
           </Button>
@@ -134,17 +134,17 @@ export default function PrintQueue() {
 
         <div className="grid grid-cols-1 gap-3 max-w-4xl mx-auto">
           {prescriptions.map(rx => (
-            <Card key={rx.id} className="animate-fade-in border-blue-50 hover:border-blue-200 transition-colors shadow-sm">
+            <Card key={rx.id} className="animate-fade-in border-border bg-card hover:bg-muted/20 transition-colors shadow-sm">
               <CardContent className="py-4 flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="font-bold text-lg text-slate-900">{(rx.patients?.title ? rx.patients.title + ' ' : '') + rx.patients?.name}</span>
-                    <Badge variant="secondary" className="bg-blue-50 text-blue-600 font-bold">TOKEN #{rx.visits?.token_number}</Badge>
+                    <span className="font-bold text-lg text-foreground">{(rx.patients?.title ? rx.patients.title + ' ' : '') + rx.patients?.name}</span>
+                    <Badge variant="secondary" className="bg-blue-500/10 text-blue-500 border-none font-bold">TOKEN #{rx.visits?.token_number}</Badge>
                   </div>
                   <p className="text-sm text-muted-foreground flex items-center gap-2">
                     <Clock className="w-3.5 h-3.5" />
                     {new Date(rx.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    {rx.diagnosis && <span className="text-slate-400">· {rx.diagnosis}</span>}
+                    {rx.diagnosis && <span className="text-muted-foreground/60">· {rx.diagnosis}</span>}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -156,11 +156,11 @@ export default function PrintQueue() {
             </Card>
           ))}
           {prescriptions.length === 0 && !isLoading && (
-            <div className="text-center py-20 bg-white rounded-3xl border-2 border-dashed border-slate-100">
-              <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="text-center py-20 bg-card/50 rounded-3xl border-2 border-dashed border-border">
+              <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
                 <CheckCircle className="w-10 h-10 text-emerald-500" />
               </div>
-              <h3 className="text-xl font-bold text-slate-800">All Caught Up!</h3>
+              <h3 className="text-xl font-bold text-foreground">All Caught Up!</h3>
               <p className="text-muted-foreground mt-1">There are no prescriptions waiting in the queue.</p>
             </div>
           )}
