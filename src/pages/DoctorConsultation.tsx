@@ -23,10 +23,14 @@ import PageBanner from '@/components/PageBanner';
 import consultationBanner from '@/assets/consultation_banner.png';
 
 interface Medicine {
+  type: string;
   name: string;
-  dosage: string;
-  frequency: string;
-  duration: string;
+  dosage?: string;
+  frequency?: string;
+  duration?: string;
+  route?: string;
+  notes?: string;
+  count?: string;
 }
 
 export default function DoctorConsultation() {
@@ -53,7 +57,7 @@ export default function DoctorConsultation() {
   const [patient, setPatient] = useState<any>(null);
   const [history, setHistory] = useState<any[]>([]);
   const [diagnosis, setDiagnosis] = useState('');
-  const [medicines, setMedicines] = useState<Medicine[]>([{ name: '', dosage: '', frequency: '', duration: '' }]);
+  const [medicines, setMedicines] = useState<Medicine[]>([{ type: 'Tab.', name: '', dosage: '', frequency: '', duration: '' }]);
   const [advice, setAdvice] = useState('');
   const [saving, setSaving] = useState(false);
   const [showDigitalRx, setShowDigitalRx] = useState(false);
@@ -152,7 +156,7 @@ export default function DoctorConsultation() {
         if (Date.now() - draft.timestamp < 24 * 60 * 60 * 1000) {
           setDiagnosis(draft.diagnosis || '');
           setClinicalNotes(draft.clinicalNotes || '');
-          setMedicines(draft.medicines || [{ name: '', dosage: '', frequency: '', duration: '' }]);
+          setMedicines(draft.medicines || [{ type: 'Tab.', name: '', dosage: '', frequency: '', duration: '' }]);
           setAdvice(draft.advice || '');
           setPrescriptionImage(draft.prescriptionImage);
           setPrescriptionPaths(draft.prescriptionPaths || []);
@@ -173,7 +177,7 @@ export default function DoctorConsultation() {
     // Load existing prescription data
     setDiagnosis(rxData?.diagnosis || '');
     setClinicalNotes(rxData?.clinical_notes || '');
-    setMedicines(rxData?.medicines || [{ name: '', dosage: '', frequency: '', duration: '' }]);
+    setMedicines(rxData?.medicines || [{ type: 'Tab.', name: '', dosage: '', frequency: '', duration: '' }]);
     
     // Determine if it's a handwritten prescription or typed advice
     if (rxImage && rxImage.startsWith('data:image')) {
@@ -247,10 +251,52 @@ export default function DoctorConsultation() {
     }
   };
 
-  const addMedicine = () => setMedicines(m => [...m, { name: '', dosage: '', frequency: '', duration: '' }]);
+  const addMedicine = () => setMedicines(m => [...m, { type: 'Tab.', name: '', dosage: '', frequency: '', duration: '' }]);
   const removeMedicine = (i: number) => setMedicines(m => m.filter((_, idx) => idx !== i));
   const updateMedicine = (i: number, field: keyof Medicine, value: string) =>
     setMedicines(m => m.map((med, idx) => idx === i ? { ...med, [field]: value } : med));
+
+  const updateFrequency = (i: number, part: 'morning' | 'afternoon' | 'night', value: string) => {
+    // Only allow numbers
+    const cleanValue = value.replace(/[^0-9]/g, '');
+    setMedicines(m => m.map((med, idx) => {
+      if (idx !== i) return med;
+      const parts = (med.frequency || '0-0-0').split('-');
+      // Ensure we have 3 parts
+      while (parts.length < 3) parts.push('0');
+      
+      if (part === 'morning') parts[0] = cleanValue || '0';
+      if (part === 'afternoon') parts[1] = cleanValue || '0';
+      if (part === 'night') parts[2] = cleanValue || '0';
+      
+      return { ...med, frequency: parts.join('-') };
+    }));
+  };
+
+  const handleMedicineKeyDown = (e: React.KeyboardEvent, index: number, fieldName: string) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const form = (e.target as HTMLElement).closest('.medicine-row');
+      if (!form) return;
+      
+      const inputs = Array.from(form.querySelectorAll('input, select')) as HTMLElement[];
+      const currentIndex = inputs.indexOf(e.target as HTMLElement);
+      
+      if (currentIndex < inputs.length - 1) {
+        inputs[currentIndex + 1].focus();
+      } else {
+        // If last field of current medicine, maybe add new medicine or go to advice
+        if (index === medicines.length - 1) {
+          addMedicine();
+          // Timeout to wait for new row to render
+          setTimeout(() => {
+            const nextRow = form.parentElement?.lastElementChild?.querySelector('input');
+            if (nextRow) nextRow.focus();
+          }, 0);
+        }
+      }
+    }
+  };
 
   // Memoize status color helper to prevent re-calculations during re-renders
   const getStatusColor = (s: string) => {
@@ -318,7 +364,7 @@ export default function DoctorConsultation() {
       setPrescriptionPaths([]);
       setDiagnosis('');
       setClinicalNotes('');
-      setMedicines([{ name: '', dosage: '', frequency: '', duration: '' }]);
+      setMedicines([{ type: 'Tab.', name: '', dosage: '', frequency: '', duration: '' }]);
 
       queryClient.invalidateQueries({ queryKey: ['visitQueue'] });
     } catch (err: any) {
@@ -682,26 +728,153 @@ export default function DoctorConsultation() {
                       </div>
                       <div className="space-y-3">
                         {medicines.map((med, i) => (
-                          <div key={i} className="flex gap-2 items-start bg-slate-50/30 p-3 rounded-2xl border border-slate-100 group relative">
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 flex-1">
-                              <div className="space-y-1">
-                                <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">Name</p>
-                                <Input placeholder="Paracetamol" value={med.name} onChange={e => updateMedicine(i, 'name', e.target.value)} className="h-10 text-sm font-bold border-slate-200 bg-white rounded-lg" />
+                          <div key={i} className="medicine-row flex gap-2 items-start bg-slate-50/30 p-3 rounded-2xl border border-slate-100 group relative">
+                            <div className="flex flex-col md:flex-row gap-3 flex-1">
+                              {/* Type Selector */}
+                              <div className="md:w-32 shrink-0">
+                                <p className="text-[9px] font-bold text-slate-400 uppercase ml-1 mb-1">Type</p>
+                                <select 
+                                  value={med.type} 
+                                  onChange={e => updateMedicine(i, 'type', e.target.value)}
+                                  onKeyDown={e => handleMedicineKeyDown(e, i, 'type')}
+                                  className="w-full h-10 text-sm font-bold border border-slate-200 bg-white rounded-lg px-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                                >
+                                  <option value="Inj.">Inj.</option>
+                                  <option value="Syp.">Syp.</option>
+                                  <option value="Tab.">Tab.</option>
+                                  <option value="Cap.">Cap.</option>
+                                  <option value="Oin.">Oin.</option>
+                                  <option value="cr.">cr.</option>
+                                  <option value="drops.">drops.</option>
+                                  <option value="Sac">Sac</option>
+                                </select>
                               </div>
-                              <div className="space-y-1">
-                                <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">Dosage</p>
-                                <Input placeholder="500mg" value={med.dosage} onChange={e => updateMedicine(i, 'dosage', e.target.value)} className="h-10 text-sm font-bold border-slate-200 bg-white rounded-lg" />
-                              </div>
-                              <div className="space-y-1">
-                                <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">Frequency</p>
-                                <Input placeholder="1-0-1" value={med.frequency} onChange={e => updateMedicine(i, 'frequency', e.target.value)} className="h-10 text-sm font-bold border-slate-200 bg-white rounded-lg" />
-                              </div>
-                              <div className="space-y-1">
-                                <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">Duration</p>
-                                <Input placeholder="5 Days" value={med.duration} onChange={e => updateMedicine(i, 'duration', e.target.value)} className="h-10 text-sm font-bold border-slate-200 bg-white rounded-lg" />
+
+                              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 flex-1">
+                                <div className="space-y-1">
+                                  <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">Name</p>
+                                  <Input 
+                                    placeholder="Medicine Name" 
+                                    value={med.name} 
+                                    onChange={e => updateMedicine(i, 'name', e.target.value)}
+                                    onKeyDown={e => handleMedicineKeyDown(e, i, 'name')}
+                                    className="h-10 text-sm font-bold border-slate-200 bg-white rounded-lg" 
+                                  />
+                                </div>
+
+                                {/* Dynamic Fields based on Type */}
+                                {med.type === 'Inj.' && (
+                                  <>
+                                    <div className="space-y-1 text-blue-600">
+                                      <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Dosage</p>
+                                      <Input placeholder="1 ml" value={med.dosage} onChange={e => updateMedicine(i, 'dosage', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'dosage')} className="h-10 text-sm font-bold border-blue-200 bg-blue-50/30 rounded-lg placeholder:text-blue-200" />
+                                    </div>
+                                    <div className="space-y-1 text-blue-600">
+                                      <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Route</p>
+                                      <Input placeholder="I.M / I.V" value={med.route} onChange={e => updateMedicine(i, 'route', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'route')} className="h-10 text-sm font-bold border-blue-200 bg-blue-50/30 rounded-lg placeholder:text-blue-200" />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">Frequency</p>
+                                      <Input placeholder="Stat / SOS" value={med.frequency} onChange={e => updateMedicine(i, 'frequency', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'frequency')} className="h-10 text-sm font-bold border-slate-200 bg-white rounded-lg" />
+                                    </div>
+                                  </>
+                                )}
+
+                                {(med.type === 'Syp.' || med.type === 'Tab.' || med.type === 'Cap.') && (
+                                  <>
+                                    <div className="space-y-1">
+                                      <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">Dosage</p>
+                                      <Input placeholder="500mg / 5ml" value={med.dosage} onChange={e => updateMedicine(i, 'dosage', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'dosage')} className="h-10 text-sm font-bold border-slate-200 bg-white rounded-lg" />
+                                    </div>
+                                    <div className="space-y-1 text-purple-600">
+                                      <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Frequency (M-A-N)</p>
+                                      <div className="flex items-center gap-1">
+                                        <Input 
+                                          placeholder="0" 
+                                          value={(med.frequency || '0-0-0').split('-')[0] || '0'} 
+                                          onChange={e => updateFrequency(i, 'morning', e.target.value)}
+                                          onKeyDown={e => handleMedicineKeyDown(e, i, 'freq-m')}
+                                          className="h-10 w-full text-center text-sm font-bold border-purple-200 bg-purple-50/30 rounded-lg placeholder:text-purple-200" 
+                                        />
+                                        <span className="text-purple-300 font-bold">-</span>
+                                        <Input 
+                                          placeholder="0" 
+                                          value={(med.frequency || '0-0-0').split('-')[1] || '0'} 
+                                          onChange={e => updateFrequency(i, 'afternoon', e.target.value)}
+                                          onKeyDown={e => handleMedicineKeyDown(e, i, 'freq-a')}
+                                          className="h-10 w-full text-center text-sm font-bold border-purple-200 bg-purple-50/30 rounded-lg placeholder:text-purple-200" 
+                                        />
+                                        <span className="text-purple-300 font-bold">-</span>
+                                        <Input 
+                                          placeholder="0" 
+                                          value={(med.frequency || '0-0-0').split('-')[2] || '0'} 
+                                          onChange={e => updateFrequency(i, 'night', e.target.value)}
+                                          onKeyDown={e => handleMedicineKeyDown(e, i, 'freq-n')}
+                                          className="h-10 w-full text-center text-sm font-bold border-purple-200 bg-purple-50/30 rounded-lg placeholder:text-purple-200" 
+                                        />
+                                      </div>
+                                    </div>
+                                    <div className="space-y-1 text-emerald-600">
+                                      <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Frequency Notes</p>
+                                      <Input placeholder="After Food / HR (Notes)" value={med.notes} onChange={e => updateMedicine(i, 'notes', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'notes')} className="h-10 text-sm font-bold border-emerald-200 bg-emerald-50/30 rounded-lg placeholder:text-emerald-200" />
+                                    </div>
+                                  </>
+                                )}
+
+                                {(med.type === 'Oin.' || med.type === 'cr.') && (
+                                  <>
+                                    <div className="space-y-1 text-orange-600">
+                                      <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Count</p>
+                                      <Input placeholder="1 Tube / 1 Unit" value={med.count} onChange={e => updateMedicine(i, 'count', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'count')} className="h-10 text-sm font-bold border-orange-200 bg-orange-50/30 rounded-lg placeholder:text-orange-200" />
+                                    </div>
+                                    <div className="space-y-1 text-orange-600">
+                                      <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Route</p>
+                                      <Input placeholder="External / Local" value={med.route} onChange={e => updateMedicine(i, 'route', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'route')} className="h-10 text-sm font-bold border-orange-200 bg-orange-50/30 rounded-lg placeholder:text-orange-200" />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">Notes</p>
+                                      <Input placeholder="Apply 2 times" value={med.notes} onChange={e => updateMedicine(i, 'notes', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'notes')} className="h-10 text-sm font-bold border-slate-200 bg-white rounded-lg" />
+                                    </div>
+                                  </>
+                                )}
+
+                                {med.type === 'drops.' && (
+                                  <>
+                                    <div className="space-y-1 text-sky-600">
+                                      <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Count</p>
+                                      <Input placeholder="1 Bottle / 5ml" value={med.count} onChange={e => updateMedicine(i, 'count', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'count')} className="h-10 text-sm font-bold border-sky-200 bg-sky-50/30 rounded-lg placeholder:text-sky-200" />
+                                    </div>
+                                    <div className="space-y-1 text-sky-600">
+                                      <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Frequency</p>
+                                      <Input placeholder="2 drops 3 times" value={med.frequency} onChange={e => updateMedicine(i, 'frequency', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'frequency')} className="h-10 text-sm font-bold border-sky-200 bg-sky-50/30 rounded-lg placeholder:text-sky-200" />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">Notes</p>
+                                      <Input placeholder="Eye / Ear / Nose" value={med.notes} onChange={e => updateMedicine(i, 'notes', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'notes')} className="h-10 text-sm font-bold border-slate-200 bg-white rounded-lg" />
+                                    </div>
+                                  </>
+                                )}
+
+                                {med.type === 'Sac' && (
+                                  <>
+                                    <div className="space-y-1 text-amber-600">
+                                      <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Count</p>
+                                      <Input placeholder="1 Sachet / 5 Sac" value={med.count} onChange={e => updateMedicine(i, 'count', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'count')} className="h-10 text-sm font-bold border-amber-200 bg-amber-50/30 rounded-lg placeholder:text-amber-200" />
+                                    </div>
+                                    <div className="space-y-1 text-amber-600">
+                                      <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Frequency</p>
+                                      <Input placeholder="Daily night" value={med.frequency} onChange={e => updateMedicine(i, 'frequency', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'frequency')} className="h-10 text-sm font-bold border-amber-200 bg-amber-50/30 rounded-lg placeholder:text-amber-200" />
+                                    </div>
+                                    <div className="space-y-1 invisible">
+                                      <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">—</p>
+                                      <Input disabled className="h-10 bg-slate-100" />
+                                    </div>
+                                  </>
+                                )}
+
                               </div>
                             </div>
-                            <Button size="icon" variant="ghost" onClick={() => removeMedicine(i)} className="text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg h-10 w-10 mt-5 transition-colors">
+                            <Button size="icon" variant="ghost" onClick={() => removeMedicine(i)} className="text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg h-10 w-10 mt-1 transition-colors self-end md:self-center">
                               <Trash2 className="w-4 h-4" />
                             </Button>
                           </div>

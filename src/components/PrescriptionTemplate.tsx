@@ -329,8 +329,20 @@ function PageOne({ patient, visit, today, time, clinicalNotes, diagnosis, medici
                             )}
                             {diagnosis && <div style={{ fontWeight: 800, fontSize: '1.2em', marginBottom: '0.6em', color: '#1e293b' }}>Dx: {diagnosis}</div>}
                             {medicines.map((m, i) => (
-                                <div key={i} style={{ marginBottom: '0.6em', paddingLeft: '1em', borderLeft: '3px solid #3b82f6' }}>
-                                    <strong style={{ fontWeight: 700 }}>{i + 1}. {m.name}</strong>&nbsp;&nbsp;{m.dosage} × {m.frequency} × {m.duration}
+                                <div key={i} style={{ marginBottom: '0.8em', paddingLeft: '1em', borderLeft: '3px solid #3b82f6', fontSize: '1.05em' }}>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '0.4em' }}>
+                                        <strong style={{ fontWeight: 800, color: '#0f172a' }}>{i + 1}. {m.type} {m.name}</strong>
+                                        {m.dosage && <span style={{ fontWeight: 600, color: '#334155' }}>{m.dosage}</span>}
+                                        {m.count && <span style={{ fontWeight: 600, color: '#334155' }}>({m.count})</span>}
+                                        {m.route && <span style={{ fontWeight: 700, color: '#2563eb', fontSize: '0.9em', textTransform: 'uppercase' }}>[{m.route}]</span>}
+                                        {m.frequency && <span style={{ fontWeight: 700, color: '#0f172a' }}>× {m.frequency}</span>}
+                                        {m.duration && <span style={{ fontWeight: 600, color: '#475569' }}>for {m.duration}</span>}
+                                    </div>
+                                    {m.notes && (
+                                        <div style={{ fontSize: '0.85em', fontWeight: 600, color: '#64748b', marginTop: '0.1em', fontStyle: 'italic' }}>
+                                            Note: {m.notes}
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                             {advice && !isValidImage(advice) && <div style={{ marginTop: '1em', fontStyle: 'italic', color: '#475569', fontSize: '1em', fontWeight: 500 }}>Advice: {advice}</div>}
