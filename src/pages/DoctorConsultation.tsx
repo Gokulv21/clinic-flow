@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { cn, formatAge } from '@/lib/utils';
-import { User, Clock, CheckCircle, Plus, Trash2, Save, Loader2, PenTool, Eye, Menu, Printer, ArrowLeft, Activity, ClipboardList, Scale, Heart, Wind, Thermometer, Droplet, Pencil, Calendar, RefreshCw } from 'lucide-react';
+import { User, Clock, CheckCircle, Plus, Trash2, Save, Loader2, PenTool, Eye, Menu, Printer, ArrowLeft, Activity, ClipboardList, Scale, Heart, Wind, Thermometer, Droplet, Pencil, Calendar, RefreshCw, UserX } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import DigitalPrescription from '@/components/DigitalPrescription';
 import PrescriptionTemplate from '@/components/PrescriptionTemplate';
@@ -219,6 +219,34 @@ export default function DoctorConsultation() {
     lastLoadedVisitId.current = visit.id;
   };
 
+  const markAsNoShow = async () => {
+    if (!selectedVisit) return;
+    
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('visits')
+        .update({ status: 'no_show' })
+        .eq('id', selectedVisit.id);
+
+      if (error) throw error;
+
+      toast.success('Patient marked as No Show');
+      
+      // Clear selection
+      localStorage.removeItem(`draft_${selectedVisit.id}`);
+      localStorage.removeItem('active_consultation_id');
+      setSelectedVisit(null);
+      setPatient(null);
+      
+      queryClient.invalidateQueries({ queryKey: ['visitQueue'] });
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const addMedicine = () => setMedicines(m => [...m, { name: '', dosage: '', frequency: '', duration: '' }]);
   const removeMedicine = (i: number) => setMedicines(m => m.filter((_, idx) => idx !== i));
   const updateMedicine = (i: number, field: keyof Medicine, value: string) =>
@@ -400,7 +428,7 @@ export default function DoctorConsultation() {
             </div>
           </div>
         ) : (
-          <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-6 animate-slide-in pb-20 font-jakarta-sans">
+          <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-6 animate-slide-in pb-[40vh] font-jakarta-sans">
             {/* Mobile-only Header with Back Button */}
             <div className="md:hidden flex items-center justify-between mb-4 bg-white/80 backdrop-blur sticky top-[-1rem] z-20 py-2 -mx-4 px-4 border-b border-border shadow-sm">
               <div className="flex items-center gap-3">
@@ -431,9 +459,22 @@ export default function DoctorConsultation() {
                       {(patient?.title ? patient.title + ' ' : '') + patient?.name}
                     </span>
                   </div>
-                  <Badge variant="outline" className="text-[10px] font-bold px-2 py-0.5 border-slate-200">
-                    TOKEN #{selectedVisit.token_number}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={markAsNoShow}
+                      disabled={saving}
+                      className="h-8 px-2 text-red-500 hover:text-red-700 hover:bg-red-50 gap-1 rounded-lg"
+                      title="Patient left without consultation"
+                    >
+                      <UserX className="w-3.5 h-3.5" />
+                      <span className="text-[11px] font-bold">No Show</span>
+                    </Button>
+                    <Badge variant="outline" className="text-[10px] font-bold px-2 py-0.5 border-slate-200">
+                      TOKEN #{selectedVisit.token_number}
+                    </Badge>
+                  </div>
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-6 pb-6">

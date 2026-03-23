@@ -78,11 +78,11 @@ const PrescriptionTemplate = React.memo(({
                     id={idx === 0 ? "prescription-template" : undefined}
                     className="single-page-prescription"
                     style={{
-                        width: isPrint ? '210mm' : '100%',
+                        width: isPrint ? '210mm' : 'min(100%, 800px)',
                         maxWidth: '100%',
                         height: isPrint ? '296mm' : undefined,
                         maxHeight: isPrint ? '100%' : undefined,
-                        aspectRatio: isPrint ? undefined : `${EXPORT_W} / ${EXPORT_H}`,
+                        aspectRatio: isPrint ? undefined : '1 / 1.414',
                         containerType: 'inline-size' as any,
                         position: 'relative',
                         overflow: 'hidden',
