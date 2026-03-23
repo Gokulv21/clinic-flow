@@ -190,7 +190,7 @@ export default function PatientList() {
                   <div className="col-span-1">
                     <Label>Title</Label>
                     <Select value={editForm.title} onValueChange={v => setEditForm(f => ({ ...f, title: v }))}>
-                      <SelectTrigger><SelectValue placeholder="Title" /></SelectTrigger>
+                      <SelectTrigger className="border-border bg-card focus:ring-primary/10"><SelectValue placeholder="Title" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="Mr.">Mr.</SelectItem>
                         <SelectItem value="Miss">Miss</SelectItem>
@@ -200,8 +200,8 @@ export default function PatientList() {
                     </Select>
                   </div>
                   <div className="col-span-3">
-                    <Label>Name</Label>
-                    <Input value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
+                    <Label className="text-muted-foreground">Name</Label>
+                    <Input className="border-border bg-card focus:ring-primary/10" value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
                   </div>
                 </div>
                 <div>
@@ -229,8 +229,9 @@ export default function PatientList() {
                   </div>
                 </div>
                 <div>
-                  <Label>Phone</Label>
+                  <Label className="text-muted-foreground">Phone</Label>
                   <Input 
+                    className="border-border bg-card focus:ring-primary/10"
                     value={editForm.phone} 
                     onChange={e => {
                       const val = e.target.value.replace(/\D/g, '').slice(0, 10);
@@ -238,7 +239,10 @@ export default function PatientList() {
                     }} 
                   />
                 </div>
-                <div className="col-span-2"><Label>Address</Label><Input value={editForm.address} onChange={e => setEditForm(f => ({ ...f, address: e.target.value }))} /></div>
+                <div className="col-span-2">
+                  <Label className="text-muted-foreground">Address</Label>
+                  <Input className="border-border bg-card focus:ring-primary/10" value={editForm.address} onChange={e => setEditForm(f => ({ ...f, address: e.target.value }))} />
+                </div>
               </div>
               <Button onClick={saveEdit}>Save Changes</Button>
             </div>
@@ -303,12 +307,12 @@ export default function PatientList() {
               <Printer className="w-4 h-4" /> Print
             </Button>
           </div>
-          <div className="p-4 md:p-8 overflow-auto max-h-[75vh] flex justify-center">
+          <div className="p-4 md:p-8 overflow-y-auto max-h-[85vh] flex justify-center scrollbar-thin scrollbar-thumb-muted-foreground/20">
             {viewingRx && (() => {
               const rx = viewingRx.prescriptions?.[0];
               const isWritingMode = rx?.is_writing_mode ?? (!!rx?.advice_image && (rx.advice_image.startsWith('data:image') || rx.advice_image.startsWith('[')));
               return (
-                <div className="print-container bg-white shadow-2xl">
+                <div className="print-container">
                   <PrescriptionTemplate
                     patient={selectedPatient}
                     visit={viewingRx}

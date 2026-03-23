@@ -306,7 +306,7 @@ export default function NurseEntry() {
                         </div>
 
                         <div className="pt-8 flex flex-col md:flex-row gap-4">
-                            <Button variant="ghost" className="order-2 md:order-1 flex-1 h-14 text-slate-500 font-bold text-lg hover:bg-slate-100" onClick={() => setStep('patient')}>
+                            <Button variant="ghost" className="order-2 md:order-1 flex-1 h-14 text-muted-foreground font-bold text-lg hover:bg-muted" onClick={() => setStep('patient')}>
                                 <X className="w-5 h-5 mr-2" /> No, Search Again
                             </Button>
                             <Button className="order-1 md:order-2 flex-[2] h-14 text-lg font-black shadow-xl shadow-primary/30" onClick={() => setStep('vitals')}>
@@ -327,7 +327,7 @@ export default function NurseEntry() {
                         <CardContent className="pt-6">
                             <div className="flex flex-col md:flex-row gap-4 items-center">
                                 <div className="relative flex-1 w-full">
-                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                                     <Input
                                         className="h-14 pl-12 text-lg border-border focus:border-primary focus:ring-primary/20 transition-all rounded-xl shadow-sm bg-card"
                                         placeholder="Search by Name, Phone, or Reg ID..."
@@ -348,7 +348,7 @@ export default function NurseEntry() {
                                                         className="w-full flex items-center justify-between p-4 hover:bg-primary/5 transition-all text-left rounded-xl group/item"
                                                     >
                                                         <div className="flex-1">
-                                                            <div className="font-heading font-bold text-slate-800 flex items-center gap-2">
+                                                            <div className="font-heading font-bold text-foreground flex items-center gap-2">
                                                                 {p.title} {p.name}
                                                                 {p.registration_id && (
                                                                     <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full uppercase tracking-widest font-black">
@@ -356,7 +356,7 @@ export default function NurseEntry() {
                                                                     </span>
                                                                 )}
                                                             </div>
-                                                            <div className="text-sm text-slate-500 font-medium flex items-center gap-2">
+                                                            <div className="text-sm text-muted-foreground font-medium flex items-center gap-2">
                                                                 <span>{p.phone || 'No Phone'}</span>
                                                                 <span>·</span>
                                                                 <span>{formatAge(p.age)}</span>
@@ -364,27 +364,27 @@ export default function NurseEntry() {
                                                                 <span>{p.sex}</span>
                                                             </div>
                                                             {p.address && (
-                                                                <div className="text-[11px] text-slate-400 italic mt-0.5 line-clamp-1 flex items-center gap-1">
+                                                                <div className="text-[11px] text-muted-foreground/60 italic mt-0.5 line-clamp-1 flex items-center gap-1">
                                                                     <MapPin className="w-3 h-3" /> {p.address}
                                                                 </div>
                                                             )}
                                                         </div>
                                                         <div className="text-right hidden md:flex flex-col items-end">
-                                                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Reg ID</div>
+                                                            <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-0.5">Reg ID</div>
                                                             <div className="text-sm font-mono font-bold text-primary/80">{p.registration_id || 'N/A'}</div>
                                                         </div>
                                                     </button>
                                                 ))}
                                                 {searchResults.length === 0 && (
                                                     <div className="p-8 text-center space-y-3">
-                                                        <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto">
-                                                            <Search className="w-6 h-6 text-slate-300" />
+                                                        <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center mx-auto">
+                                                            <Search className="w-6 h-6 text-muted-foreground/40" />
                                                         </div>
-                                                        <p className="text-sm text-slate-500 font-medium">No patients found for "{searchQuery}"</p>
+                                                        <p className="text-sm text-muted-foreground font-medium">No patients found for "{searchQuery}"</p>
                                                     </div>
                                                 )}
                                             </div>
-                                            <div className="bg-slate-50/50 p-3 border-t border-slate-100 flex justify-center">
+                                            <div className="bg-muted/50 p-3 border-t border-border flex justify-center">
                                                 <Button 
                                                     variant="ghost" 
                                                     size="sm" 
@@ -401,12 +401,12 @@ export default function NurseEntry() {
                                         </div>
                                     )}
                                 </div>
-                                <div className="h-6 w-px bg-slate-100 hidden md:block" />
+                                <div className="h-6 w-px bg-border hidden md:block" />
                                 <div className="flex gap-2 w-full md:w-auto">
                                     <Button 
                                         onClick={() => { reset(); setSearchQuery(''); }}
                                         variant="outline" 
-                                        className="h-14 rounded-xl px-6 border-slate-200 font-bold text-slate-600 flex-1 hover:bg-slate-50"
+                                        className="h-14 rounded-xl px-6 border-border font-bold text-muted-foreground flex-1 hover:bg-muted"
                                     >
                                         Clear
                                     </Button>
@@ -428,11 +428,11 @@ export default function NurseEntry() {
 
                 {/* Registration Form */}
                 <Card className="border-border shadow-lg animate-in slide-in-from-bottom-4 duration-500 overflow-hidden bg-card">
-                    <CardHeader className="bg-muted/50 border-b border-border py-6">
+                    <CardHeader className="bg-muted/30 border-b border-border py-6">
                         <div className="flex items-center justify-between">
                             <div>
                                 <CardTitle className="text-xl font-heading font-bold text-foreground">Patient Details</CardTitle>
-                                <CardDescription className="font-medium">Complete information for the new registration</CardDescription>
+                                <CardDescription className="font-medium text-muted-foreground">Complete information for the new registration</CardDescription>
                             </div>
                             <div className="hidden sm:block">
                                 <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1 text-right">System ID</div>
@@ -446,13 +446,13 @@ export default function NurseEntry() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                             <div className="space-y-6">
                                 <div className="space-y-3">
-                                    <Label className="text-xs font-bold uppercase tracking-widest text-slate-500 flex items-center gap-2">
+                                    <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
                                         <div className="w-1.5 h-1.5 bg-primary rounded-full"></div> Patient Identity
                                     </Label>
                                     <div className="grid grid-cols-4 gap-3">
                                         <div className="col-span-1">
                                             <Select value={patient.title} onValueChange={v => setPatient(p => ({ ...p, title: v }))}>
-                                                <SelectTrigger className="h-12 rounded-xl focus:ring-primary/10 border-slate-200"><SelectValue placeholder="Ti" /></SelectTrigger>
+                                                <SelectTrigger className="h-12 rounded-xl focus:ring-primary/10 border-border bg-card"><SelectValue placeholder="Ti" /></SelectTrigger>
                                                 <SelectContent>
                                                     <SelectItem value="Mr.">Mr.</SelectItem>
                                                     <SelectItem value="Mast.">Mast.</SelectItem>
@@ -465,7 +465,7 @@ export default function NurseEntry() {
                                         <div className="col-span-3">
                                             <Input 
                                                 ref={nameRef}
-                                                className="h-12 rounded-xl focus:ring-primary/10 border-slate-200 placeholder:text-slate-300 font-medium" 
+                                                className="h-12 rounded-xl focus:ring-primary/10 border-border bg-card placeholder:text-muted-foreground/30 font-medium" 
                                                 value={patient.name} 
                                                 onChange={e => setPatient(p => ({ ...p, name: e.target.value }))} 
                                                 onKeyDown={(e) => handleKeyDown(e, ageRef)}
@@ -476,7 +476,7 @@ export default function NurseEntry() {
                                 </div>
 
                                 <div className="space-y-3">
-                                    <Label className="text-xs font-bold uppercase tracking-widest text-slate-500 flex items-center gap-2">
+                                    <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
                                         <div className="w-1.5 h-1.5 bg-primary rounded-full"></div> Medical Profile
                                     </Label>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -494,12 +494,12 @@ export default function NurseEntry() {
                                                     }}
                                                     onKeyDown={(e) => handleKeyDown(e, phoneRef)}
                                                     placeholder="Age"
-                                                    className="h-12 rounded-xl focus:ring-primary/10 border-slate-200 font-medium flex-1"
+                                                    className="h-12 rounded-xl focus:ring-primary/10 border-border bg-card font-medium flex-1"
                                                 />
                                                 <Select value={ageUnit} onValueChange={(v: any) => {
                                                     setAgeUnit(v);
                                                 }}>
-                                                    <SelectTrigger className="h-12 w-[85px] rounded-xl focus:ring-primary/10 border-slate-200"><SelectValue /></SelectTrigger>
+                                                    <SelectTrigger className="h-12 w-[85px] rounded-xl focus:ring-primary/10 border-border bg-card"><SelectValue /></SelectTrigger>
                                                     <SelectContent>
                                                         <SelectItem value="years">Yrs</SelectItem>
                                                         <SelectItem value="months">Mo</SelectItem>
@@ -514,7 +514,7 @@ export default function NurseEntry() {
                                                 setPatient(p => ({ ...p, sex: v }));
                                             }}
                                         >
-                                            <SelectTrigger className="h-12 rounded-xl focus:ring-primary/10 border-slate-200 font-medium">
+                                            <SelectTrigger className="h-12 rounded-xl focus:ring-primary/10 border-border bg-card font-medium">
                                                 <SelectValue placeholder="Gender" />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -529,14 +529,14 @@ export default function NurseEntry() {
 
                             <div className="space-y-6">
                                 <div className="space-y-3">
-                                    <Label className="text-xs font-bold uppercase tracking-widest text-slate-500 flex items-center gap-2">
+                                    <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
                                         <div className="w-1.5 h-1.5 bg-primary rounded-full"></div> Contact Information
                                     </Label>
                                     <Input
                                         ref={phoneRef}
                                         type="tel"
                                         inputMode="tel"
-                                        className="h-12 rounded-xl focus:ring-primary/10 border-slate-200 font-medium placeholder:text-slate-300"
+                                        className="h-12 rounded-xl focus:ring-primary/10 border-border bg-card font-medium placeholder:text-muted-foreground/30"
                                         value={patient.phone}
                                         onChange={e => {
                                             const val = e.target.value.replace(/\D/g, '').slice(0, 10);
@@ -548,12 +548,12 @@ export default function NurseEntry() {
                                 </div>
 
                                 <div className="space-y-3">
-                                    <Label className="text-xs font-bold uppercase tracking-widest text-slate-500 flex items-center gap-2">
+                                    <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
                                         <div className="w-1.5 h-1.5 bg-primary rounded-full"></div> Location
                                     </Label>
                                     <Input 
                                         ref={addressRef}
-                                        className="h-12 rounded-xl focus:ring-primary/10 border-slate-200 font-medium placeholder:text-slate-300" 
+                                        className="h-12 rounded-xl focus:ring-primary/10 border-border bg-card font-medium placeholder:text-muted-foreground/30" 
                                         value={patient.address} 
                                         onChange={e => setPatient(p => ({ ...p, address: e.target.value }))} 
                                         onKeyDown={(e) => handleKeyDown(e)}
@@ -563,7 +563,7 @@ export default function NurseEntry() {
                             </div>
                         </div>
 
-                        <div className="pt-4 border-t border-slate-100 -mx-6 px-6 bg-slate-50/30 flex justify-center md:justify-end pb-8">
+                        <div className="pt-4 border-t border-border -mx-6 px-6 bg-muted/20 flex justify-center md:justify-end pb-8">
                             <Button onClick={handleNewPatientNext} size="lg" className="w-full md:w-auto h-14 px-10 rounded-xl font-bold text-lg shadow-xl shadow-primary/20 hover:translate-y-[-2px] hover:shadow-primary/30 active:translate-y-[0px] transition-all">
                                 Continue — Record Vitals <ChevronDown className="w-5 h-5 ml-2" />
                             </Button>
@@ -586,10 +586,10 @@ export default function NurseEntry() {
             <CardContent className="pt-10 space-y-10 pb-10">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 <div className="space-y-3">
-                  <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">Weight <span className="text-slate-300">(kg)</span></Label>
+                  <Label className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">Weight <span className="text-muted-foreground/40">(kg)</span></Label>
                   <Input
                     ref={weightRef}
-                    className="h-14 rounded-2xl text-xl font-bold border-slate-200 focus:ring-primary/10"
+                    className="h-14 rounded-2xl text-xl font-bold border-border bg-card focus:ring-primary/10"
                     type="number"
                     step="0.1"
                     min="0"
@@ -604,7 +604,7 @@ export default function NurseEntry() {
                   />
                 </div>
                 <div className="space-y-3">
-                  <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">Blood Pressure <span className="text-slate-300">(mmHg)</span></Label>
+                  <Label className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">Blood Pressure <span className="text-muted-foreground/40">(mmHg)</span></Label>
                   <div className="flex items-center gap-3">
                     <Input
                       ref={sbpRef}
@@ -621,7 +621,7 @@ export default function NurseEntry() {
                         }
                       }}
                       onKeyDown={(e) => handleKeyDown(e, dbpRef)}
-                      className="h-14 rounded-2xl text-xl font-bold text-center border-slate-200 focus:ring-primary/10"
+                      className="h-14 rounded-2xl text-xl font-bold text-center border-border bg-card focus:ring-primary/10"
                     />
                     <span className="text-primary font-black text-2xl">/</span>
                     <Input
@@ -640,16 +640,16 @@ export default function NurseEntry() {
                         }
                       }}
                       onKeyDown={(e) => handleKeyDown(e, pulseRef)}
-                      className="h-14 rounded-2xl text-xl font-bold text-center border-slate-200 focus:ring-primary/10"
+                      className="h-14 rounded-2xl text-xl font-bold text-center border-border bg-card focus:ring-primary/10"
                     />
                   </div>
                 </div>
                 <div className="space-y-3">
-                  <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">Pulse Rate <span className="text-slate-300">(bpm)</span></Label>
+                  <Label className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">Pulse Rate <span className="text-muted-foreground/40">(bpm)</span></Label>
                   <Input
                     ref={pulseRef}
                     id="pulse-input"
-                    className="h-14 rounded-2xl text-xl font-bold border-slate-200 focus:ring-primary/10"
+                    className="h-14 rounded-2xl text-xl font-bold border-border bg-card focus:ring-primary/10"
                     type="number"
                     min="0"
                     max="250"
@@ -663,10 +663,10 @@ export default function NurseEntry() {
                   />
                 </div>
                 <div className="space-y-3">
-                  <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">SpO2 <span className="text-slate-300">(%)</span></Label>
+                  <Label className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">SpO2 <span className="text-muted-foreground/40">(%)</span></Label>
                   <Input
                     ref={spo2Ref}
-                    className="h-14 rounded-2xl text-xl font-bold border-slate-200 focus:ring-primary/10"
+                    className="h-14 rounded-2xl text-xl font-bold border-border bg-card focus:ring-primary/10"
                     type="number"
                     step="0.1"
                     min="0"
@@ -681,10 +681,10 @@ export default function NurseEntry() {
                   />
                 </div>
                 <div className="space-y-3">
-                  <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">Temperature <span className="text-slate-300">(°F)</span></Label>
+                  <Label className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">Temperature <span className="text-muted-foreground/40">(°F)</span></Label>
                   <Input
                     ref={tempRef}
-                    className="h-14 rounded-2xl text-xl font-bold border-slate-200 focus:ring-primary/10"
+                    className="h-14 rounded-2xl text-xl font-bold border-border bg-card focus:ring-primary/10"
                     type="number"
                     step="0.1"
                     min="90"
@@ -699,10 +699,10 @@ export default function NurseEntry() {
                   />
                 </div>
                 <div className="space-y-3">
-                  <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">CBG <span className="text-slate-300">(mg/dL)</span></Label>
+                  <Label className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">CBG <span className="text-muted-foreground/40">(mg/dL)</span></Label>
                   <Input
                     ref={cbgRef}
-                    className="h-14 rounded-2xl text-xl font-bold border-slate-200 focus:ring-primary/10"
+                    className="h-14 rounded-2xl text-xl font-bold border-border bg-card focus:ring-primary/10"
                     type="number"
                     min="0"
                     max="600"
@@ -718,7 +718,7 @@ export default function NurseEntry() {
               </div>
               
               <div className="flex flex-col md:flex-row gap-4 pt-4">
-                <Button variant="outline" size="lg" onClick={() => setStep('patient')} className="order-2 md:order-1 flex-1 h-14 rounded-2xl font-bold text-slate-400 group border-slate-200">
+                <Button variant="outline" size="lg" onClick={() => setStep('patient')} className="order-2 md:order-1 flex-1 h-14 rounded-2xl font-bold text-muted-foreground group border-border hover:bg-muted">
                     <ChevronDown className="w-5 h-5 mr-2 rotate-90 group-hover:-translate-x-1 transition-transform" /> Go Back
                 </Button>
                 <Button onClick={submitVisit} disabled={loading} size="lg" className="order-1 md:order-2 flex-[2] h-14 rounded-2xl font-black text-xl shadow-2xl shadow-primary/30">

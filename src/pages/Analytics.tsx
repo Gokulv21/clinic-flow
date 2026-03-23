@@ -192,7 +192,7 @@ export default function Analytics() {
       </PageBanner>
 
       <div className="px-4 md:px-8 space-y-8">
-        <div className="bg-white p-1 rounded-xl shadow-sm border border-slate-100 hidden md:flex w-fit ml-auto">
+        <div className="bg-card p-1 rounded-xl shadow-sm border border-border hidden md:flex w-fit ml-auto">
           <Button variant="ghost" size="sm" className="rounded-lg text-xs font-bold gap-2">
             <Filter className="w-3.5 h-3.5" /> Filter Data
           </Button>
@@ -201,19 +201,19 @@ export default function Analytics() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {[
-          { label: "Today's Patients", value: stats.todayPatients, icon: <CalendarDays className="w-5 h-5" />, color: 'bg-blue-50 text-blue-600', trend: trends.today },
-          { label: 'Monthly Volume', value: stats.monthPatients, icon: <Activity className="w-5 h-5" />, color: 'bg-emerald-50 text-emerald-600', trend: trends.month },
-          { label: 'Total Database', value: stats.totalPatients, icon: <Users className="w-5 h-5" />, color: 'bg-amber-50 text-amber-600', trend: 'Lifetime records' },
+          { label: "Today's Patients", value: stats.todayPatients, icon: <CalendarDays className="w-5 h-5" />, color: 'bg-blue-500/10 text-blue-500', trend: trends.today },
+          { label: 'Monthly Volume', value: stats.monthPatients, icon: <Activity className="w-5 h-5" />, color: 'bg-emerald-500/10 text-emerald-500', trend: trends.month },
+          { label: 'Total Database', value: stats.totalPatients, icon: <Users className="w-5 h-5" />, color: 'bg-amber-500/10 text-amber-500', trend: 'Lifetime records' },
         ].map(s => (
-          <Card key={s.label} className="border-none shadow-sm hover:shadow-md transition-shadow bg-white overflow-hidden group">
+          <Card key={s.label} className="border-none shadow-sm hover:shadow-md transition-shadow bg-card overflow-hidden group">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between mb-4">
                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 ${s.color}`}>{s.icon}</div>
-                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{s.trend}</span>
+                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{s.trend}</span>
               </div>
               <div>
-                <p className="text-sm font-bold text-slate-500">{s.label}</p>
-                <p className="text-4xl font-extrabold text-slate-800 tracking-tighter mt-1">{s.value}</p>
+                <p className="text-sm font-bold text-muted-foreground">{s.label}</p>
+                <p className="text-4xl font-extrabold text-foreground tracking-tighter mt-1">{s.value}</p>
               </div>
             </CardContent>
           </Card>
@@ -221,14 +221,14 @@ export default function Analytics() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <Card className="lg:col-span-2 border-none shadow-sm bg-white overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-7 border-b border-slate-50">
+        <Card className="lg:col-span-2 border-none shadow-sm bg-card overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-7 border-b border-border">
             <div>
-              <CardTitle className="text-lg font-bold text-slate-800">Patient Traffic</CardTitle>
-              <p className="text-xs text-slate-400 mt-0.5 font-medium">Visualization of visit frequency</p>
+              <CardTitle className="text-lg font-bold text-foreground">Patient Traffic</CardTitle>
+              <p className="text-xs text-muted-foreground mt-0.5 font-medium">Visualization of visit frequency</p>
             </div>
             <Select value={timeRange} onValueChange={(v: TimeRange) => setTimeRange(v)}>
-              <SelectTrigger className="w-[130px] h-9 bg-slate-50 border-none font-bold text-xs rounded-lg">
+              <SelectTrigger className="w-[130px] h-9 bg-muted border-none font-bold text-xs rounded-lg">
                 <SelectValue placeholder="Select range" />
               </SelectTrigger>
               <SelectContent>
@@ -243,23 +243,24 @@ export default function Analytics() {
             <div className="h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={volumeData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
                   <XAxis 
                     dataKey="name" 
                     axisLine={false} 
                     tickLine={false} 
-                    tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10, fontWeight: 600 }}
                     dy={10}
                   />
                   <YAxis 
                     axisLine={false} 
                     tickLine={false} 
-                    tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10, fontWeight: 600 }}
                     allowDecimals={false}
                   />
                   <Tooltip 
-                    cursor={{ fill: '#f8fafc' }}
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', padding: '12px' }}
+                    cursor={{ fill: 'hsl(var(--muted))', opacity: 0.4 }}
+                    contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '12px', border: '1px solid hsl(var(--border))', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', padding: '12px' }}
+                    labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 'bold' }}
                   />
                   <Bar dataKey="patients" radius={[6, 6, 0, 0]} barSize={timeRange === 'year' ? 30 : 20}>
                     {volumeData.map((entry, index) => (
@@ -272,10 +273,10 @@ export default function Analytics() {
           </CardContent>
         </Card>
 
-        <Card className="border-none shadow-sm bg-white">
-          <CardHeader className="pb-2 border-b border-slate-50 mb-4">
-            <CardTitle className="text-lg font-bold text-slate-800">Disease Distribution</CardTitle>
-            <p className="text-xs text-slate-400 font-medium">Most frequent diagnoses</p>
+        <Card className="border-none shadow-sm bg-card">
+          <CardHeader className="pb-2 border-b border-border mb-4">
+            <CardTitle className="text-lg font-bold text-foreground">Disease Distribution</CardTitle>
+            <p className="text-xs text-muted-foreground font-medium">Most frequent diagnoses</p>
           </CardHeader>
           <CardContent>
             {diagnosisData.length > 0 ? (
@@ -294,8 +295,8 @@ export default function Analytics() {
                   {diagnosisData.map((d, i) => (
                     <div key={d.name} className="flex items-center gap-2">
                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                       <span className="text-[11px] font-bold text-slate-600 truncate">{d.name}</span>
-                       <span className="text-[10px] font-medium text-slate-400 ml-auto">{d.value}</span>
+                       <span className="text-[11px] font-bold text-foreground truncate">{d.name}</span>
+                       <span className="text-[10px] font-medium text-muted-foreground ml-auto">{d.value}</span>
                     </div>
                   ))}
                 </div>
@@ -309,15 +310,15 @@ export default function Analytics() {
         </Card>
 
         {/* Disease Seasonality Chart */}
-        <Card className="lg:col-span-3 border-none shadow-sm bg-white overflow-hidden">
-          <CardHeader className="pb-6 border-b border-slate-50">
+        <Card className="lg:col-span-3 border-none shadow-sm bg-card overflow-hidden">
+          <CardHeader className="pb-6 border-b border-border">
             <div className="flex items-center gap-2">
-               <div className="p-1.5 bg-indigo-50 rounded-lg">
-                 <Activity className="w-4 h-4 text-indigo-600" />
+               <div className="p-1.5 bg-primary/10 rounded-lg">
+                 <Activity className="w-4 h-4 text-primary" />
                </div>
                <div>
-                  <CardTitle className="text-lg font-bold text-slate-800">Disease Seasonality</CardTitle>
-                  <p className="text-xs text-slate-400 font-medium">Trends for common conditions over the last 6 months</p>
+                  <CardTitle className="text-lg font-bold text-foreground">Disease Seasonality</CardTitle>
+                  <p className="text-xs text-muted-foreground font-medium">Trends for common conditions over the last 6 months</p>
                </div>
             </div>
           </CardHeader>
@@ -333,10 +334,13 @@ export default function Analytics() {
                       </linearGradient>
                     ))}
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 700 }} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }} />
-                  <Tooltip contentStyle={{ borderRadius: '12px' }} />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
+                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11, fontWeight: 700 }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10, fontWeight: 600 }} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '12px', border: '1px solid hsl(var(--border))' }}
+                    labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 'bold' }}
+                  />
                   <Area type="monotone" dataKey="Fever" stroke={COLORS[0]} fillOpacity={1} fill="url(#color0)" strokeWidth={3} />
                   <Area type="monotone" dataKey="Cough" stroke={COLORS[1]} fillOpacity={1} fill="url(#color1)" strokeWidth={3} />
                   <Area type="monotone" dataKey="Diabetes" stroke={COLORS[2]} fillOpacity={1} fill="url(#color2)" strokeWidth={3} />

@@ -41,12 +41,40 @@ const PrescriptionTemplate = React.memo(({
         const fetchDoctorProfile = async () => {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
-                const { data } = await supabase
-                    .from('profiles')
-                    .select('*')
+                // First check if current user is a doctor
+                const { data: roleData } = await supabase
+                    .from('user_roles')
+                    .select('role')
                     .eq('user_id', user.id)
-                    .single();
-                if (data) setDoctorProfile(data);
+                    .eq('role', 'doctor')
+                    .maybeSingle();
+
+                if (roleData) {
+                    // Current user is a doctor, fetch their profile
+                    const { data } = await supabase
+                        .from('profiles')
+                        .select('*')
+                        .eq('user_id', user.id)
+                        .single();
+                    if (data) setDoctorProfile(data);
+                } else {
+                    // Current user is NOT a doctor (e.g. staff), fetch the first available doctor's profile
+                    const { data: doctorRole } = await supabase
+                        .from('user_roles')
+                        .select('user_id')
+                        .eq('role', 'doctor')
+                        .limit(1)
+                        .maybeSingle();
+                    
+                    if (doctorRole) {
+                        const { data } = await supabase
+                            .from('profiles')
+                            .select('*')
+                            .eq('user_id', doctorRole.user_id)
+                            .single();
+                        if (data) setDoctorProfile(data);
+                    }
+                }
             }
         };
         fetchDoctorProfile();
@@ -103,7 +131,7 @@ const PrescriptionTemplate = React.memo(({
                         aspectRatio: isPrint ? undefined : '1 / 1.414',
                         containerType: 'inline-size' as any,
                         position: 'relative',
-                        overflow: 'hidden',
+                        overflow: isPrint ? 'hidden' : 'visible',
                         background: '#ffffff',
                         backgroundColor: '#ffffff',
                         boxSizing: 'border-box',
@@ -183,7 +211,7 @@ function PageOne({ patient, visit, today, time, clinicalNotes, diagnosis, medici
                 fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
                 fontSize: '1.8cqw', // Further increased base font size
                 color: '#0f172a',
-                overflow: 'hidden',
+                overflow: isWritingMode ? 'hidden' : 'visible',
             }}
         >
             <div className="margin-line margin-line-left" />

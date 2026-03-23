@@ -103,8 +103,8 @@ export default function Dashboard() {
 
       <div>
         <div className="flex items-center gap-2 mb-6">
-          <TrendingUp className="w-5 h-5 text-slate-400" />
-          <h2 className="text-[13px] font-black tracking-[0.2em] text-slate-400 uppercase">Core Operations</h2>
+          <TrendingUp className="w-5 h-5 text-muted-foreground" />
+          <h2 className="text-[13px] font-black tracking-[0.2em] text-muted-foreground uppercase">Core Operations</h2>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -121,8 +121,8 @@ export default function Dashboard() {
                 <h3 className="font-heading font-black text-lg text-foreground group-hover:text-blue-600 transition-colors">{m.label}</h3>
                 <p className="text-xs font-medium text-muted-foreground line-clamp-2">{m.desc}</p>
               </div>
-              <div className="absolute top-4 right-4 text-slate-200 dark:text-slate-800 group-hover:text-blue-100 dark:group-hover:text-blue-900 transition-colors">
-                 <Activity className="w-12 h-12 opacity-20" />
+              <div className="absolute top-4 right-4 text-muted-foreground/10 dark:text-muted-foreground/10 group-hover:text-blue-500/20 transition-colors">
+                 <Activity className="w-12 h-12" />
               </div>
             </button>
           ))}

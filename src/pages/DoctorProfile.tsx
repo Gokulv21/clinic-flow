@@ -572,9 +572,9 @@ export default function DoctorProfile() {
                          </Card>
 
                          {/* Mini Analytics */}
-                         <Card className="border-slate-100 rounded-[2rem] shadow-sm bg-white overflow-hidden p-8 flex flex-col">
+                         <Card className="border-border dark:border-slate-800 rounded-[2rem] shadow-sm bg-card overflow-hidden p-8 flex flex-col">
                              <div className="flex items-center justify-between mb-8">
-                                <h3 className="text-sm font-black uppercase tracking-widest text-slate-400">Weekly Performance</h3>
+                                <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground">Weekly Performance</h3>
                                 <TrendingUp className="w-5 h-5 text-emerald-500" />
                              </div>
                              <div className="h-64 mt-auto">
@@ -732,10 +732,10 @@ export default function DoctorProfile() {
                             ))}
                             {staff.length === 0 && (
                                 <div className="col-span-full py-20 text-center space-y-4">
-                                    <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto">
-                                        <Users className="w-8 h-8 text-slate-200" />
+                                    <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mx-auto">
+                                        <Users className="w-8 h-8 text-muted-foreground/30" />
                                     </div>
-                                    <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">No registered staff found</p>
+                                    <p className="text-muted-foreground font-bold uppercase tracking-widest text-xs">No registered staff found</p>
                                 </div>
                             )}
                         </div>
