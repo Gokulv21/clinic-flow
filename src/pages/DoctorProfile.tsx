@@ -8,7 +8,7 @@ import {
     UserCheck, BarChart3, PieChart, Settings, Mail, Phone, MapPin, 
     Medal, FileSignature, Save, RefreshCw, Plus, Stethoscope, Printer,
     ArrowRight, CheckCircle2, Circle, PanelLeft, LayoutDashboard,
-    Group, Info, Moon, Sun, HeartPulse, TrendingUp, Search, UserPlus, Camera
+    Group, Info, Moon, Sun, HeartPulse, TrendingUp, Search, UserPlus, Camera, Trash2
 } from 'lucide-react';
 import { startOfDay, endOfDay, subDays, format, isSameDay, parseISO } from 'date-fns';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -51,7 +51,11 @@ const AVATAR_OPTIONS = [
 
 const getAvatarUrl = (url?: string) => {
     if (!url) return AVATAR_OPTIONS[0].url;
+    // If it's a full URL (Supabase or external)
+    if (url.startsWith('http')) return url;
+    // If it's a local relative path starting with /avatars/
     if (url.startsWith('/avatars/')) return `/prescripto${url}`;
+    // Fallback
     return url;
 };
 
@@ -254,6 +258,52 @@ export default function DoctorProfile() {
         }
     };
 
+    const handleDeletePhoto = async () => {
+        if (!profile?.avatar_url || !user?.id) return;
+        
+        // Only delete if it's a custom uploaded photo (contains Supabase storage path)
+        const isCustomPhoto = profile.avatar_url.includes('/storage/v1/object/public/avatars/');
+        
+        if (!isCustomPhoto) {
+            // If it's just a default avatar, just reset it
+            setProfile(prev => prev ? { ...prev, avatar_url: undefined } : null);
+            return;
+        }
+
+        const confirmDelete = window.confirm('Are you sure you want to delete your profile photo?');
+        if (!confirmDelete) return;
+
+        setUploading(true);
+        try {
+            // Extract filename from URL
+            const urlParts = profile.avatar_url.split('/');
+            const fileName = urlParts[urlParts.length - 1].split('?')[0];
+
+            // 1. Delete from Supabase Storage
+            const { error: storageError } = await supabase.storage
+                .from('avatars')
+                .remove([fileName]);
+
+            if (storageError) console.error('Storage deletion error:', storageError);
+
+            // 2. Update Profile to null/default
+            const { error: updateError } = await supabase
+                .from('profiles')
+                .update({ avatar_url: null })
+                .eq('user_id', user.id);
+
+            if (updateError) throw updateError;
+
+            setProfile(prev => prev ? { ...prev, avatar_url: undefined } : null);
+            toast.success('Profile photo removed');
+        } catch (err: any) {
+            console.error(err);
+            toast.error(err.message || 'Failed to delete photo');
+        } finally {
+            setUploading(false);
+        }
+    };
+
     async function fetchAllProfiles() {
         try {
             const { data } = await supabase
@@ -315,20 +365,36 @@ export default function DoctorProfile() {
                             <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/20 to-transparent" />
                             
                             {/* Upload Overlay */}
-                            <button 
-                                onClick={() => fileInputRef.current?.click()}
-                                disabled={uploading}
-                                className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white gap-2 cursor-pointer"
-                            >
-                                {uploading ? (
-                                    <Loader2 className="w-8 h-8 animate-spin" />
-                                ) : (
-                                    <>
-                                        <Camera className="w-8 h-8" />
-                                        <span className="text-[10px] font-black uppercase tracking-widest text-center px-2">Update Photo</span>
-                                    </>
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white gap-3 cursor-pointer">
+                                <button 
+                                    onClick={() => fileInputRef.current?.click()}
+                                    disabled={uploading}
+                                    className="flex flex-col items-center gap-1 hover:scale-110 transition-transform"
+                                >
+                                    {uploading ? (
+                                        <Loader2 className="w-8 h-8 animate-spin" />
+                                    ) : (
+                                        <>
+                                            <Camera className="w-8 h-8" />
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-center px-2">Update</span>
+                                        </>
+                                    )}
+                                </button>
+                                
+                                {profile?.avatar_url?.includes('http') && (
+                                    <button 
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDeletePhoto();
+                                        }}
+                                        disabled={uploading}
+                                        className="flex flex-col items-center gap-1 text-red-400 hover:text-red-300 hover:scale-110 transition-transform pt-2 border-t border-white/20 w-16"
+                                    >
+                                        <Trash2 className="w-5 h-5" />
+                                        <span className="text-[9px] font-black uppercase tracking-widest">Remove</span>
+                                    </button>
                                 )}
-                            </button>
+                            </div>
                         </div>
                         <input 
                             type="file" 
