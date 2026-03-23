@@ -1,9 +1,24 @@
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { Maximize2, Minimize2, Trash2, Save, Undo, Redo, X, Eraser, PenTool, Circle, Plus, ChevronLeft, ChevronRight, Tablet, Settings2 } from 'lucide-react';
+import { 
+    Maximize2, Minimize2, Trash2, Save, Undo, Redo, X, 
+    Eraser, PenTool, Circle, Plus, ChevronLeft, ChevronRight, 
+    Tablet, Settings2, AlertTriangle 
+} from 'lucide-react';
 import PrescriptionTemplate from './PrescriptionTemplate';
 import { getStroke } from 'perfect-freehand';
 import { useGesture } from '@use-gesture/react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface DigitalPrescriptionProps {
     patient: any;
@@ -426,9 +441,33 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                         <Button variant="ghost" size="sm" onClick={handleRedo} disabled={historyStep === history.length - 1} className="h-8">
                             <Redo className="w-4 h-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={handleClear} disabled={pages[currentPageIndex]?.length === 0} className="h-8 text-red-600">
-                            <Trash2 className="w-4 h-4" />
-                        </Button>
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="sm" disabled={pages[currentPageIndex]?.length === 0} className="h-8 text-red-600">
+                                    <Trash2 className="w-4 h-4" />
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent className="rounded-[2rem] border-none shadow-2xl">
+                                <AlertDialogHeader>
+                                    <div className="flex items-center gap-3 text-red-600 mb-2">
+                                        <AlertTriangle className="w-6 h-6" />
+                                        <AlertDialogTitle className="text-xl font-black">Clear Prescription?</AlertDialogTitle>
+                                    </div>
+                                    <AlertDialogDescription className="text-slate-500 font-bold">
+                                        This will permanently delete all your drawings on this page. This action cannot be undone.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter className="gap-2 sm:gap-0">
+                                    <AlertDialogCancel className="rounded-full font-bold border-slate-200">Cancel</AlertDialogCancel>
+                                    <AlertDialogAction 
+                                        onClick={handleClear}
+                                        className="rounded-full font-black uppercase tracking-widest text-[10px] bg-red-600 hover:bg-red-700 text-white px-6"
+                                    >
+                                        Yes, Clear Page
+                                    </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
                     </div>
 
                     <div className="flex items-center gap-1 md:gap-1.5 bg-slate-100 p-0.5 rounded-lg flex-wrap sm:flex-nowrap">

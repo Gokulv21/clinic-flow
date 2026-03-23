@@ -35,6 +35,24 @@ const PrescriptionTemplate = React.memo(({
     isWritingMode = false,
 }: PrescriptionTemplateProps) => {
 
+    const [doctorProfile, setDoctorProfile] = useState<any>(null);
+
+    useEffect(() => {
+        const fetchDoctorProfile = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .single();
+                if (data) setDoctorProfile(data);
+            }
+        };
+        fetchDoctorProfile();
+    }, []);
+
+
     const today = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
     const time = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
@@ -106,6 +124,7 @@ const PrescriptionTemplate = React.memo(({
                             advice={advice}
                             hasTyped={showTyped}
                             vitals={vitals}
+                            doctorProfile={doctorProfile}
                         />
                     ) : (
                         <div style={{ position: 'absolute', inset: 0, background: '#fff' }}>
@@ -148,10 +167,11 @@ interface PageOneProps {
     medicines: any[];
     advice?: string;
     hasTyped: boolean;
+    doctorProfile: any;
     vitals: { label: string; value: any; unit: string }[];
 }
 
-function PageOne({ patient, visit, today, time, clinicalNotes, diagnosis, medicines, advice, hasTyped, vitals }: PageOneProps) {
+function PageOne({ patient, visit, today, time, clinicalNotes, diagnosis, medicines, advice, hasTyped, vitals, doctorProfile }: PageOneProps) {
     return (
         <div
             id="rx-inner"
@@ -238,13 +258,13 @@ function PageOne({ patient, visit, today, time, clinicalNotes, diagnosis, medici
 
                     <div>
                         <div style={{ fontWeight: 800, color: '#334155', fontSize: '2em', lineHeight: 1, letterSpacing: '0.01em' }}>
-                            Dr. V. Aravind
+                            {doctorProfile?.full_name || 'Dr. V. Aravind'}
                         </div>
                         <div style={{ color: '#475569', fontSize: '0.9em', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', marginTop: '0.3em' }}>
-                            MBBS., CCEBDM., (PHFI)
+                            {doctorProfile?.qualifications || 'MBBS., CCEBDM., (PHFI)'}
                         </div>
                         <div style={{ color: '#475569', fontSize: '0.85em', fontWeight: 500, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-                            Reg. No: 152590
+                            {doctorProfile?.registration_id ? `Reg. No: ${doctorProfile.registration_id}` : 'Reg. No: 152590'}
                         </div>
                         <div style={{ color: '#64748b', fontSize: '0.8em', fontWeight: 600, marginTop: '0.1em' }}>
                             பொதுநலம் மற்றும் சர்க்கரை நோய் நிபுணர்
@@ -253,16 +273,16 @@ function PageOne({ patient, visit, today, time, clinicalNotes, diagnosis, medici
                 </div>
                 <div style={{ textAlign: 'right' }}>
                     <div style={{ fontWeight: 900, color: '#7d326cff', fontSize: '3.2em', letterSpacing: '0.04em', lineHeight: 1 }}>
-                        GV Clinic
+                        {doctorProfile?.clinic_name || 'GV Clinic'}
                     </div>
                     <div style={{ color: '#475569', fontSize: '0.8em', marginTop: '0.4em', letterSpacing: '0.2em', fontWeight: 800 }}>
                         24/7 Emergency · ECG · Lab
                     </div>
                     <div style={{ color: '#64748b', fontSize: '0.75em', marginTop: '0.2em', letterSpacing: '0.02em', fontWeight: 500 }}>
-                        742, SSR Complex, Saththanur – 606 706
+                        {doctorProfile?.clinic_address || '742, SSR Complex, Saththanur – 606 706'}
                     </div>
                     <div style={{ color: '#64748b', fontSize: '0.75em', marginTop: '0.2em', letterSpacing: '0.02em', fontWeight: 500, textAlign: 'center' }}>
-                        +91-9488017536
+                        {doctorProfile?.clinic_phone || '+91-9488017536'}
                     </div>
                 </div>
             </div>
@@ -345,7 +365,13 @@ function PageOne({ patient, visit, today, time, clinicalNotes, diagnosis, medici
             </div>
 
             {/* ── FOOTER ──────────────────────────────────────── */}
-            <div style={{ background: '#fff', borderTop: '2px solid #0f172a', padding: '1em 2em', display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+            <div style={{ background: '#fff', borderTop: '2px solid #0f172a', padding: '1em 2em', display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, position: 'relative' }}>
+                {doctorProfile?.signature_data && (
+                    <div style={{ position: 'absolute', right: '4em', bottom: '4em', textAlign: 'center' }}>
+                        <img src={doctorProfile.signature_data} alt="Signature" style={{ maxHeight: '4.5em', width: 'auto', marginBottom: '0.2em', mixBlendMode: 'multiply' }} />
+                        <div style={{ fontSize: '0.6em', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Digital Signature</div>
+                    </div>
+                )}
                 <span style={{ color: '#475569', fontSize: '1em', fontWeight: 700, letterSpacing: '0.02em', textAlign: 'center' }}>
                     அடுத்த முறை வரும்போது இந்த மருந்துச்சீட்டை கொண்டு வரவும்
                 </span>

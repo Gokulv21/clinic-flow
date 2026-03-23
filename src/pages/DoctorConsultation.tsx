@@ -605,104 +605,121 @@ export default function DoctorConsultation() {
                       setShowDigitalRx(true);
                     }}
                     className={cn(
-                      "h-8 px-4 bg-primary/5 border-primary/20 text-primary hover:bg-primary/10 transition-all",
+                      "h-10 px-6 bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-lg rounded-xl border-none",
                       !isWritingMode && "opacity-40"
                     )}
                   >
                     <PenTool className="w-4 h-4 mr-2" />
-                    <span className="text-[11px] font-bold">Open Template (Pen)</span>
+                    <span className="text-xs font-black uppercase tracking-widest">Open Signature & Pen Template</span>
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {prescriptionImage && (
-                  <div className="relative group border rounded-lg overflow-hidden bg-slate-50 mb-4 h-32 flex items-center justify-center">
-                    <img src={Array.isArray(prescriptionImage) ? prescriptionImage[0] : (prescriptionImage?.startsWith('[') ? JSON.parse(prescriptionImage)[0] : prescriptionImage)} alt="Handwritten Rx" className="max-h-full" />
-                    <Button
-                      variant="destructive"
-                      size="icon"
-                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => setPrescriptionImage(null)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+              <CardContent className="space-y-6">
+                {isWritingMode && (
+                    <div className={cn(
+                        "flex flex-col items-center justify-center p-8 rounded-[2rem] border-2 border-dashed transition-all",
+                        prescriptionImage ? "border-emerald-200 bg-emerald-50/30" : "border-slate-200 bg-slate-50/50"
+                    )}>
+                        {prescriptionImage ? (
+                            <div className="relative group w-full max-w-md aspect-[1/1.414] bg-white rounded-2xl shadow-xl border overflow-hidden">
+                                <img 
+                                    src={Array.isArray(prescriptionImage) ? prescriptionImage[0] : (prescriptionImage?.startsWith('[') ? JSON.parse(prescriptionImage)[0] : prescriptionImage)} 
+                                    alt="Handwritten Rx" 
+                                    className="w-full h-full object-contain" 
+                                />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                                    <Button size="sm" onClick={() => setShowDigitalRx(true)} className="bg-white text-slate-900 hover:bg-slate-100 font-bold">Edit</Button>
+                                    <Button variant="destructive" size="sm" onClick={() => setPrescriptionImage(null)} className="font-bold">Clear</Button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="text-center space-y-4">
+                                <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto text-blue-600">
+                                    <PenTool className="w-10 h-10" />
+                                </div>
+                                <div>
+                                    <p className="text-base font-black text-slate-800">No Pen Content Yet</p>
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Tap 'Open Template' above to start writing</p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+
+                {!isWritingMode && (
+                  <div className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-500">
+                    <div className="space-y-3">
+                      <Label className="text-[12px] font-extrabold text-slate-500 uppercase tracking-widest ml-1">Clinical Notes</Label>
+                      <Textarea 
+                        value={clinicalNotes} 
+                        onChange={e => setClinicalNotes(e.target.value)} 
+                        placeholder="Enter clinical examination notes, symptoms, etc." 
+                        className="min-h-[120px] text-base font-bold bg-slate-50/50 border-slate-100 focus:bg-white focus:ring-blue-500 transition-all rounded-xl resize-none shadow-inner"
+                      />
+                    </div>
+
+                    <div className="space-y-3">
+                      <Label className="text-[12px] font-extrabold text-slate-500 uppercase tracking-widest ml-1">Diagnosis</Label>
+                      <Input 
+                        value={diagnosis} 
+                        onChange={e => setDiagnosis(e.target.value)} 
+                        placeholder="Enter diagnosis" 
+                        className="h-12 text-base font-bold bg-slate-50/50 border-slate-100 focus:bg-white focus:ring-blue-500 transition-all rounded-xl shadow-inner"
+                      />
+                    </div>
                   </div>
                 )}
 
-                <div className="space-y-4">
-                  <div className="space-y-3">
-                    <Label className="text-[12px] font-extrabold text-slate-500 uppercase tracking-widest ml-1">Clinical Notes</Label>
-                    <Textarea 
-                      value={clinicalNotes} 
-                      onChange={e => setClinicalNotes(e.target.value)} 
-                      placeholder="Enter clinical examination notes, symptoms, etc." 
-                      disabled={isWritingMode}
-                      className="min-h-[100px] text-base font-bold bg-slate-50/50 border-slate-100 focus:bg-white focus:ring-blue-500 transition-all rounded-xl disabled:opacity-50 disabled:cursor-not-allowed resize-none"
-                    />
-                  </div>
-
-                  <div className="space-y-3">
-                    <Label className="text-[12px] font-extrabold text-slate-500 uppercase tracking-widest ml-1">Diagnosis</Label>
-                    <Input 
-                      value={diagnosis} 
-                      onChange={e => setDiagnosis(e.target.value)} 
-                      placeholder="Enter diagnosis" 
-                      disabled={isWritingMode}
-                      className="h-12 text-base font-bold bg-slate-50/50 border-slate-100 focus:bg-white focus:ring-blue-500 transition-all rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-4 pt-2">
-                  <div className="flex items-center justify-between ml-1">
-                    <Label className="text-[12px] font-extrabold text-slate-500 uppercase tracking-widest">Medicines</Label>
-                    {!isWritingMode && (
-                      <Button size="sm" variant="outline" onClick={addMedicine} className="h-8 pr-3 pl-2 text-[11px] font-bold border-blue-100 text-blue-600 hover:bg-blue-50 bg-white rounded-lg">
-                        <Plus className="w-3.5 h-3.5 mr-1" /> Add Medicine
-                      </Button>
-                    )}
-                  </div>
-                  <div className="space-y-3">
-                    {medicines.map((med, i) => (
-                      <div key={i} className="flex gap-2 items-start bg-slate-50/30 p-3 rounded-2xl border border-slate-100 group relative">
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 flex-1">
-                          <div className="space-y-1">
-                            <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">Name</p>
-                            <Input placeholder="Paracetamol" value={med.name} onChange={e => updateMedicine(i, 'name', e.target.value)} disabled={isWritingMode} className="h-10 text-sm font-bold border-slate-200 bg-white rounded-lg" />
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">Dosage</p>
-                            <Input placeholder="500mg" value={med.dosage} onChange={e => updateMedicine(i, 'dosage', e.target.value)} disabled={isWritingMode} className="h-10 text-sm font-bold border-slate-200 bg-white rounded-lg" />
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">Frequency</p>
-                            <Input placeholder="1-0-1" value={med.frequency} onChange={e => updateMedicine(i, 'frequency', e.target.value)} disabled={isWritingMode} className="h-10 text-sm font-bold border-slate-200 bg-white rounded-lg" />
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">Duration</p>
-                            <Input placeholder="5 Days" value={med.duration} onChange={e => updateMedicine(i, 'duration', e.target.value)} disabled={isWritingMode} className="h-10 text-sm font-bold border-slate-200 bg-white rounded-lg" />
-                          </div>
-                        </div>
-                        {!isWritingMode && (
-                          <Button size="icon" variant="ghost" onClick={() => removeMedicine(i)} className="text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg h-10 w-10 mt-5 transition-colors">
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        )}
+                {!isWritingMode && (
+                  <div className="space-y-6 animate-in fade-in slide-in-from-top-6 duration-700">
+                    <div className="space-y-4 pt-2">
+                      <div className="flex items-center justify-between ml-1">
+                        <Label className="text-[12px] font-extrabold text-slate-500 uppercase tracking-widest">Medicines</Label>
+                        <Button size="sm" variant="outline" onClick={addMedicine} className="h-8 pr-3 pl-2 text-[11px] font-bold border-blue-100 text-blue-600 hover:bg-blue-50 bg-white rounded-lg">
+                          <Plus className="w-3.5 h-3.5 mr-1" /> Add Medicine
+                        </Button>
                       </div>
-                    ))}
-                  </div>
-                </div>
+                      <div className="space-y-3">
+                        {medicines.map((med, i) => (
+                          <div key={i} className="flex gap-2 items-start bg-slate-50/30 p-3 rounded-2xl border border-slate-100 group relative">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 flex-1">
+                              <div className="space-y-1">
+                                <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">Name</p>
+                                <Input placeholder="Paracetamol" value={med.name} onChange={e => updateMedicine(i, 'name', e.target.value)} className="h-10 text-sm font-bold border-slate-200 bg-white rounded-lg" />
+                              </div>
+                              <div className="space-y-1">
+                                <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">Dosage</p>
+                                <Input placeholder="500mg" value={med.dosage} onChange={e => updateMedicine(i, 'dosage', e.target.value)} className="h-10 text-sm font-bold border-slate-200 bg-white rounded-lg" />
+                              </div>
+                              <div className="space-y-1">
+                                <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">Frequency</p>
+                                <Input placeholder="1-0-1" value={med.frequency} onChange={e => updateMedicine(i, 'frequency', e.target.value)} className="h-10 text-sm font-bold border-slate-200 bg-white rounded-lg" />
+                              </div>
+                              <div className="space-y-1">
+                                <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">Duration</p>
+                                <Input placeholder="5 Days" value={med.duration} onChange={e => updateMedicine(i, 'duration', e.target.value)} className="h-10 text-sm font-bold border-slate-200 bg-white rounded-lg" />
+                              </div>
+                            </div>
+                            <Button size="icon" variant="ghost" onClick={() => removeMedicine(i)} className="text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg h-10 w-10 mt-5 transition-colors">
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
 
-                <div className="space-y-3 pt-2">
-                  <Label className="text-[12px] font-extrabold text-slate-500 uppercase tracking-widest ml-1">Advice</Label>
-                  <Input 
-                    value={advice} 
-                    onChange={e => setAdvice(e.target.value)} 
-                    placeholder="Drink plenty of water..." 
-                    disabled={isWritingMode}
-                    className="h-12 text-base font-bold bg-slate-50/50 border-slate-100 focus:bg-white focus:ring-blue-500 transition-all rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
-                  />
-                </div>
+                    <div className="space-y-3 pt-2">
+                      <Label className="text-[12px] font-extrabold text-slate-500 uppercase tracking-widest ml-1">Advice</Label>
+                      <Input 
+                        value={advice} 
+                        onChange={e => setAdvice(e.target.value)} 
+                        placeholder="Drink plenty of water..." 
+                        className="h-12 text-base font-bold bg-slate-50/50 border-slate-100 focus:bg-white focus:ring-blue-500 transition-all rounded-xl shadow-inner"
+                      />
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-3">
                   <Button
