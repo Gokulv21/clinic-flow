@@ -33,6 +33,11 @@ interface Medicine {
   count?: string;
 }
 
+const COMMON_FREQUENCIES = [
+  '1-0-1', '1-1-1', '0-0-1', '1-0-0', '0-1-0', '1-1-0', '0-1-1', 
+  'Stat', 'SOS', 'Twice daily', 'Thrice daily', 'Four times daily', 'Before food', 'After food'
+];
+
 export default function DoctorConsultation() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -255,23 +260,6 @@ export default function DoctorConsultation() {
   const removeMedicine = (i: number) => setMedicines(m => m.filter((_, idx) => idx !== i));
   const updateMedicine = (i: number, field: keyof Medicine, value: string) =>
     setMedicines(m => m.map((med, idx) => idx === i ? { ...med, [field]: value } : med));
-
-  const updateFrequency = (i: number, part: 'morning' | 'afternoon' | 'night', value: string) => {
-    // Only allow numbers
-    const cleanValue = value.replace(/[^0-9]/g, '');
-    setMedicines(m => m.map((med, idx) => {
-      if (idx !== i) return med;
-      const parts = (med.frequency || '0-0-0').split('-');
-      // Ensure we have 3 parts
-      while (parts.length < 3) parts.push('0');
-      
-      if (part === 'morning') parts[0] = cleanValue || '0';
-      if (part === 'afternoon') parts[1] = cleanValue || '0';
-      if (part === 'night') parts[2] = cleanValue || '0';
-      
-      return { ...med, frequency: parts.join('-') };
-    }));
-  };
 
   const handleMedicineKeyDown = (e: React.KeyboardEvent, index: number, fieldName: string) => {
     if (e.key === 'Enter') {
@@ -787,32 +775,15 @@ export default function DoctorConsultation() {
                                       <Input placeholder="500mg / 5ml" value={med.dosage} onChange={e => updateMedicine(i, 'dosage', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'dosage')} className="h-10 text-sm font-bold border-slate-200 bg-white rounded-lg" />
                                     </div>
                                     <div className="space-y-1 text-purple-600">
-                                      <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Frequency (M-A-N)</p>
-                                      <div className="flex items-center gap-1">
-                                        <Input 
-                                          placeholder="0" 
-                                          value={(med.frequency || '0-0-0').split('-')[0] || '0'} 
-                                          onChange={e => updateFrequency(i, 'morning', e.target.value)}
-                                          onKeyDown={e => handleMedicineKeyDown(e, i, 'freq-m')}
-                                          className="h-10 w-full text-center text-sm font-bold border-purple-200 bg-purple-50/30 rounded-lg placeholder:text-purple-200" 
-                                        />
-                                        <span className="text-purple-300 font-bold">-</span>
-                                        <Input 
-                                          placeholder="0" 
-                                          value={(med.frequency || '0-0-0').split('-')[1] || '0'} 
-                                          onChange={e => updateFrequency(i, 'afternoon', e.target.value)}
-                                          onKeyDown={e => handleMedicineKeyDown(e, i, 'freq-a')}
-                                          className="h-10 w-full text-center text-sm font-bold border-purple-200 bg-purple-50/30 rounded-lg placeholder:text-purple-200" 
-                                        />
-                                        <span className="text-purple-300 font-bold">-</span>
-                                        <Input 
-                                          placeholder="0" 
-                                          value={(med.frequency || '0-0-0').split('-')[2] || '0'} 
-                                          onChange={e => updateFrequency(i, 'night', e.target.value)}
-                                          onKeyDown={e => handleMedicineKeyDown(e, i, 'freq-n')}
-                                          className="h-10 w-full text-center text-sm font-bold border-purple-200 bg-purple-50/30 rounded-lg placeholder:text-purple-200" 
-                                        />
-                                      </div>
+                                      <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Frequency</p>
+                                      <Input 
+                                        list="freq-suggestions"
+                                        placeholder="1-0-1" 
+                                        value={med.frequency} 
+                                        onChange={e => updateMedicine(i, 'frequency', e.target.value)} 
+                                        onKeyDown={e => handleMedicineKeyDown(e, i, 'frequency')} 
+                                        className="h-10 text-sm font-bold border-purple-200 bg-purple-50/30 rounded-lg placeholder:text-purple-200" 
+                                      />
                                     </div>
                                     <div className="space-y-1 text-emerald-600">
                                       <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Frequency Notes</p>
@@ -1108,6 +1079,11 @@ export default function DoctorConsultation() {
           </div>
         </DialogContent>
       </Dialog>
+      <datalist id="freq-suggestions">
+        {COMMON_FREQUENCIES.map(freq => (
+          <option key={freq} value={freq} />
+        ))}
+      </datalist>
     </div>
   );
 }
