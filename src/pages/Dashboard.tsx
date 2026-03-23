@@ -67,31 +67,31 @@ export default function Dashboard() {
     <div className="p-6 max-w-5xl mx-auto space-y-10 font-jakarta-sans pb-20">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h1 className="text-4xl font-black tracking-tight text-slate-900">
+          <h1 className="text-4xl font-black tracking-tight text-foreground">
             Welcome, <span className="text-blue-600">{(profile?.full_name ?? 'Doctor')}</span>
           </h1>
-          <p className="text-slate-500 font-medium mt-1 text-lg">
+          <p className="text-muted-foreground font-medium mt-1 text-lg">
             {roles.map(r => r.charAt(0).toUpperCase() + r.slice(1)).join(' & ')} Overview
           </p>
         </div>
-        <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-full shadow-sm border border-slate-100">
+        <div className="flex items-center gap-2 bg-card px-4 py-2 rounded-full shadow-sm border border-border">
           <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Clinic Live</span>
+          <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Clinic Live</span>
         </div>
       </div>
 
       {/* Quick Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
-          { label: "Today's Visits", val: stats.today, icon: CalendarDays, color: 'text-blue-600', bg: 'bg-blue-50' },
-          { label: "Completed", val: stats.completed, icon: UserCheck, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-          { label: "Total Patients", val: stats.total, icon: Activity, color: 'text-purple-600', bg: 'bg-purple-50' }
+          { label: "Today's Visits", val: stats.today, icon: CalendarDays, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-500/10' },
+          { label: "Completed", val: stats.completed, icon: UserCheck, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-500/10' },
+          { label: "Total Patients", val: stats.total, icon: Activity, color: 'text-purple-600', bg: 'bg-purple-50 dark:bg-purple-500/10' }
         ].map(s => (
-          <Card key={s.label} className="border-none shadow-sm overflow-hidden group">
+          <Card key={s.label} className="border-none shadow-sm overflow-hidden group bg-card">
             <CardContent className="p-6 flex items-center justify-between">
               <div>
-                <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">{s.label}</p>
-                <p className="text-3xl font-black text-slate-900 group-hover:scale-110 transition-transform origin-left">{s.val}</p>
+                <p className="text-[11px] font-black text-muted-foreground uppercase tracking-widest mb-1">{s.label}</p>
+                <p className="text-3xl font-black text-foreground group-hover:scale-110 transition-transform origin-left">{s.val}</p>
               </div>
               <div className={cn("p-3 rounded-2xl transition-all group-hover:rotate-12", s.bg)}>
                 <s.icon className={cn("w-6 h-6", s.color)} />
@@ -112,16 +112,16 @@ export default function Dashboard() {
             <button
               key={m.path}
               onClick={() => navigate(m.path)}
-              className="group relative flex flex-col p-6 bg-white rounded-[2rem] border border-slate-100 hover:border-blue-200 transition-all text-left shadow-sm hover:shadow-xl hover:-translate-y-2 overflow-hidden"
+              className="group relative flex flex-col p-6 bg-card rounded-[2rem] border border-border hover:border-blue-500/50 transition-all text-left shadow-sm hover:shadow-xl hover:-translate-y-2 overflow-hidden"
             >
               <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center mb-6 bg-gradient-to-br shadow-lg group-hover:scale-110 transition-transform", m.color)}>
                 <div className="text-white">{m.icon}</div>
               </div>
               <div className="space-y-1">
-                <h3 className="font-heading font-black text-lg text-slate-900 group-hover:text-blue-600 transition-colors">{m.label}</h3>
-                <p className="text-xs font-medium text-slate-400 line-clamp-2">{m.desc}</p>
+                <h3 className="font-heading font-black text-lg text-foreground group-hover:text-blue-600 transition-colors">{m.label}</h3>
+                <p className="text-xs font-medium text-muted-foreground line-clamp-2">{m.desc}</p>
               </div>
-              <div className="absolute top-4 right-4 text-slate-200 group-hover:text-blue-100 transition-colors">
+              <div className="absolute top-4 right-4 text-slate-200 dark:text-slate-800 group-hover:text-blue-100 dark:group-hover:text-blue-900 transition-colors">
                  <Activity className="w-12 h-12 opacity-20" />
               </div>
             </button>

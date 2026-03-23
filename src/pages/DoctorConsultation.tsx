@@ -504,7 +504,7 @@ export default function DoctorConsultation() {
 
       {/* Consultation Details (Main content) */}
       <div className={cn(
-        "flex-1 overflow-auto bg-slate-50/30 h-full",
+        "flex-1 overflow-auto bg-muted/30 h-full",
         !selectedVisit ? "hidden md:block" : "block"
       )}>
         {!selectedVisit ? (
@@ -518,7 +518,7 @@ export default function DoctorConsultation() {
         ) : (
           <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-6 animate-slide-in pb-[40vh] font-jakarta-sans">
             {/* Mobile-only Header with Back Button */}
-            <div className="md:hidden flex items-center justify-between mb-4 bg-white/80 backdrop-blur sticky top-[-1rem] z-20 py-2 -mx-4 px-4 border-b border-border shadow-sm">
+            <div className="md:hidden flex items-center justify-between mb-4 bg-background/80 backdrop-blur sticky top-[-1rem] z-20 py-2 -mx-4 px-4 border-b border-border shadow-sm">
               <div className="flex items-center gap-3">
                 <Button variant="ghost" size="icon" onClick={() => {
                   localStorage.removeItem('active_consultation_id');
@@ -536,14 +536,14 @@ export default function DoctorConsultation() {
               </Badge>
             </div>
             {/* Patient Info */}
-            <Card className="border-none shadow-sm bg-white">
+            <Card className="border-none shadow-sm bg-card">
               <CardHeader className="pb-3 px-6">
                 <CardTitle className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-50 rounded-lg">
+                    <div className="p-2 bg-blue-50 dark:bg-blue-500/10 rounded-lg">
                       <User className="w-5 h-5 text-blue-600" />
                     </div>
-                    <span className="text-xl font-extrabold tracking-tight text-slate-800">
+                    <span className="text-xl font-extrabold tracking-tight text-foreground">
                       {(patient?.title ? patient.title + ' ' : '') + patient?.name}
                     </span>
                   </div>
@@ -567,17 +567,17 @@ export default function DoctorConsultation() {
               </CardHeader>
               <CardContent className="px-6 pb-6">
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 text-sm">
-                  <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100">
-                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Age / Sex</p>
-                    <p className="text-base font-bold text-slate-700">{formatAge(patient?.age)}/{patient?.sex?.charAt(0) ?? '—'}</p>
+                  <div className="bg-muted/50 p-3 rounded-xl border border-border">
+                    <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Age / Sex</p>
+                    <p className="text-base font-bold text-foreground">{formatAge(patient?.age)}/{patient?.sex?.charAt(0) ?? '—'}</p>
                   </div>
-                  <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100">
-                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Phone</p>
-                    <p className="text-base font-bold text-slate-700">{patient?.phone}</p>
+                  <div className="bg-muted/50 p-3 rounded-xl border border-border">
+                    <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Phone</p>
+                    <p className="text-base font-bold text-foreground">{patient?.phone}</p>
                   </div>
-                  <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100 col-span-2">
-                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Address</p>
-                    <p className="text-base font-bold text-slate-700 truncate">{patient?.address || '—'}</p>
+                  <div className="bg-muted/50 p-3 rounded-xl border border-border col-span-2">
+                    <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Address</p>
+                    <p className="text-base font-bold text-foreground truncate">{patient?.address || '—'}</p>
                   </div>
                 </div>
 
@@ -585,7 +585,7 @@ export default function DoctorConsultation() {
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
                       <Activity className="w-4 h-4 text-blue-500" />
-                      <h4 className="text-[12px] font-extrabold text-slate-600 uppercase tracking-widest">Clinical Vitals</h4>
+                      <h4 className="text-[12px] font-extrabold text-muted-foreground uppercase tracking-widest">Clinical Vitals</h4>
                     </div>
                     <Button 
                       variant="ghost" 
@@ -599,19 +599,19 @@ export default function DoctorConsultation() {
                   </div>
                   <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
                     {[
-                      { label: 'Weight', value: selectedVisit.weight, unit: 'kg', icon: Scale, color: 'text-orange-500', bg: 'bg-orange-50' },
-                      { label: 'BP', value: selectedVisit.blood_pressure, unit: 'mmHg', icon: Heart, color: 'text-red-500', bg: 'bg-red-50' },
-                      { label: 'Pulse', value: selectedVisit.pulse_rate, unit: 'bpm', icon: Activity, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-                      { label: 'SpO2', value: selectedVisit.spo2, unit: '%', icon: Wind, color: 'text-sky-500', bg: 'bg-sky-50' },
-                      { label: 'Temp', value: selectedVisit.temperature, unit: '°F', icon: Thermometer, color: 'text-amber-500', bg: 'bg-amber-50' },
-                      { label: 'CBG', value: selectedVisit.cbg, unit: 'mg/dL', icon: Droplet, color: 'text-rose-500', bg: 'bg-rose-50' },
+                      { label: 'Weight', value: selectedVisit.weight, unit: 'kg', icon: Scale, color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-500/10' },
+                      { label: 'BP', value: selectedVisit.blood_pressure, unit: 'mmHg', icon: Heart, color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-500/10' },
+                      { label: 'Pulse', value: selectedVisit.pulse_rate, unit: 'bpm', icon: Activity, color: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-500/10' },
+                      { label: 'SpO2', value: selectedVisit.spo2, unit: '%', icon: Wind, color: 'text-sky-500', bg: 'bg-sky-50 dark:bg-sky-500/10' },
+                      { label: 'Temp', value: selectedVisit.temperature, unit: '°F', icon: Thermometer, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-500/10' },
+                      { label: 'CBG', value: selectedVisit.cbg, unit: 'mg/dL', icon: Droplet, color: 'text-rose-500', bg: 'bg-rose-50 dark:bg-rose-500/10' },
                     ].map(v => (
-                      <div key={v.label} className="text-center p-3 rounded-2xl bg-white border border-slate-100 shadow-sm hover:border-blue-200 transition-all group flex flex-col items-center gap-1.5">
+                      <div key={v.label} className="text-center p-3 rounded-2xl bg-card border border-border shadow-sm hover:border-blue-500/50 transition-all group flex flex-col items-center gap-1.5">
                         <div className={cn("p-2 rounded-xl transition-colors", v.bg)}>
                           <v.icon className={cn("w-4 h-4", v.color)} />
                         </div>
-                        <p className="text-[10px] font-extrabold text-slate-400 group-hover:text-blue-400 transition-colors uppercase">{v.label}</p>
-                        <p className="font-extrabold text-sm text-slate-700 leading-none">{v.value ?? '—'}<span className="text-[10px] font-medium ml-0.5 opacity-60 font-sans">{v.value ? ` ${v.unit}` : ''}</span></p>
+                        <p className="text-[10px] font-extrabold text-muted-foreground group-hover:text-blue-500 transition-colors uppercase">{v.label}</p>
+                        <p className="font-extrabold text-sm text-foreground leading-none">{v.value ?? '—'}<span className="text-[10px] font-medium ml-0.5 opacity-60 font-sans">{v.value ? ` ${v.unit}` : ''}</span></p>
                       </div>
                     ))}
                   </div>
@@ -626,18 +626,18 @@ export default function DoctorConsultation() {
                 <CardContent>
                   <div className="space-y-3 max-h-40 overflow-auto">
                     {history.map(h => (
-                      <div key={h.id} className="text-sm p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between group">
+                      <div key={h.id} className="text-sm p-3 rounded-xl bg-muted border border-border flex items-center justify-between group">
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                             <span className="font-bold text-slate-700">{new Date(h.created_at).toLocaleDateString()}</span>
-                             <span className="text-[10px] font-bold text-slate-400">TOKEN #{h.token_number}</span>
+                             <span className="font-bold text-foreground">{new Date(h.created_at).toLocaleDateString()}</span>
+                             <span className="text-[10px] font-bold text-muted-foreground">TOKEN #{h.token_number}</span>
                           </div>
-                          {h.diagnosis && <p className="text-xs text-slate-500 mt-0.5 truncate italic">Dx: {h.diagnosis}</p>}
+                          {h.diagnosis && <p className="text-xs text-muted-foreground mt-0.5 truncate italic">Dx: {h.diagnosis}</p>}
                         </div>
                         <Button 
                           size="sm" 
                           variant="ghost" 
-                          className="h-8 w-8 p-0 text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors shrink-0"
+                          className="h-8 w-8 p-0 text-muted-foreground hover:text-blue-600 hover:bg-blue-500/10 transition-colors shrink-0"
                           onClick={() => setViewingHistoryRx(h)}
                         >
                           <Eye className="w-4 h-4" />
@@ -650,22 +650,22 @@ export default function DoctorConsultation() {
             )}
 
             {/* Prescription */}
-            <Card className="border-none shadow-sm overflow-hidden bg-white">
-              <CardHeader className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 pb-4 px-6 bg-slate-50/50">
+            <Card className="border-none shadow-sm overflow-hidden bg-card">
+              <CardHeader className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 pb-4 px-6 bg-muted/50">
                 <div className="flex items-center gap-2">
-                  <div className="p-1.5 bg-blue-100 rounded-md">
+                  <div className="p-1.5 bg-blue-500/10 rounded-md">
                     <ClipboardList className="w-4 h-4 text-blue-600" />
                   </div>
-                  <CardTitle className="text-lg font-bold text-slate-800">Prescription Details</CardTitle>
+                  <CardTitle className="text-lg font-bold text-foreground">Prescription Details</CardTitle>
                 </div>
                 
                 <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg shrink-0">
+                  <div className="flex items-center gap-1 bg-muted p-1 rounded-lg shrink-0 border border-border">
                     <Button
                       variant={!isWritingMode ? "secondary" : "ghost"}
                       size="sm"
                       onClick={() => setIsWritingMode(false)}
-                      className={cn("h-8 px-3 text-[11px] font-bold", !isWritingMode && "bg-white shadow-sm")}
+                      className={cn("h-8 px-3 text-[11px] font-bold", !isWritingMode && "bg-background shadow-sm")}
                     >
                       Typing Mode
                     </Button>
@@ -673,7 +673,7 @@ export default function DoctorConsultation() {
                       variant={isWritingMode ? "secondary" : "ghost"}
                       size="sm"
                       onClick={() => setIsWritingMode(true)}
-                      className={cn("h-8 px-3 text-[11px] font-bold", isWritingMode && "bg-white shadow-sm")}
+                      className={cn("h-8 px-3 text-[11px] font-bold", isWritingMode && "bg-background shadow-sm")}
                     >
                       Writing Mode
                     </Button>
@@ -706,7 +706,7 @@ export default function DoctorConsultation() {
                 {isWritingMode && (
                     <div className={cn(
                         "flex flex-col items-center justify-center p-8 rounded-[2rem] border-2 border-dashed transition-all",
-                        prescriptionImage ? "border-emerald-200 bg-emerald-50/30" : "border-slate-200 bg-slate-50/50"
+                        prescriptionImage ? "border-emerald-500/30 bg-emerald-500/5" : "border-border bg-muted/50"
                     )}>
                         {prescriptionImage ? (
                             <div className="relative group w-full max-w-md aspect-[1/1.414] bg-white rounded-2xl shadow-xl border overflow-hidden">
@@ -722,12 +722,12 @@ export default function DoctorConsultation() {
                             </div>
                         ) : (
                             <div className="text-center space-y-4">
-                                <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto text-blue-600">
+                                <div className="w-20 h-20 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto text-blue-600">
                                     <PenTool className="w-10 h-10" />
                                 </div>
-                                <div>
-                                    <p className="text-base font-black text-slate-800">No Pen Content Yet</p>
-                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Tap 'Open Template' above to start writing</p>
+                                <div className="space-y-1">
+                                    <p className="text-base font-black text-foreground">No Pen Content Yet</p>
+                                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Tap 'Open Template' above to start writing</p>
                                 </div>
                             </div>
                         )}
@@ -738,7 +738,7 @@ export default function DoctorConsultation() {
                 {!isWritingMode && (
                   <div className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-500">
                     <div className="space-y-3">
-                      <Label className="text-[12px] font-extrabold text-slate-500 uppercase tracking-widest ml-1">Clinical Notes</Label>
+                      <Label className="text-[12px] font-extrabold text-muted-foreground uppercase tracking-widest ml-1">Clinical Notes</Label>
                       <Textarea 
                         value={clinicalNotes} 
                         onChange={e => {
@@ -746,12 +746,12 @@ export default function DoctorConsultation() {
                           setLastInputWay('typing');
                         }} 
                         placeholder="Enter clinical examination notes, symptoms, etc." 
-                        className="min-h-[120px] text-base font-bold bg-slate-50/50 border-slate-100 focus:bg-white focus:ring-blue-500 transition-all rounded-xl resize-none shadow-inner"
+                        className="min-h-[120px] text-base font-bold bg-muted/50 border-border focus:bg-card focus:ring-blue-500 transition-all rounded-xl resize-none shadow-inner"
                       />
                     </div>
 
                     <div className="space-y-3">
-                      <Label className="text-[12px] font-extrabold text-slate-500 uppercase tracking-widest ml-1">Diagnosis</Label>
+                      <Label className="text-[12px] font-extrabold text-muted-foreground uppercase tracking-widest ml-1">Diagnosis</Label>
                       <Input 
                         value={diagnosis} 
                         onChange={e => {
@@ -759,7 +759,7 @@ export default function DoctorConsultation() {
                           setLastInputWay('typing');
                         }} 
                         placeholder="Enter diagnosis" 
-                        className="h-12 text-base font-bold bg-slate-50/50 border-slate-100 focus:bg-white focus:ring-blue-500 transition-all rounded-xl shadow-inner"
+                        className="h-12 text-base font-bold bg-muted/50 border-border focus:bg-card focus:ring-blue-500 transition-all rounded-xl shadow-inner"
                       />
                     </div>
                   </div>
@@ -769,23 +769,23 @@ export default function DoctorConsultation() {
                   <div className="space-y-6 animate-in fade-in slide-in-from-top-6 duration-700">
                     <div className="space-y-4 pt-2">
                       <div className="flex items-center justify-between ml-1">
-                        <Label className="text-[12px] font-extrabold text-slate-500 uppercase tracking-widest">Medicines</Label>
-                        <Button size="sm" variant="outline" onClick={addMedicine} className="h-8 pr-3 pl-2 text-[11px] font-bold border-blue-100 text-blue-600 hover:bg-blue-50 bg-white rounded-lg">
+                        <Label className="text-[12px] font-extrabold text-muted-foreground uppercase tracking-widest">Medicines</Label>
+                        <Button size="sm" variant="outline" onClick={addMedicine} className="h-8 pr-3 pl-2 text-[11px] font-bold border-blue-500/20 text-blue-600 hover:bg-blue-500/10 bg-card rounded-lg">
                           <Plus className="w-3.5 h-3.5 mr-1" /> Add Medicine
                         </Button>
                       </div>
                       <div className="space-y-3">
                         {medicines.map((med, i) => (
-                          <div key={i} className="medicine-row flex gap-2 items-start bg-slate-50/30 p-3 rounded-2xl border border-slate-100 group relative">
+                          <div key={i} className="medicine-row flex gap-2 items-start bg-muted/30 p-3 rounded-2xl border border-border group relative">
                             <div className="flex flex-col md:flex-row gap-3 flex-1">
                               {/* Type Selector */}
                               <div className="md:w-32 shrink-0">
-                                <p className="text-[9px] font-bold text-slate-400 uppercase ml-1 mb-1">Type</p>
+                                <p className="text-[9px] font-bold text-muted-foreground uppercase ml-1 mb-1">Type</p>
                                 <select 
                                   value={med.type} 
                                   onChange={e => updateMedicine(i, 'type', e.target.value)}
                                   onKeyDown={e => handleMedicineKeyDown(e, i, 'type')}
-                                  className="w-full h-10 text-sm font-bold border border-slate-200 bg-white rounded-lg px-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                                  className="w-full h-10 text-sm font-bold border border-border bg-card rounded-lg px-2 focus:ring-2 focus:ring-blue-500 outline-none text-foreground"
                                 >
                                   <option value="Inj.">Inj.</option>
                                   <option value="Supp.">Supp.</option>
@@ -801,7 +801,7 @@ export default function DoctorConsultation() {
 
                               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 flex-1">
                                 <div className="space-y-1">
-                                  <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">Name</p>
+                                  <p className="text-[9px] font-bold text-muted-foreground uppercase ml-1">Name</p>
                                   <Input 
                                     placeholder="Medicine Name" 
                                     value={med.name} 
@@ -810,48 +810,48 @@ export default function DoctorConsultation() {
                                       setLastInputWay('typing');
                                     }}
                                     onKeyDown={e => handleMedicineKeyDown(e, i, 'name')}
-                                    className="h-10 text-sm font-bold border-slate-200 bg-white rounded-lg" 
+                                    className="h-10 text-sm font-bold border-border bg-card rounded-lg" 
                                   />
                                 </div>
 
                                 {/* Dynamic Fields based on Type */}
                                 {(med.type === 'Inj.' || med.type === 'Supp.') && (
                                   <>
-                                    <div className="space-y-1 text-blue-600">
+                                    <div className="space-y-1 text-blue-600 dark:text-blue-400">
                                       <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Dosage</p>
-                                      <Input placeholder="1 ml" value={med.dosage} onChange={e => updateMedicine(i, 'dosage', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'dosage')} className="h-10 text-sm font-bold border-blue-200 bg-blue-50/30 rounded-lg placeholder:text-blue-200" />
+                                      <Input placeholder="1 ml" value={med.dosage} onChange={e => updateMedicine(i, 'dosage', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'dosage')} className="h-10 text-sm font-bold border-blue-500/20 bg-blue-500/5 rounded-lg placeholder:text-blue-200/50" />
                                     </div>
-                                    <div className="space-y-1 text-blue-600">
+                                    <div className="space-y-1 text-blue-600 dark:text-blue-400">
                                       <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Route</p>
-                                      <Input placeholder="I.M / I.V" value={med.route} onChange={e => updateMedicine(i, 'route', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'route')} className="h-10 text-sm font-bold border-blue-200 bg-blue-50/30 rounded-lg placeholder:text-blue-200" />
+                                      <Input placeholder="I.M / I.V" value={med.route} onChange={e => updateMedicine(i, 'route', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'route')} className="h-10 text-sm font-bold border-blue-500/20 bg-blue-500/5 rounded-lg placeholder:text-blue-200/50" />
                                     </div>
                                     <div className="space-y-1">
-                                      <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">Frequency</p>
+                                      <p className="text-[9px] font-bold text-muted-foreground uppercase ml-1">Frequency</p>
                                       <div className="relative medicine-freq-container">
                                         <Input 
                                           placeholder="Stat / SOS" 
                                           value={med.frequency} 
                                           onChange={e => updateMedicine(i, 'frequency', e.target.value)} 
                                           onKeyDown={e => handleMedicineKeyDown(e, i, 'frequency')} 
-                                          className="h-10 pr-9 text-sm font-bold border-slate-200 bg-white rounded-lg" 
+                                          className="h-10 pr-9 text-sm font-bold border-border bg-card rounded-lg" 
                                         />
                                         <Popover>
                                           <PopoverTrigger asChild>
                                             <Button 
                                               variant="ghost" 
                                               size="icon" 
-                                              className="absolute right-0 top-0 h-10 w-9 hover:bg-slate-100 rounded-r-lg"
+                                              className="absolute right-0 top-0 h-10 w-9 hover:bg-muted rounded-r-lg"
                                               title="Select Frequency"
                                             >
-                                              <ChevronDown className="h-4 w-4 text-slate-400" />
+                                              <ChevronDown className="h-4 w-4 text-muted-foreground" />
                                             </Button>
                                           </PopoverTrigger>
-                                          <PopoverContent className="w-[180px] p-0 shadow-xl border-slate-200" align="end">
-                                            <div className="max-h-60 overflow-auto p-1 bg-white rounded-lg">
+                                          <PopoverContent className="w-[180px] p-0 shadow-xl border-border" align="end">
+                                            <div className="max-h-60 overflow-auto p-1 bg-card rounded-lg">
                                               {COMMON_FREQUENCIES.map(freq => (
                                                 <button
                                                   key={freq}
-                                                  className="w-full text-left px-3 py-2 text-[13px] font-bold hover:bg-blue-50 text-slate-700 rounded-md transition-colors"
+                                                  className="w-full text-left px-3 py-2 text-[13px] font-bold hover:bg-blue-500/10 text-foreground rounded-md transition-colors"
                                                   onClick={() => updateMedicine(i, 'frequency', freq)}
                                                 >
                                                   {freq}
@@ -868,10 +868,10 @@ export default function DoctorConsultation() {
                                 {(med.type === 'Syp.' || med.type === 'Tab.' || med.type === 'Cap.') && (
                                   <>
                                     <div className="space-y-1">
-                                      <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">Dosage</p>
-                                      <Input placeholder="500mg / 5ml" value={med.dosage} onChange={e => updateMedicine(i, 'dosage', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'dosage')} className="h-10 text-sm font-bold border-slate-200 bg-white rounded-lg" />
+                                      <p className="text-[9px] font-bold text-muted-foreground uppercase ml-1">Dosage</p>
+                                      <Input placeholder="500mg / 5ml" value={med.dosage} onChange={e => updateMedicine(i, 'dosage', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'dosage')} className="h-10 text-sm font-bold border-border bg-card rounded-lg" />
                                     </div>
-                                    <div className="space-y-1 text-purple-600">
+                                    <div className="space-y-1 text-purple-600 dark:text-purple-400">
                                       <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Frequency</p>
                                       <div className="relative medicine-freq-container">
                                         <Input 
@@ -879,25 +879,25 @@ export default function DoctorConsultation() {
                                           value={med.frequency} 
                                           onChange={e => updateMedicine(i, 'frequency', e.target.value)} 
                                           onKeyDown={e => handleMedicineKeyDown(e, i, 'frequency')} 
-                                          className="h-10 pr-9 text-sm font-bold border-purple-200 bg-purple-50/30 rounded-lg placeholder:text-purple-200" 
+                                          className="h-10 pr-9 text-sm font-bold border-purple-500/20 bg-purple-500/5 rounded-lg placeholder:text-purple-200/50" 
                                         />
                                         <Popover>
                                           <PopoverTrigger asChild>
                                             <Button 
                                               variant="ghost" 
                                               size="icon" 
-                                              className="absolute right-0 top-0 h-10 w-9 hover:bg-purple-100/50 rounded-r-lg"
+                                              className="absolute right-0 top-0 h-10 w-9 hover:bg-purple-500/10 rounded-r-lg"
                                               title="Select Frequency"
                                             >
-                                              <ChevronDown className="h-4 w-4 text-purple-400" />
+                                              <ChevronDown className="h-4 w-4 text-purple-500" />
                                             </Button>
                                           </PopoverTrigger>
-                                          <PopoverContent className="w-[180px] p-0 shadow-xl border-purple-200" align="end">
-                                            <div className="max-h-60 overflow-auto p-1 bg-white rounded-lg">
+                                          <PopoverContent className="w-[180px] p-0 shadow-xl border-purple-500/20" align="end">
+                                            <div className="max-h-60 overflow-auto p-1 bg-card rounded-lg">
                                               {COMMON_FREQUENCIES.map(freq => (
                                                 <button
                                                   key={freq}
-                                                  className="w-full text-left px-3 py-2 text-[13px] font-bold hover:bg-purple-50 text-slate-700 rounded-md transition-colors"
+                                                  className="w-full text-left px-3 py-2 text-[13px] font-bold hover:bg-purple-500/10 text-foreground rounded-md transition-colors"
                                                   onClick={() => updateMedicine(i, 'frequency', freq)}
                                                 >
                                                   {freq}
@@ -908,37 +908,37 @@ export default function DoctorConsultation() {
                                         </Popover>
                                       </div>
                                     </div>
-                                    <div className="space-y-1 text-emerald-600">
+                                    <div className="space-y-1 text-emerald-600 dark:text-emerald-400">
                                       <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Remarks</p>
-                                      <Input placeholder="After Food / HR (Notes)" value={med.notes} onChange={e => updateMedicine(i, 'notes', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'notes')} className="h-10 text-sm font-bold border-emerald-200 bg-emerald-50/30 rounded-lg placeholder:text-emerald-200" />
+                                      <Input placeholder="After Food / HR (Notes)" value={med.notes} onChange={e => updateMedicine(i, 'notes', e.target.value)} onKeyDown={handleMedicineKeyDown ? (e) => handleMedicineKeyDown(e, i, 'notes') : undefined} className="h-10 text-sm font-bold border-emerald-500/20 bg-emerald-500/5 rounded-lg placeholder:text-emerald-200/50" />
                                     </div>
                                   </>
                                 )}
 
                                 {(med.type === 'Oin.' || med.type === 'cr.') && (
                                   <>
-                                    <div className="space-y-1 text-orange-600">
+                                    <div className="space-y-1 text-orange-600 dark:text-orange-400">
                                       <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Count</p>
-                                      <Input placeholder="1 Tube / 1 Unit" value={med.count} onChange={e => updateMedicine(i, 'count', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'count')} className="h-10 text-sm font-bold border-orange-200 bg-orange-50/30 rounded-lg placeholder:text-orange-200" />
+                                      <Input placeholder="1 Tube / 1 Unit" value={med.count} onChange={e => updateMedicine(i, 'count', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'count')} className="h-10 text-sm font-bold border-orange-500/20 bg-orange-500/5 rounded-lg placeholder:text-orange-200/50" />
                                     </div>
-                                    <div className="space-y-1 text-orange-600">
+                                    <div className="space-y-1 text-orange-600 dark:text-orange-400">
                                       <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Route</p>
-                                      <Input placeholder="External / Local" value={med.route} onChange={e => updateMedicine(i, 'route', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'route')} className="h-10 text-sm font-bold border-orange-200 bg-orange-50/30 rounded-lg placeholder:text-orange-200" />
+                                      <Input placeholder="External / Local" value={med.route} onChange={e => updateMedicine(i, 'route', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'route')} className="h-10 text-sm font-bold border-orange-500/20 bg-orange-500/5 rounded-lg placeholder:text-orange-200/50" />
                                     </div>
                                     <div className="space-y-1">
-                                      <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">Remarks</p>
-                                      <Input placeholder="Apply 2 times" value={med.notes} onChange={e => updateMedicine(i, 'notes', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'notes')} className="h-10 text-sm font-bold border-slate-200 bg-white rounded-lg" />
+                                      <p className="text-[9px] font-bold text-muted-foreground uppercase ml-1">Remarks</p>
+                                      <Input placeholder="Apply 2 times" value={med.notes} onChange={e => updateMedicine(i, 'notes', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'notes')} className="h-10 text-sm font-bold border-border bg-card rounded-lg" />
                                     </div>
                                   </>
                                 )}
 
                                 {med.type === 'drops.' && (
                                   <>
-                                    <div className="space-y-1 text-sky-600">
+                                    <div className="space-y-1 text-sky-600 dark:text-sky-400">
                                       <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Count</p>
-                                      <Input placeholder="1 Bottle / 5ml" value={med.count} onChange={e => updateMedicine(i, 'count', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'count')} className="h-10 text-sm font-bold border-sky-200 bg-sky-50/30 rounded-lg placeholder:text-sky-200" />
+                                      <Input placeholder="1 Bottle / 5ml" value={med.count} onChange={e => updateMedicine(i, 'count', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'count')} className="h-10 text-sm font-bold border-sky-500/20 bg-sky-500/5 rounded-lg placeholder:text-sky-200/50" />
                                     </div>
-                                    <div className="space-y-1 text-sky-600">
+                                    <div className="space-y-1 text-sky-600 dark:text-sky-400">
                                       <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Frequency</p>
                                       <div className="relative medicine-freq-container">
                                         <Input 
@@ -946,25 +946,25 @@ export default function DoctorConsultation() {
                                           value={med.frequency} 
                                           onChange={e => updateMedicine(i, 'frequency', e.target.value)} 
                                           onKeyDown={e => handleMedicineKeyDown(e, i, 'frequency')} 
-                                          className="h-10 pr-9 text-sm font-bold border-sky-200 bg-sky-50/30 rounded-lg placeholder:text-sky-200" 
+                                          className="h-10 pr-9 text-sm font-bold border-sky-500/20 bg-sky-500/5 rounded-lg placeholder:text-sky-200/50" 
                                         />
                                         <Popover>
                                           <PopoverTrigger asChild>
                                             <Button 
                                               variant="ghost" 
                                               size="icon" 
-                                              className="absolute right-0 top-0 h-10 w-9 hover:bg-sky-100/50 rounded-r-lg"
+                                              className="absolute right-0 top-0 h-10 w-9 hover:bg-sky-500/10 rounded-r-lg"
                                               title="Select Frequency"
                                             >
-                                              <ChevronDown className="h-4 w-4 text-sky-400" />
+                                              <ChevronDown className="h-4 w-4 text-sky-500" />
                                             </Button>
                                           </PopoverTrigger>
-                                          <PopoverContent className="w-[180px] p-0 shadow-xl border-sky-200" align="end">
-                                            <div className="max-h-60 overflow-auto p-1 bg-white rounded-lg">
+                                          <PopoverContent className="w-[180px] p-0 shadow-xl border-sky-500/20" align="end">
+                                            <div className="max-h-60 overflow-auto p-1 bg-card rounded-lg">
                                               {COMMON_FREQUENCIES.map(freq => (
                                                 <button
                                                   key={freq}
-                                                  className="w-full text-left px-3 py-2 text-[13px] font-bold hover:bg-sky-50 text-slate-700 rounded-md transition-colors"
+                                                  className="w-full text-left px-3 py-2 text-[13px] font-bold hover:bg-sky-500/10 text-foreground rounded-md transition-colors"
                                                   onClick={() => updateMedicine(i, 'frequency', freq)}
                                                 >
                                                   {freq}
@@ -976,19 +976,19 @@ export default function DoctorConsultation() {
                                       </div>
                                     </div>
                                     <div className="space-y-1">
-                                      <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">Remarks</p>
-                                      <Input placeholder="Eye / Ear / Nose" value={med.notes} onChange={e => updateMedicine(i, 'notes', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'notes')} className="h-10 text-sm font-bold border-slate-200 bg-white rounded-lg" />
+                                      <p className="text-[9px] font-bold text-muted-foreground uppercase ml-1">Remarks</p>
+                                      <Input placeholder="Eye / Ear / Nose" value={med.notes} onChange={e => updateMedicine(i, 'notes', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'notes')} className="h-10 text-sm font-bold border-border bg-card rounded-lg" />
                                     </div>
                                   </>
                                 )}
 
                                 {med.type === 'Sac' && (
                                   <>
-                                    <div className="space-y-1 text-amber-600">
+                                    <div className="space-y-1 text-amber-600 dark:text-amber-400">
                                       <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Count</p>
-                                      <Input placeholder="1 Sachet / 5 Sac" value={med.count} onChange={e => updateMedicine(i, 'count', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'count')} className="h-10 text-sm font-bold border-amber-200 bg-amber-50/30 rounded-lg placeholder:text-amber-200" />
+                                      <Input placeholder="1 Sachet / 5 Sac" value={med.count} onChange={e => updateMedicine(i, 'count', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'count')} className="h-10 text-sm font-bold border-amber-500/20 bg-amber-500/5 rounded-lg placeholder:text-amber-200/50" />
                                     </div>
-                                    <div className="space-y-1 text-amber-600">
+                                    <div className="space-y-1 text-amber-600 dark:text-amber-400">
                                       <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Frequency</p>
                                       <div className="relative medicine-freq-container">
                                         <Input 
@@ -996,25 +996,25 @@ export default function DoctorConsultation() {
                                           value={med.frequency} 
                                           onChange={e => updateMedicine(i, 'frequency', e.target.value)} 
                                           onKeyDown={e => handleMedicineKeyDown(e, i, 'frequency')} 
-                                          className="h-10 pr-9 text-sm font-bold border-amber-200 bg-amber-50/30 rounded-lg placeholder:text-amber-200" 
+                                          className="h-10 pr-9 text-sm font-bold border-amber-500/20 bg-amber-500/5 rounded-lg placeholder:text-amber-200/50" 
                                         />
                                         <Popover>
                                           <PopoverTrigger asChild>
                                             <Button 
                                               variant="ghost" 
                                               size="icon" 
-                                              className="absolute right-0 top-0 h-10 w-9 hover:bg-amber-100/50 rounded-r-lg"
+                                              className="absolute right-0 top-0 h-10 w-9 hover:bg-amber-500/10 rounded-r-lg"
                                               title="Select Frequency"
                                             >
-                                              <ChevronDown className="h-4 w-4 text-amber-400" />
+                                              <ChevronDown className="h-4 w-4 text-amber-500" />
                                             </Button>
                                           </PopoverTrigger>
-                                          <PopoverContent className="w-[180px] p-0 shadow-xl border-amber-200" align="end">
-                                            <div className="max-h-60 overflow-auto p-1 bg-white rounded-lg">
+                                          <PopoverContent className="w-[180px] p-0 shadow-xl border-amber-500/20" align="end">
+                                            <div className="max-h-60 overflow-auto p-1 bg-card rounded-lg">
                                               {COMMON_FREQUENCIES.map(freq => (
                                                 <button
                                                   key={freq}
-                                                  className="w-full text-left px-3 py-2 text-[13px] font-bold hover:bg-amber-50 text-slate-700 rounded-md transition-colors"
+                                                  className="w-full text-left px-3 py-2 text-[13px] font-bold hover:bg-amber-500/10 text-foreground rounded-md transition-colors"
                                                   onClick={() => updateMedicine(i, 'frequency', freq)}
                                                 >
                                                   {freq}
@@ -1026,15 +1026,15 @@ export default function DoctorConsultation() {
                                       </div>
                                     </div>
                                     <div className="space-y-1 invisible">
-                                      <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">—</p>
-                                      <Input disabled className="h-10 bg-slate-100" />
+                                      <p className="text-[9px] font-bold text-muted-foreground uppercase ml-1">—</p>
+                                      <Input disabled className="h-10 bg-muted" />
                                     </div>
                                   </>
                                 )}
 
                               </div>
                             </div>
-                            <Button size="icon" variant="ghost" onClick={() => removeMedicine(i)} className="text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg h-10 w-10 mt-1 transition-colors self-end md:self-center">
+                            <Button size="icon" variant="ghost" onClick={() => removeMedicine(i)} className="text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-lg h-10 w-10 mt-1 transition-colors self-end md:self-center">
                               <Trash2 className="w-4 h-4" />
                             </Button>
                           </div>
@@ -1043,12 +1043,12 @@ export default function DoctorConsultation() {
                     </div>
 
                     <div className="space-y-3 pt-2">
-                      <Label className="text-[12px] font-extrabold text-slate-500 uppercase tracking-widest ml-1">Advice</Label>
+                      <Label className="text-[12px] font-extrabold text-muted-foreground uppercase tracking-widest ml-1">Advice</Label>
                       <Input 
                         value={advice} 
                         onChange={e => setAdvice(e.target.value)} 
                         placeholder="Drink plenty of water..." 
-                        className="h-12 text-base font-bold bg-slate-50/50 border-slate-100 focus:bg-white focus:ring-blue-500 transition-all rounded-xl shadow-inner"
+                        className="h-12 text-base font-bold bg-muted/50 border-border focus:bg-card focus:ring-blue-500 transition-all rounded-xl shadow-inner"
                       />
                     </div>
                   </div>
@@ -1088,8 +1088,8 @@ export default function DoctorConsultation() {
 
       {/* Preview Dialog */}
       <Dialog open={showPreview} onOpenChange={setShowPreview}>
-        <DialogContent className="max-w-[900px] w-[95vw] p-0 overflow-hidden bg-white">
-          <DialogHeader className="bg-white p-4 border-b relative">
+        <DialogContent className="max-w-[900px] w-[95vw] p-0 overflow-hidden bg-background">
+          <DialogHeader className="bg-muted/50 p-4 border-b relative">
             <div className="flex items-center justify-between w-full">
               <Button variant="outline" size="sm" onClick={() => printPrescription('#consultation-print-preview')} className="gap-2 z-10">
                 <Printer className="w-4 h-4" /> Print
@@ -1100,7 +1100,7 @@ export default function DoctorConsultation() {
               <div className="w-20" /> {/* Spacer for symmetry with print button */}
             </div>
           </DialogHeader>
-          <div className="p-4 md:p-8 overflow-auto max-h-[85vh] flex justify-center bg-white" id="consultation-print-preview">
+          <div className="p-4 md:p-8 overflow-auto max-h-[85vh] flex justify-center bg-muted/30" id="consultation-print-preview">
             <PrescriptionTemplate
               patient={patient}
               visit={selectedVisit}
@@ -1118,8 +1118,8 @@ export default function DoctorConsultation() {
 
       {/* History Preview Dialog */}
       <Dialog open={!!viewingHistoryRx} onOpenChange={open => !open && setViewingHistoryRx(null)}>
-        <DialogContent className="max-w-[800px] p-0 overflow-hidden bg-slate-100">
-          <div className="bg-white p-4 border-b relative sticky top-0 z-10">
+        <DialogContent className="max-w-[800px] p-0 overflow-hidden bg-background">
+          <div className="bg-muted/50 p-4 border-b relative sticky top-0 z-10">
             <div className="flex items-center justify-between w-full">
               <Button size="sm" onClick={() => printPrescription('#history-print-preview')} className="gap-2 z-10">
                 <Printer className="w-4 h-4" /> Print
@@ -1130,7 +1130,7 @@ export default function DoctorConsultation() {
               <div className="w-20" /> {/* Spacer */}
             </div>
           </div>
-          <div className="p-4 md:p-8 overflow-auto max-h-[75vh] flex justify-center bg-white" id="history-print-preview">
+          <div className="p-4 md:p-8 overflow-auto max-h-[75vh] flex justify-center bg-muted/30" id="history-print-preview">
             {viewingHistoryRx && (() => {
               const rx = viewingHistoryRx.prescriptions?.[0];
               const isWritingMode = rx?.is_writing_mode ?? (!!rx?.advice_image && (rx.advice_image.startsWith('data:image') || rx.advice_image.startsWith('[')));

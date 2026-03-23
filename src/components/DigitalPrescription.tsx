@@ -366,17 +366,27 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
     };
 
     const handleClear = () => {
-        const updatedPages = [...pages];
-        updatedPages[currentPageIndex] = [];
-        setPages(updatedPages);
+        // Use a functional update to ensure we have the latest state and avoid closure issues
+        setPages(prevPages => {
+            const updated = [...prevPages];
+            updated[currentPageIndex] = [];
+            
+            // Sync history
+            setHistory(prevHistory => {
+                const newHistory = prevHistory.slice(0, historyStep + 1);
+                newHistory.push(updated);
+                setHistoryStep(newHistory.length - 1);
+                return newHistory;
+            });
 
-        const newHistory = history.slice(0, historyStep + 1);
-        newHistory.push(updatedPages);
-        setHistory(newHistory);
-        setHistoryStep(newHistory.length - 1);
+            return updated;
+        });
 
-        redrawStatic([]); // Manual redraw for clear
-        isDirtyRef.current = true;
+        // Use requestAnimationFrame to ensure the state update has propagated if needed
+        requestAnimationFrame(() => {
+            redrawStatic([]);
+            isDirtyRef.current = true;
+        });
     };
 
     // ── PAGE MANAGEMENT

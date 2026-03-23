@@ -188,59 +188,6 @@ function PageOne({ patient, visit, today, time, clinicalNotes, diagnosis, medici
         >
             <div className="margin-line margin-line-left" />
             <div className="margin-line margin-line-right" />
-            <style>{`
-                @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-                
-                #prescription-template * { box-sizing: border-box; }
-                @media print {
-                    @page { margin: 0; size: A4; }
-                    body { margin: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-                    #rx-inner { 
-                        position: relative !important;
-                        font-size: 3.8mm !important; 
-                        background: white !important; 
-                        background-color: #ffffff !important; 
-                        -webkit-print-color-adjust: exact !important; 
-                        print-color-adjust: exact !important;
-                        min-height: 290mm !important;
-                        height: auto !important;
-                        width: 100% !important;
-                        page-break-inside: avoid !important;
-                        box-sizing: border-box !important;
-                    }
-                    .single-page-prescription { 
-                        position: relative !important;
-                        background: white !important; 
-                        background-color: #ffffff !important; 
-                        -webkit-print-color-adjust: exact !important; 
-                        print-color-adjust: exact !important;
-                        height: 290mm !important; 
-                        width: 210mm !important; 
-                        margin: 0 auto !important;
-                        border: none !important;
-                        box-shadow: none !important;
-                        page-break-after: auto !important;
-                        page-break-inside: avoid !important;
-                        overflow: hidden !important;
-                        display: flex !important;
-                        flex-direction: column !important;
-                        box-sizing: border-box !important;
-                    }
-                    .no-print { display: none !important; }
-                }
-
-                .margin-line {
-                    position: absolute;
-                    top: 0;
-                    bottom: 0;
-                    width: 1px;
-                    background-color: #cbd5e1;
-                    opacity: 0.8;
-                    z-index: 10;
-                }
-                .margin-line-left { left: 0em; }
-                .margin-line-right { right: 0em; }
-            `}</style>
 
             {/* ── HEADER ─────────────────────────────────────── */}
             <div style={{

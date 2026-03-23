@@ -233,7 +233,7 @@ export default function NurseEntry() {
   if (step === 'done') {
     return (
       <div className="p-6 flex items-center justify-center min-h-[80vh]">
-        <Card className="w-full max-w-md text-center animate-fade-in shadow-2xl border-primary/20 bg-white/80 backdrop-blur-sm">
+        <Card className="w-full max-w-md text-center animate-fade-in shadow-2xl border-primary/20 bg-card/80 backdrop-blur-sm">
           <CardContent className="pt-10 pb-10 space-y-6">
             <div className="relative inline-block">
                 <CheckCircle className="w-20 h-20 text-success mx-auto drop-shadow-lg" />
@@ -241,12 +241,12 @@ export default function NurseEntry() {
             </div>
             
             <div className="space-y-2">
-                <h2 className="text-3xl font-heading font-bold text-slate-800">Registration Successful!</h2>
+                <h2 className="text-3xl font-heading font-bold text-foreground">Registration Successful!</h2>
                 <p className="text-muted-foreground font-medium">{patient.title} {patient.name} </p>
             </div>
 
-            <div className="py-6 bg-slate-50 rounded-2xl border border-slate-100 shadow-inner">
-                <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Queue Ticket</div>
+            <div className="py-6 bg-muted rounded-2xl border border-border shadow-inner">
+                <div className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Queue Ticket</div>
                 <div className="text-7xl font-heading font-bold text-primary drop-shadow-sm">#{tokenNumber}</div>
             </div>
             
@@ -276,30 +276,30 @@ export default function NurseEntry() {
                     <CardHeader className="bg-primary/5 py-8 border-b border-primary/10">
                         <div className="text-center space-y-2">
                             <CardDescription className="text-primary font-bold uppercase tracking-widest text-xs">Verify Patient Information</CardDescription>
-                            <CardTitle className="text-3xl font-heading font-black text-slate-800">Is this the correct patient?</CardTitle>
+                            <CardTitle className="text-3xl font-heading font-black text-foreground">Is this the correct patient?</CardTitle>
                         </div>
                     </CardHeader>
                     <CardContent className="pt-10 pb-10 space-y-8 px-6 md:px-10">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6 md:gap-y-8">
                             <div className="space-y-1">
-                                <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Full Name</Label>
-                                <div className="text-xl font-bold text-slate-800">{selectedPatientFull.title} {selectedPatientFull.name}</div>
+                                <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Full Name</Label>
+                                <div className="text-xl font-bold text-foreground">{selectedPatientFull.title} {selectedPatientFull.name}</div>
                             </div>
                             <div className="space-y-1">
-                                <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Registration ID</Label>
+                                <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Registration ID</Label>
                                 <div className="text-xl font-mono font-bold text-primary">{selectedPatientFull.registration_id || 'N/A'}</div>
                             </div>
                             <div className="space-y-1">
-                                <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Age / Gender</Label>
-                                <div className="text-xl font-bold text-slate-800">{formatAge(selectedPatientFull.age)} / {selectedPatientFull.sex}</div>
+                                <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Age / Gender</Label>
+                                <div className="text-xl font-bold text-foreground">{formatAge(selectedPatientFull.age)} / {selectedPatientFull.sex}</div>
                             </div>
                             <div className="space-y-1">
-                                <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Phone Number</Label>
-                                <div className="text-xl font-bold text-slate-800">{selectedPatientFull.phone || '—'}</div>
+                                <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Phone Number</Label>
+                                <div className="text-xl font-bold text-foreground">{selectedPatientFull.phone || '—'}</div>
                             </div>
                             <div className="md:col-span-2 space-y-1">
-                                <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Full Address</Label>
-                                <div className="text-lg md:text-xl font-medium text-slate-600 leading-relaxed italic bg-slate-50 p-4 md:p-6 rounded-xl border border-dashed border-slate-200">
+                                <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Full Address</Label>
+                                <div className="text-lg md:text-xl font-medium text-foreground leading-relaxed italic bg-muted p-4 md:p-6 rounded-xl border border-dashed border-border">
                                     "{selectedPatientFull.address || 'No address on record'}"
                                 </div>
                             </div>
@@ -329,7 +329,7 @@ export default function NurseEntry() {
                                 <div className="relative flex-1 w-full">
                                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                                     <Input
-                                        className="h-14 pl-12 text-lg border-slate-200 focus:border-primary focus:ring-primary/20 transition-all rounded-xl shadow-sm"
+                                        className="h-14 pl-12 text-lg border-border focus:border-primary focus:ring-primary/20 transition-all rounded-xl shadow-sm bg-card"
                                         placeholder="Search by Name, Phone, or Reg ID..."
                                         value={searchQuery}
                                         onFocus={() => setShowSearch(true)}
@@ -339,7 +339,7 @@ export default function NurseEntry() {
                                         }}
                                     />
                                     {showSearch && searchQuery && (
-                                        <div className="absolute z-50 top-full left-0 right-0 mt-3 bg-white border border-slate-100 rounded-2xl shadow-2xl overflow-hidden max-h-[400px] overflow-y-auto animate-in fade-in zoom-in-95 duration-200">
+                                        <div className="absolute z-50 top-full left-0 right-0 mt-3 bg-card border border-border rounded-2xl shadow-2xl overflow-hidden max-h-[400px] overflow-y-auto animate-in fade-in zoom-in-95 duration-200">
                                             <div className="p-2 space-y-1">
                                                 {searchResults.map(p => (
                                                     <button
@@ -427,16 +427,16 @@ export default function NurseEntry() {
                 </div>
 
                 {/* Registration Form */}
-                <Card className="border-slate-100 shadow-lg animate-in slide-in-from-bottom-4 duration-500 overflow-hidden">
-                    <CardHeader className="bg-slate-50/50 border-b border-slate-100 py-6">
+                <Card className="border-border shadow-lg animate-in slide-in-from-bottom-4 duration-500 overflow-hidden bg-card">
+                    <CardHeader className="bg-muted/50 border-b border-border py-6">
                         <div className="flex items-center justify-between">
                             <div>
-                                <CardTitle className="text-xl font-heading font-bold text-slate-800">Patient Details</CardTitle>
+                                <CardTitle className="text-xl font-heading font-bold text-foreground">Patient Details</CardTitle>
                                 <CardDescription className="font-medium">Complete information for the new registration</CardDescription>
                             </div>
                             <div className="hidden sm:block">
-                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 text-right">System ID</div>
-                                <div className="text-xs font-mono font-bold bg-white py-1 px-3 rounded-lg border border-slate-200 text-slate-400">
+                                <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1 text-right">System ID</div>
+                                <div className="text-xs font-mono font-bold bg-background py-1 px-3 rounded-lg border border-border text-muted-foreground">
                                     PENDING GENERATION
                                 </div>
                             </div>
@@ -574,12 +574,12 @@ export default function NurseEntry() {
         )}
 
         {step === 'vitals' && (
-          <Card className="animate-fade-in shadow-2xl border-primary/20 max-w-4xl mx-auto overflow-hidden">
+          <Card className="animate-fade-in shadow-2xl border-primary/20 max-w-4xl mx-auto overflow-hidden bg-card">
             <CardHeader className="bg-primary/5 py-8 border-b border-primary/10">
                 <div className="flex items-center justify-between">
                     <div className="space-y-1">
                         <CardDescription className="text-primary font-bold uppercase tracking-widest text-[10px]">Vitals Pre-Consultation</CardDescription>
-                        <CardTitle className="text-2xl font-heading font-black text-slate-800">Recording Vitals: {patient.title} {patient.name}</CardTitle>
+                        <CardTitle className="text-2xl font-heading font-black text-foreground">Recording Vitals: {patient.title} {patient.name}</CardTitle>
                     </div>
                 </div>
             </CardHeader>

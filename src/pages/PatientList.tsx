@@ -119,14 +119,14 @@ export default function PatientList() {
 
         <div className="grid gap-3">
         {patients.map(p => (
-          <Card key={p.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => viewPatient(p)}>
+          <Card key={p.id} className="cursor-pointer hover:shadow-md transition-shadow bg-card border-border" onClick={() => viewPatient(p)}>
             <CardContent className="py-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-slate-100 rounded-full">
-                  <User className="w-5 h-5 text-slate-500" />
+                <div className="p-2 bg-muted rounded-full">
+                  <User className="w-5 h-5 text-muted-foreground" />
                 </div>
                 <div>
-                  <div className="font-heading font-bold text-slate-800 flex items-center gap-2">
+                  <div className="font-heading font-bold text-foreground flex items-center gap-2">
                     {p.title} {p.name}
                     {p.registration_id && (
                         <span className="text-[10px] items-center bg-primary/10 text-primary px-2 py-0.5 rounded-full uppercase tracking-widest font-black">
@@ -134,7 +134,7 @@ export default function PatientList() {
                         </span>
                     )}
                   </div>
-                  <div className="text-sm text-slate-500 font-medium">
+                  <div className="text-sm text-muted-foreground font-medium">
                     {p.phone} · {formatAge(p.age)} · {p.sex}
                   </div>
                 </div>
@@ -296,10 +296,10 @@ export default function PatientList() {
 
       {/* Prescription Preview Dialog */}
       <Dialog open={!!viewingRx} onOpenChange={open => !open && setViewingRx(null)}>
-        <DialogContent className="max-w-[800px] p-0 overflow-hidden bg-slate-100">
-          <div className="bg-white p-4 border-b flex items-center justify-between sticky top-0 z-10">
-            <h3 className="font-bold">Prescription History</h3>
-            <Button size="sm" onClick={() => printPrescription()} className="gap-2">
+        <DialogContent className="max-w-[800px] p-0 overflow-hidden bg-muted">
+          <div className="bg-card p-4 border-b border-border flex items-center justify-between sticky top-0 z-10">
+            <h3 className="font-bold text-foreground">Prescription History</h3>
+            <Button size="sm" onClick={() => printPrescription('.print-container')} className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
               <Printer className="w-4 h-4" /> Print
             </Button>
           </div>
@@ -308,16 +308,18 @@ export default function PatientList() {
               const rx = viewingRx.prescriptions?.[0];
               const isWritingMode = rx?.is_writing_mode ?? (!!rx?.advice_image && (rx.advice_image.startsWith('data:image') || rx.advice_image.startsWith('[')));
               return (
-                <PrescriptionTemplate
-                  patient={selectedPatient}
-                  visit={viewingRx}
-                  handwrittenImage={rx?.advice_image}
-                  clinicalNotes={rx?.clinical_notes}
-                  diagnosis={rx?.diagnosis || viewingRx.diagnosis}
-                  medicines={rx?.medicines || []}
-                  advice={!isWritingMode ? rx?.advice_image : null}
-                  isWritingMode={isWritingMode}
-                />
+                <div className="print-container">
+                  <PrescriptionTemplate
+                    patient={selectedPatient}
+                    visit={viewingRx}
+                    handwrittenImage={rx?.advice_image}
+                    clinicalNotes={rx?.clinical_notes}
+                    diagnosis={rx?.diagnosis || viewingRx.diagnosis}
+                    medicines={rx?.medicines || []}
+                    advice={!isWritingMode ? rx?.advice_image : null}
+                    isWritingMode={isWritingMode}
+                  />
+                </div>
               );
             })()}
           </div>

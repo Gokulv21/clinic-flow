@@ -17,8 +17,8 @@ export default function PageBanner({
   children 
 }: PageBannerProps) {
   return (
-    <div className={cn("relative w-full overflow-hidden bg-white mb-8 group", className)}>
-      <div className="absolute inset-0 bg-gradient-to-r from-white via-white/95 to-transparent z-10" />
+    <div className={cn("relative w-full overflow-hidden bg-background mb-8 group border-b border-border", className)}>
+      <div className="absolute inset-0 bg-gradient-to-r from-background via-background/95 to-transparent z-10" />
       
       <motion.div 
         initial={{ scale: 1.1, opacity: 0 }}
@@ -29,9 +29,12 @@ export default function PageBanner({
         <img 
           src={imageSrc} 
           alt={title} 
-          className="w-full h-full object-cover object-right-top md:object-center grayscale-[0.2] group-hover:grayscale-0 transition-all duration-700"
+          className="w-full h-full object-cover object-right-top md:object-center grayscale-[0.2] dark:grayscale-[0.5] group-hover:grayscale-0 transition-all duration-700"
         />
       </motion.div>
+      
+      {/* Dark Mode Overlay for better image blending in true black */}
+      <div className="absolute inset-0 bg-black/10 dark:bg-black/40 z-[5] pointer-events-none" />
 
       <div className="relative z-20 px-6 py-12 md:px-12 md:py-16 max-w-7xl mx-auto flex flex-col justify-center min-h-[220px] md:min-h-[280px]">
         <motion.div
@@ -39,10 +42,10 @@ export default function PageBanner({
           animate={{ x: 0, opacity: 1 }}
           transition={{ delay: 0.2, duration: 0.5 }}
         >
-          <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight text-slate-900 mb-3 drop-shadow-sm">
+          <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight text-foreground mb-3 drop-shadow-sm">
             {title}
           </h1>
-          <p className="text-slate-500 text-sm md:text-lg max-w-xl font-medium leading-relaxed">
+          <p className="text-muted-foreground text-sm md:text-lg max-w-xl font-medium leading-relaxed">
             {description}
           </p>
         </motion.div>
@@ -59,7 +62,7 @@ export default function PageBanner({
         )}
       </div>
 
-      <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-slate-200 via-slate-100 to-transparent z-30" />
+      <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-border via-border/50 to-transparent z-30" />
     </div>
   );
 }

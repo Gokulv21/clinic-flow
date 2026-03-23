@@ -104,6 +104,56 @@
     background: hsl(var(--sidebar-background));
     border-right: 1px solid hsl(var(--sidebar-border));
   }
+
+  /* ── Prescription Template Styles ── */
+  #prescription-template * { box-sizing: border-box; }
+  
+  .margin-line {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background-color: #cbd5e1;
+    opacity: 0.8;
+    z-index: 10;
+  }
+  .margin-line-left { left: 0em; }
+  .margin-line-right { right: 0em; }
+
+  @media print {
+    #rx-inner { 
+        position: relative !important;
+        font-size: 3.8mm !important; 
+        background: white !important; 
+        background-color: #ffffff !important; 
+        -webkit-print-color-adjust: exact !important; 
+        print-color-adjust: exact !important;
+        min-height: 290mm !important;
+        height: auto !important;
+        width: 100% !important;
+        page-break-inside: avoid !important;
+        box-sizing: border-box !important;
+    }
+    .single-page-prescription { 
+        position: relative !important;
+        background: white !important; 
+        background-color: #ffffff !important; 
+        -webkit-print-color-adjust: exact !important; 
+        print-color-adjust: exact !important;
+        height: 290mm !important; 
+        width: 210mm !important; 
+        margin: 0 auto !important;
+        border: none !important;
+        box-shadow: none !important;
+        page-break-after: auto !important;
+        page-break-inside: avoid !important;
+        overflow: hidden !important;
+        display: flex !important;
+        flex-direction: column !important;
+        box-sizing: border-box !important;
+    }
+    .no-print { display: none !important; }
+  }
 }
 
 /* ── Global Print Shield ─────────────────────────────────────────── */
