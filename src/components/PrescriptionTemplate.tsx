@@ -125,6 +125,7 @@ const PrescriptionTemplate = React.memo(({
                             hasTyped={showTyped}
                             vitals={vitals}
                             doctorProfile={doctorProfile}
+                            isWritingMode={isWritingMode}
                         />
                     ) : (
                         <div style={{ position: 'absolute', inset: 0, background: '#fff' }}>
@@ -169,9 +170,10 @@ interface PageOneProps {
     hasTyped: boolean;
     doctorProfile: any;
     vitals: { label: string; value: any; unit: string }[];
+    isWritingMode: boolean;
 }
 
-function PageOne({ patient, visit, today, time, clinicalNotes, diagnosis, medicines, advice, hasTyped, vitals, doctorProfile }: PageOneProps) {
+function PageOne({ patient, visit, today, time, clinicalNotes, diagnosis, medicines, advice, hasTyped, vitals, doctorProfile, isWritingMode }: PageOneProps) {
     return (
         <div
             id="rx-inner"
@@ -366,7 +368,7 @@ function PageOne({ patient, visit, today, time, clinicalNotes, diagnosis, medici
 
             {/* ── FOOTER ──────────────────────────────────────── */}
             <div style={{ background: '#fff', borderTop: '2px solid #0f172a', padding: '1em 2em', display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, position: 'relative' }}>
-                {doctorProfile?.signature_data && (
+                {doctorProfile?.signature_data && !isWritingMode && (
                     <div style={{ position: 'absolute', right: '4em', bottom: '4em', textAlign: 'center' }}>
                         <img src={doctorProfile.signature_data} alt="Signature" style={{ maxHeight: '4.5em', width: 'auto', marginBottom: '0.2em', mixBlendMode: 'multiply' }} />
                         <div style={{ fontSize: '0.6em', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Digital Signature</div>
