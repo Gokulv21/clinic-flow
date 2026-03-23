@@ -989,6 +989,4 @@ export default function DoctorProfile() {
             </Dialog>
         </div>
     );
-};
-
-export default DoctorProfile;
+}

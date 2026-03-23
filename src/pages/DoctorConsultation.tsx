@@ -236,15 +236,31 @@ export default function DoctorConsultation() {
     try {
       const patientId = selectedVisit.patient_id;
 
-      // 1. Delete the visit entirely
+      // 1. Update status to 'no_show' first as a safeguard (removes from active queue immediately)
+      const { error: statusError } = await supabase
+        .from('visits')
+        .update({ status: 'no_show' })
+        .eq('id', selectedVisit.id);
+      
+      if (statusError) throw new Error(`Failed to update status: ${statusError.message}`);
+
+      // 2. Delete associated prescriptions (to avoid foreign key constraints)
+      const { error: rxDeleteError } = await supabase
+        .from('prescriptions')
+        .delete()
+        .eq('visit_id', selectedVisit.id);
+
+      if (rxDeleteError) throw new Error(`Failed to delete prescription: ${rxDeleteError.message}`);
+
+      // 3. Delete the visit record entirely
       const { error: deleteError } = await supabase
         .from('visits')
         .delete()
         .eq('id', selectedVisit.id);
 
-      if (deleteError) throw deleteError;
+      if (deleteError) throw new Error(`Failed to delete visit record: ${deleteError.message}`);
 
-      // 2. Check if this patient has ANY other visits
+      // 4. Check if this patient has ANY other visits
       const { data: otherVisits } = await supabase
         .from('visits')
         .select('id')
