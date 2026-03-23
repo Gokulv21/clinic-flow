@@ -8,7 +8,7 @@ import {
     UserCheck, BarChart3, PieChart, Settings, Mail, Phone, MapPin, 
     Medal, FileSignature, Save, RefreshCw, Plus, Stethoscope, Printer,
     ArrowRight, CheckCircle2, Circle, PanelLeft, LayoutDashboard,
-    Group, Info, Moon, Sun, HeartPulse, TrendingUp, Search, UserPlus, Camera, Trash2
+    Group, Info, Moon, Sun, HeartPulse, TrendingUp, Search, UserPlus, Camera, Trash2, Eye, X
 } from 'lucide-react';
 import { startOfDay, endOfDay, subDays, format, isSameDay, parseISO } from 'date-fns';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -67,6 +67,7 @@ export default function DoctorProfile() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [uploading, setUploading] = useState(false);
+    const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     
     // Stats & Analytics State
@@ -365,21 +366,31 @@ export default function DoctorProfile() {
                             <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/20 to-transparent" />
                             
                             {/* Upload Overlay */}
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white gap-3 cursor-pointer">
-                                <button 
-                                    onClick={() => fileInputRef.current?.click()}
-                                    disabled={uploading}
-                                    className="flex flex-col items-center gap-1 hover:scale-110 transition-transform"
-                                >
-                                    {uploading ? (
-                                        <Loader2 className="w-8 h-8 animate-spin" />
-                                    ) : (
-                                        <>
-                                            <Camera className="w-8 h-8" />
-                                            <span className="text-[10px] font-black uppercase tracking-widest text-center px-2">Update</span>
-                                        </>
-                                    )}
-                                </button>
+                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white gap-3 cursor-pointer p-2 backdrop-blur-sm">
+                                <div className="grid grid-cols-2 gap-2 w-full px-4">
+                                    <button 
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setImagePreviewUrl(getAvatarUrl(profile?.avatar_url));
+                                        }}
+                                        className="flex flex-col items-center gap-1 hover:scale-110 transition-transform bg-white/10 hover:bg-white/20 p-2 rounded-xl"
+                                    >
+                                        <Eye className="w-6 h-6" />
+                                        <span className="text-[9px] font-black uppercase tracking-widest">Open</span>
+                                    </button>
+                                    
+                                    <button 
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            fileInputRef.current?.click();
+                                        }}
+                                        disabled={uploading}
+                                        className="flex flex-col items-center gap-1 hover:scale-110 transition-transform bg-white/10 hover:bg-white/20 p-2 rounded-xl"
+                                    >
+                                        {uploading ? <Loader2 className="w-6 h-6 animate-spin" /> : <Camera className="w-6 h-6" />}
+                                        <span className="text-[9px] font-black uppercase tracking-widest text-center">Browse</span>
+                                    </button>
+                                </div>
                                 
                                 {profile?.avatar_url?.includes('http') && (
                                     <button 
@@ -388,10 +399,12 @@ export default function DoctorProfile() {
                                             handleDeletePhoto();
                                         }}
                                         disabled={uploading}
-                                        className="flex flex-col items-center gap-1 text-red-400 hover:text-red-300 hover:scale-110 transition-transform pt-2 border-t border-white/20 w-16"
+                                        className="flex flex-col items-center gap-1 text-red-100 hover:text-white bg-red-500/20 hover:bg-red-500/40 p-2 rounded-xl w-full mx-4 transition-all"
                                     >
-                                        <Trash2 className="w-5 h-5" />
-                                        <span className="text-[9px] font-black uppercase tracking-widest">Remove</span>
+                                        <div className="flex items-center gap-2">
+                                            <Trash2 className="w-4 h-4" />
+                                            <span className="text-[9px] font-black uppercase tracking-widest">Remove Photo</span>
+                                        </div>
                                     </button>
                                 )}
                             </div>
@@ -956,6 +969,26 @@ export default function DoctorProfile() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+            {/* Full-Screen Image Preview */}
+            <Dialog open={!!imagePreviewUrl} onOpenChange={open => !open && setImagePreviewUrl(null)}>
+                <DialogContent className="max-w-3xl p-0 overflow-hidden border-none bg-black/90 rounded-[2.5rem] shadow-2xl backdrop-blur-xl">
+                    <div className="relative aspect-auto flex items-center justify-center p-4">
+                        <img 
+                            src={imagePreviewUrl || ''} 
+                            className="max-w-full max-h-[85vh] rounded-2xl object-contain shadow-2xl" 
+                            alt="Full Preview" 
+                        />
+                        <button 
+                            onClick={() => setImagePreviewUrl(null)}
+                            className="absolute top-6 right-6 bg-white/10 hover:bg-white/20 p-3 rounded-full text-white transition-all backdrop-blur-md border border-white/20 group"
+                        >
+                            <X className="w-6 h-6 group-hover:rotate-90 transition-transform duration-300" />
+                        </button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
-}
+};
+
+export default DoctorProfile;
