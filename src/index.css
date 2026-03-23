@@ -113,8 +113,8 @@
     margin: 0 !important;
   }
 
-  /* When is-printing class is present on body, hide everything EXCEPT the print mount */
-  body.is-printing #root {
+  /* Hide everything except print mount */
+  body.is-printing > *:not(#print-mount) {
     display: none !important;
   }
 
@@ -161,6 +161,7 @@
     height: auto !important;
     width: auto !important;
     overflow: visible !important;
+    display: block !important;
   }
 
   /* Force exact color printing */

@@ -196,28 +196,35 @@ function PageOne({ patient, visit, today, time, clinicalNotes, diagnosis, medici
                     @page { margin: 0; size: A4; }
                     body { margin: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
                     #rx-inner { 
+                        position: relative !important;
                         font-size: 3.8mm !important; 
                         background: white !important; 
                         background-color: #ffffff !important; 
                         -webkit-print-color-adjust: exact !important; 
                         print-color-adjust: exact !important;
-                        height: 296mm !important;
-                        width: 210mm !important;
+                        min-height: 290mm !important;
+                        height: auto !important;
+                        width: 100% !important;
                         page-break-inside: avoid !important;
+                        box-sizing: border-box !important;
                     }
                     .single-page-prescription { 
+                        position: relative !important;
                         background: white !important; 
                         background-color: #ffffff !important; 
                         -webkit-print-color-adjust: exact !important; 
                         print-color-adjust: exact !important;
-                        height: 295.7mm !important; /* Slightly reduced A4 height to prevent overflow on some browsers */
-                        width: 100% !important; 
-                        max-width: 210mm !important;
+                        height: 290mm !important; 
+                        width: 210mm !important; 
                         margin: 0 auto !important;
                         border: none !important;
                         box-shadow: none !important;
                         page-break-after: auto !important;
                         page-break-inside: avoid !important;
+                        overflow: hidden !important;
+                        display: flex !important;
+                        flex-direction: column !important;
+                        box-sizing: border-box !important;
                     }
                     .no-print { display: none !important; }
                 }
