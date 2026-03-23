@@ -335,12 +335,12 @@ function PageOne({ patient, visit, today, time, clinicalNotes, diagnosis, medici
                                         {m.dosage && <span style={{ fontWeight: 600, color: '#334155' }}>{m.dosage}</span>}
                                         {m.count && <span style={{ fontWeight: 600, color: '#334155' }}>({m.count})</span>}
                                         {m.route && <span style={{ fontWeight: 700, color: '#2563eb', fontSize: '0.9em', textTransform: 'uppercase' }}>[{m.route}]</span>}
-                                        {m.frequency && <span style={{ fontWeight: 700, color: '#0f172a' }}>× {m.frequency}</span>}
+                                        {m.frequency && <span style={{ fontWeight: 700, color: '#0f172a' }}>{m.frequency}</span>}
                                         {m.duration && <span style={{ fontWeight: 600, color: '#475569' }}>for {m.duration}</span>}
                                     </div>
                                     {m.notes && (
                                         <div style={{ fontSize: '0.85em', fontWeight: 600, color: '#64748b', marginTop: '0.1em', fontStyle: 'italic' }}>
-                                            Note: {m.notes}
+                                            Remarks: {m.notes}
                                         </div>
                                     )}
                                 </div>

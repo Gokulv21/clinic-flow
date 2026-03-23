@@ -10,13 +10,14 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { cn, formatAge } from '@/lib/utils';
-import { User, Clock, CheckCircle, Plus, Trash2, Save, Loader2, PenTool, Eye, Menu, Printer, ArrowLeft, Activity, ClipboardList, Scale, Heart, Wind, Thermometer, Droplet, Pencil, Calendar, RefreshCw, UserX } from 'lucide-react';
+import { User, Clock, CheckCircle, Plus, Trash2, Save, Loader2, PenTool, Eye, Menu, Printer, ArrowLeft, Activity, ClipboardList, Scale, Heart, Wind, Thermometer, Droplet, Pencil, Calendar, RefreshCw, UserX, ChevronDown } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import DigitalPrescription from '@/components/DigitalPrescription';
 import PrescriptionTemplate from '@/components/PrescriptionTemplate';
 import { format } from "date-fns";
 import prescriptionLogo from '@/assets/prescriptionLogo.png';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { printPrescription } from '@/lib/printPrescription';
 import PageBanner from '@/components/PageBanner';
@@ -728,6 +729,7 @@ export default function DoctorConsultation() {
                                   className="w-full h-10 text-sm font-bold border border-slate-200 bg-white rounded-lg px-2 focus:ring-2 focus:ring-blue-500 outline-none"
                                 >
                                   <option value="Inj.">Inj.</option>
+                                  <option value="Supp.">Supp.</option>
                                   <option value="Syp.">Syp.</option>
                                   <option value="Tab.">Tab.</option>
                                   <option value="Cap.">Cap.</option>
@@ -751,7 +753,7 @@ export default function DoctorConsultation() {
                                 </div>
 
                                 {/* Dynamic Fields based on Type */}
-                                {med.type === 'Inj.' && (
+                                {(med.type === 'Inj.' || med.type === 'Supp.') && (
                                   <>
                                     <div className="space-y-1 text-blue-600">
                                       <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Dosage</p>
@@ -763,7 +765,40 @@ export default function DoctorConsultation() {
                                     </div>
                                     <div className="space-y-1">
                                       <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">Frequency</p>
-                                      <Input placeholder="Stat / SOS" value={med.frequency} onChange={e => updateMedicine(i, 'frequency', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'frequency')} className="h-10 text-sm font-bold border-slate-200 bg-white rounded-lg" />
+                                      <div className="relative medicine-freq-container">
+                                        <Input 
+                                          placeholder="Stat / SOS" 
+                                          value={med.frequency} 
+                                          onChange={e => updateMedicine(i, 'frequency', e.target.value)} 
+                                          onKeyDown={e => handleMedicineKeyDown(e, i, 'frequency')} 
+                                          className="h-10 pr-9 text-sm font-bold border-slate-200 bg-white rounded-lg" 
+                                        />
+                                        <Popover>
+                                          <PopoverTrigger asChild>
+                                            <Button 
+                                              variant="ghost" 
+                                              size="icon" 
+                                              className="absolute right-0 top-0 h-10 w-9 hover:bg-slate-100 rounded-r-lg"
+                                              title="Select Frequency"
+                                            >
+                                              <ChevronDown className="h-4 w-4 text-slate-400" />
+                                            </Button>
+                                          </PopoverTrigger>
+                                          <PopoverContent className="w-[180px] p-0 shadow-xl border-slate-200" align="end">
+                                            <div className="max-h-60 overflow-auto p-1 bg-white rounded-lg">
+                                              {COMMON_FREQUENCIES.map(freq => (
+                                                <button
+                                                  key={freq}
+                                                  className="w-full text-left px-3 py-2 text-[13px] font-bold hover:bg-blue-50 text-slate-700 rounded-md transition-colors"
+                                                  onClick={() => updateMedicine(i, 'frequency', freq)}
+                                                >
+                                                  {freq}
+                                                </button>
+                                              ))}
+                                            </div>
+                                          </PopoverContent>
+                                        </Popover>
+                                      </div>
                                     </div>
                                   </>
                                 )}
@@ -776,17 +811,43 @@ export default function DoctorConsultation() {
                                     </div>
                                     <div className="space-y-1 text-purple-600">
                                       <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Frequency</p>
-                                      <Input 
-                                        list="freq-suggestions"
-                                        placeholder="1-0-1" 
-                                        value={med.frequency} 
-                                        onChange={e => updateMedicine(i, 'frequency', e.target.value)} 
-                                        onKeyDown={e => handleMedicineKeyDown(e, i, 'frequency')} 
-                                        className="h-10 text-sm font-bold border-purple-200 bg-purple-50/30 rounded-lg placeholder:text-purple-200" 
-                                      />
+                                      <div className="relative medicine-freq-container">
+                                        <Input 
+                                          placeholder="1-0-1" 
+                                          value={med.frequency} 
+                                          onChange={e => updateMedicine(i, 'frequency', e.target.value)} 
+                                          onKeyDown={e => handleMedicineKeyDown(e, i, 'frequency')} 
+                                          className="h-10 pr-9 text-sm font-bold border-purple-200 bg-purple-50/30 rounded-lg placeholder:text-purple-200" 
+                                        />
+                                        <Popover>
+                                          <PopoverTrigger asChild>
+                                            <Button 
+                                              variant="ghost" 
+                                              size="icon" 
+                                              className="absolute right-0 top-0 h-10 w-9 hover:bg-purple-100/50 rounded-r-lg"
+                                              title="Select Frequency"
+                                            >
+                                              <ChevronDown className="h-4 w-4 text-purple-400" />
+                                            </Button>
+                                          </PopoverTrigger>
+                                          <PopoverContent className="w-[180px] p-0 shadow-xl border-purple-200" align="end">
+                                            <div className="max-h-60 overflow-auto p-1 bg-white rounded-lg">
+                                              {COMMON_FREQUENCIES.map(freq => (
+                                                <button
+                                                  key={freq}
+                                                  className="w-full text-left px-3 py-2 text-[13px] font-bold hover:bg-purple-50 text-slate-700 rounded-md transition-colors"
+                                                  onClick={() => updateMedicine(i, 'frequency', freq)}
+                                                >
+                                                  {freq}
+                                                </button>
+                                              ))}
+                                            </div>
+                                          </PopoverContent>
+                                        </Popover>
+                                      </div>
                                     </div>
                                     <div className="space-y-1 text-emerald-600">
-                                      <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Frequency Notes</p>
+                                      <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Remarks</p>
                                       <Input placeholder="After Food / HR (Notes)" value={med.notes} onChange={e => updateMedicine(i, 'notes', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'notes')} className="h-10 text-sm font-bold border-emerald-200 bg-emerald-50/30 rounded-lg placeholder:text-emerald-200" />
                                     </div>
                                   </>
@@ -803,7 +864,7 @@ export default function DoctorConsultation() {
                                       <Input placeholder="External / Local" value={med.route} onChange={e => updateMedicine(i, 'route', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'route')} className="h-10 text-sm font-bold border-orange-200 bg-orange-50/30 rounded-lg placeholder:text-orange-200" />
                                     </div>
                                     <div className="space-y-1">
-                                      <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">Notes</p>
+                                      <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">Remarks</p>
                                       <Input placeholder="Apply 2 times" value={med.notes} onChange={e => updateMedicine(i, 'notes', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'notes')} className="h-10 text-sm font-bold border-slate-200 bg-white rounded-lg" />
                                     </div>
                                   </>
@@ -817,10 +878,43 @@ export default function DoctorConsultation() {
                                     </div>
                                     <div className="space-y-1 text-sky-600">
                                       <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Frequency</p>
-                                      <Input placeholder="2 drops 3 times" value={med.frequency} onChange={e => updateMedicine(i, 'frequency', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'frequency')} className="h-10 text-sm font-bold border-sky-200 bg-sky-50/30 rounded-lg placeholder:text-sky-200" />
+                                      <div className="relative medicine-freq-container">
+                                        <Input 
+                                          placeholder="2 drops 3 times" 
+                                          value={med.frequency} 
+                                          onChange={e => updateMedicine(i, 'frequency', e.target.value)} 
+                                          onKeyDown={e => handleMedicineKeyDown(e, i, 'frequency')} 
+                                          className="h-10 pr-9 text-sm font-bold border-sky-200 bg-sky-50/30 rounded-lg placeholder:text-sky-200" 
+                                        />
+                                        <Popover>
+                                          <PopoverTrigger asChild>
+                                            <Button 
+                                              variant="ghost" 
+                                              size="icon" 
+                                              className="absolute right-0 top-0 h-10 w-9 hover:bg-sky-100/50 rounded-r-lg"
+                                              title="Select Frequency"
+                                            >
+                                              <ChevronDown className="h-4 w-4 text-sky-400" />
+                                            </Button>
+                                          </PopoverTrigger>
+                                          <PopoverContent className="w-[180px] p-0 shadow-xl border-sky-200" align="end">
+                                            <div className="max-h-60 overflow-auto p-1 bg-white rounded-lg">
+                                              {COMMON_FREQUENCIES.map(freq => (
+                                                <button
+                                                  key={freq}
+                                                  className="w-full text-left px-3 py-2 text-[13px] font-bold hover:bg-sky-50 text-slate-700 rounded-md transition-colors"
+                                                  onClick={() => updateMedicine(i, 'frequency', freq)}
+                                                >
+                                                  {freq}
+                                                </button>
+                                              ))}
+                                            </div>
+                                          </PopoverContent>
+                                        </Popover>
+                                      </div>
                                     </div>
                                     <div className="space-y-1">
-                                      <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">Notes</p>
+                                      <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">Remarks</p>
                                       <Input placeholder="Eye / Ear / Nose" value={med.notes} onChange={e => updateMedicine(i, 'notes', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'notes')} className="h-10 text-sm font-bold border-slate-200 bg-white rounded-lg" />
                                     </div>
                                   </>
@@ -834,7 +928,40 @@ export default function DoctorConsultation() {
                                     </div>
                                     <div className="space-y-1 text-amber-600">
                                       <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Frequency</p>
-                                      <Input placeholder="Daily night" value={med.frequency} onChange={e => updateMedicine(i, 'frequency', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'frequency')} className="h-10 text-sm font-bold border-amber-200 bg-amber-50/30 rounded-lg placeholder:text-amber-200" />
+                                      <div className="relative medicine-freq-container">
+                                        <Input 
+                                          placeholder="Daily night" 
+                                          value={med.frequency} 
+                                          onChange={e => updateMedicine(i, 'frequency', e.target.value)} 
+                                          onKeyDown={e => handleMedicineKeyDown(e, i, 'frequency')} 
+                                          className="h-10 pr-9 text-sm font-bold border-amber-200 bg-amber-50/30 rounded-lg placeholder:text-amber-200" 
+                                        />
+                                        <Popover>
+                                          <PopoverTrigger asChild>
+                                            <Button 
+                                              variant="ghost" 
+                                              size="icon" 
+                                              className="absolute right-0 top-0 h-10 w-9 hover:bg-amber-100/50 rounded-r-lg"
+                                              title="Select Frequency"
+                                            >
+                                              <ChevronDown className="h-4 w-4 text-amber-400" />
+                                            </Button>
+                                          </PopoverTrigger>
+                                          <PopoverContent className="w-[180px] p-0 shadow-xl border-amber-200" align="end">
+                                            <div className="max-h-60 overflow-auto p-1 bg-white rounded-lg">
+                                              {COMMON_FREQUENCIES.map(freq => (
+                                                <button
+                                                  key={freq}
+                                                  className="w-full text-left px-3 py-2 text-[13px] font-bold hover:bg-amber-50 text-slate-700 rounded-md transition-colors"
+                                                  onClick={() => updateMedicine(i, 'frequency', freq)}
+                                                >
+                                                  {freq}
+                                                </button>
+                                              ))}
+                                            </div>
+                                          </PopoverContent>
+                                        </Popover>
+                                      </div>
                                     </div>
                                     <div className="space-y-1 invisible">
                                       <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">—</p>
@@ -1079,11 +1206,6 @@ export default function DoctorConsultation() {
           </div>
         </DialogContent>
       </Dialog>
-      <datalist id="freq-suggestions">
-        {COMMON_FREQUENCIES.map(freq => (
-          <option key={freq} value={freq} />
-        ))}
-      </datalist>
     </div>
   );
 }
