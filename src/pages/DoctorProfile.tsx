@@ -360,7 +360,7 @@ export default function DoctorProfile() {
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                 <div className="flex items-center gap-6">
                     <div className="relative group perspective-1000">
-                        <div className="w-28 h-36 md:w-32 md:h-44 rounded-[2rem] bg-gradient-to-b from-blue-500 to-blue-700 shadow-2xl overflow-hidden flex items-center justify-center transform transition-all duration-500 group-hover:rotate-y-12 group-hover:scale-105 border-4 border-white">
+                        <div className="w-28 h-36 md:w-32 md:h-44 rounded-[2rem] bg-gradient-to-b from-blue-500 to-blue-700 shadow-2xl overflow-hidden flex items-center justify-center transform transition-all duration-500 group-hover:rotate-y-12 group-hover:scale-105 border-4 border-white dark:border-slate-800">
                                 <img src={getAvatarUrl(profile?.avatar_url)} className="w-full h-full object-cover" alt="Profile" />
                             <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/20 to-transparent" />
                             
@@ -403,18 +403,18 @@ export default function DoctorProfile() {
                             className="hidden" 
                             accept="image/*" 
                         />
-                        <div className="absolute -bottom-3 -right-3 bg-emerald-500 text-white p-2 rounded-2xl border-4 border-white shadow-xl">
+                        <div className="absolute -bottom-3 -right-3 bg-emerald-500 text-white p-2 rounded-2xl border-4 border-white dark:border-slate-800 shadow-xl">
                             <CheckCircle2 className="w-5 h-5" />
                         </div>
                     </div>
                     
                     <div className="space-y-1">
                         <div className="flex flex-wrap items-center gap-2">
-                            <h1 className="text-3xl md:text-5xl font-black tracking-tighter text-slate-900 group">
+                            <h1 className="text-3xl md:text-5xl font-black tracking-tighter text-slate-900 dark:text-slate-50 group">
                                 {profile?.full_name}
                             </h1>
                             {roles.map(role => (
-                                <span key={role} className="bg-slate-900 text-white text-[10px] px-3 py-1 rounded-full font-black uppercase tracking-widest">
+                                <span key={role} className="bg-slate-900 dark:bg-slate-50 dark:text-slate-900 text-white text-[10px] px-3 py-1 rounded-full font-black uppercase tracking-widest">
                                     {role}
                                 </span>
                             ))}
@@ -433,7 +433,7 @@ export default function DoctorProfile() {
                     <Button 
                         variant="outline" 
                         size="sm" 
-                        className="rounded-2xl border-slate-200 gap-2 font-bold h-11 px-6 shadow-sm hover:bg-slate-50"
+                        className="rounded-2xl border-slate-200 dark:border-slate-800 gap-2 font-bold h-11 px-6 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-800"
                         onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                     >
                         {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
@@ -452,8 +452,8 @@ export default function DoctorProfile() {
             </div>
 
             <Tabs defaultValue="overview" className="w-full space-y-8">
-                <TabsList className="bg-white/50 backdrop-blur p-1.5 rounded-[2rem] border border-slate-200 w-full md:w-auto h-auto grid grid-cols-2 md:grid-cols-4 gap-2">
-                    <TabsTrigger value="overview" className="rounded-full px-8 py-3 data-[state=active]:bg-slate-900 data-[state=active]:text-white font-black text-xs uppercase tracking-widest gap-2">
+                <TabsList className="bg-white/50 dark:bg-slate-900/50 backdrop-blur p-1.5 rounded-[2rem] border border-slate-200 dark:border-slate-800 w-full md:w-auto h-auto grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <TabsTrigger value="overview" className="rounded-full px-8 py-3 data-[state=active]:bg-slate-900 data-[state=active]:text-white dark:data-[state=active]:bg-slate-50 dark:data-[state=active]:text-slate-900 font-black text-xs uppercase tracking-widest gap-2">
                         <LayoutDashboard className="w-4 h-4" /> Overview
                     </TabsTrigger>
                     <TabsTrigger value="analytics" className="rounded-full px-8 py-3 data-[state=active]:bg-slate-900 data-[state=active]:text-white font-black text-xs uppercase tracking-widest gap-2">
@@ -488,23 +488,23 @@ export default function DoctorProfile() {
                                 </div>
                             </CardContent>
                         </Card>
-                        <Card className="border-none shadow-sm bg-white overflow-hidden p-6 flex flex-col justify-center gap-4">
-                            <h4 className="text-[11px] font-black uppercase tracking-widest text-slate-400">Quick Actions</h4>
+                        <Card className="border-none shadow-sm bg-white dark:bg-slate-900 overflow-hidden p-6 flex flex-col justify-center gap-4">
+                            <h4 className="text-[11px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Quick Actions</h4>
                             <div className="grid grid-cols-3 gap-2">
                                 {[
-                                    { icon: <Plus className="w-5 h-5" />, label: "Entry", color: "bg-blue-50 text-blue-600", path: "/nurse" },
-                                    { icon: <Stethoscope className="w-5 h-5" />, label: "Queue", color: "bg-purple-50 text-purple-600", path: "/consultation" },
-                                    { icon: <Printer className="w-5 h-5" />, label: "Print", color: "bg-emerald-50 text-emerald-600", path: "/print" }
+                                    { icon: <Plus className="w-5 h-5" />, label: "Entry", color: "bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400", path: "/nurse" },
+                                    { icon: <Stethoscope className="w-5 h-5" />, label: "Queue", color: "bg-purple-50 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400", path: "/consultation" },
+                                    { icon: <Printer className="w-5 h-5" />, label: "Print", color: "bg-emerald-50 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400", path: "/print" }
                                 ].map(a => (
                                     <button 
                                         key={a.label} 
                                         onClick={() => navigate(a.path)}
                                         className="flex flex-col items-center gap-1 hover:scale-105 transition-transform"
                                     >
-                                        <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all text-white", a.color)}>
+                                        <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all", a.color)}>
                                             {a.icon}
                                         </div>
-                                        <span className="text-[10px] font-black text-slate-500 uppercase">{a.label}</span>
+                                        <span className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase">{a.label}</span>
                                     </button>
                                 ))}
                             </div>
@@ -513,46 +513,46 @@ export default function DoctorProfile() {
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-4">
                          {/* Activity Timeline */}
-                         <Card className="border-slate-100 rounded-[2rem] shadow-sm bg-white overflow-hidden">
-                            <CardHeader className="border-b border-slate-50 px-8 py-6">
+                         <Card className="border-slate-100 dark:border-slate-800 rounded-[2rem] shadow-sm bg-white dark:bg-slate-900 overflow-hidden">
+                            <CardHeader className="border-b border-slate-50 dark:border-slate-800 px-8 py-6">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
                                         <div className="w-2 h-2 rounded-full bg-blue-500" />
-                                        <CardTitle className="text-sm font-black uppercase tracking-widest">Clinic Timeline</CardTitle>
+                                        <CardTitle className="text-sm font-black uppercase tracking-widest dark:text-slate-100">Clinic Timeline</CardTitle>
                                     </div>
-                                    <Activity className="w-4 h-4 text-slate-200" />
+                                    <Activity className="w-4 h-4 text-slate-200 dark:text-slate-800" />
                                 </div>
                             </CardHeader>
                             <CardContent className="p-0">
-                                <div className="divide-y divide-slate-50">
+                                <div className="divide-y divide-slate-50 dark:divide-slate-800">
                                     {stats.recentActivity.map((visit, i) => (
-                                        <div key={visit.id} className="p-6 hover:bg-slate-50/50 transition-colors flex items-center justify-between group">
+                                        <div key={visit.id} className="p-6 hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors flex items-center justify-between group">
                                             <div className="flex items-center gap-4">
                                                 <div className="relative">
-                                                    <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-black text-slate-400 group-hover:bg-blue-100 group-hover:text-blue-600 transition-all">
+                                                    <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-black text-slate-400 dark:text-slate-500 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/40 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-all">
                                                         {visit.patients?.name?.charAt(0)}
                                                     </div>
-                                                    <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-white flex items-center justify-center shadow-sm">
+                                                    <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-white dark:bg-slate-900 flex items-center justify-center shadow-sm">
                                                        {visit.status === 'completed' ? <CheckCircle2 className="w-2.5 h-2.5 text-emerald-500" /> : <Clock className="w-2.5 h-2.5 text-amber-500" />}
                                                     </div>
                                                 </div>
                                                 <div>
-                                                    <p className="font-bold text-slate-900 leading-tight">{visit.patients?.name}</p>
-                                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">
+                                                    <p className="font-bold text-slate-900 dark:text-slate-100 leading-tight">{visit.patients?.name}</p>
+                                                    <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-0.5">
                                                         {visit.status === 'completed' ? 'Consultation Finished' : 'Waiting in Queue'}
                                                     </p>
                                                 </div>
                                             </div>
                                             <div className="text-right">
-                                                <p className="text-xs font-black text-slate-900">
+                                                <p className="text-xs font-black text-slate-900 dark:text-slate-100">
                                                     {new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: 'numeric' }).format(new Date(visit.created_at))}
                                                 </p>
-                                                <p className="text-[10px] font-bold text-slate-300">Just now</p>
+                                                <p className="text-[10px] font-bold text-slate-300 dark:text-slate-600">Just now</p>
                                             </div>
                                         </div>
                                     ))}
                                 </div>
-                                <Button variant="ghost" className="w-full h-14 rounded-none text-blue-600 font-bold text-xs uppercase tracking-widest hover:bg-slate-50 border-t border-slate-50">
+                                <Button variant="ghost" className="w-full h-14 rounded-none text-blue-600 dark:text-blue-400 font-bold text-xs uppercase tracking-widest hover:bg-slate-50 dark:hover:bg-slate-800 border-t border-slate-50 dark:border-slate-800">
                                     See All Activity <ArrowRight className="w-4 h-4 ml-2" />
                                 </Button>
                             </CardContent>
@@ -593,13 +593,13 @@ export default function DoctorProfile() {
 
                 <TabsContent value="analytics" className="space-y-8 focus-visible:outline-none">
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        <Card className="lg:col-span-2 border-slate-100 rounded-[2rem] p-8 space-y-8 bg-white shadow-sm">
+                        <Card className="lg:col-span-2 border-slate-100 dark:border-slate-800 rounded-[2rem] p-8 space-y-8 bg-white dark:bg-slate-900 shadow-sm">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <CardTitle className="text-2xl font-black tracking-tight mb-1">Patient Volume Trend</CardTitle>
-                                    <CardDescription>Visualizing your clinic flow over the last 7 days.</CardDescription>
+                                    <CardTitle className="text-2xl font-black tracking-tight mb-1 dark:text-slate-100">Patient Volume Trend</CardTitle>
+                                    <CardDescription className="dark:text-slate-400">Visualizing your clinic flow over the last 7 days.</CardDescription>
                                 </div>
-                                <div className="bg-blue-50 text-blue-600 p-3 rounded-2xl">
+                                <div className="bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 p-3 rounded-2xl">
                                     <Activity className="w-6 h-6" />
                                 </div>
                             </div>
@@ -629,10 +629,10 @@ export default function DoctorProfile() {
                             </div>
                         </Card>
 
-                        <Card className="border-slate-100 rounded-[2rem] p-8 space-y-8 bg-white shadow-sm flex flex-col">
+                        <Card className="border-slate-100 dark:border-slate-800 rounded-[2rem] p-8 space-y-8 bg-white dark:bg-slate-900 shadow-sm flex flex-col">
                             <div>
-                                <CardTitle className="text-2xl font-black tracking-tight mb-1">Demographics</CardTitle>
-                                <CardDescription>Patient gender distribution.</CardDescription>
+                                <CardTitle className="text-2xl font-black tracking-tight mb-1 dark:text-slate-100">Demographics</CardTitle>
+                                <CardDescription className="dark:text-slate-400">Patient gender distribution.</CardDescription>
                             </div>
                             <div className="h-64 relative flex-1">
                                 <ResponsiveContainer width="100%" height="100%">
@@ -652,18 +652,18 @@ export default function DoctorProfile() {
                                     </RePieChart>
                                 </ResponsiveContainer>
                                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                    <p className="text-2xl font-black">{stats.totalPatients}</p>
-                                    <p className="text-[10px] font-black text-slate-400 uppercase">Total Patients</p>
+                                    <p className="text-2xl font-black dark:text-slate-100">{stats.totalPatients}</p>
+                                    <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase">Total Patients</p>
                                 </div>
                             </div>
                             <div className="space-y-3">
                                 {stats.demographics.map(d => (
-                                    <div key={d.name} className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-100">
+                                    <div key={d.name} className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
                                         <div className="flex items-center gap-2">
                                             <div className="w-3 h-3 rounded-full" style={{ background: d.color }} />
-                                            <span className="text-sm font-bold text-slate-700">{d.name}</span>
+                                            <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{d.name}</span>
                                         </div>
-                                        <span className="text-sm font-black text-slate-900">{stats.totalPatients > 0 ? Math.round((d.value / stats.totalPatients) * 100) : 0}%</span>
+                                        <span className="text-sm font-black text-slate-900 dark:text-white">{stats.totalPatients > 0 ? Math.round((d.value / stats.totalPatients) * 100) : 0}%</span>
                                     </div>
                                 ))}
                             </div>
@@ -672,11 +672,11 @@ export default function DoctorProfile() {
                 </TabsContent>
 
                 <TabsContent value="team" className="focus-visible:outline-none">
-                    <Card className="border-slate-100 rounded-[2rem] p-8 bg-white shadow-sm">
+                    <Card className="border-slate-100 dark:border-slate-800 rounded-[2rem] p-8 bg-white dark:bg-slate-900 shadow-sm">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
                             <div>
-                                <CardTitle className="text-3xl font-black tracking-tighter mb-1">Clinic Staff members</CardTitle>
-                                <CardDescription>Manage your nurse and support team access levels.</CardDescription>
+                                <CardTitle className="text-3xl font-black tracking-tighter mb-1 dark:text-slate-100">Clinic Staff members</CardTitle>
+                                <CardDescription className="dark:text-slate-400">Manage your nurse and support team access levels.</CardDescription>
                             </div>
                             {hasRole('doctor') && (
                                 <Button 
@@ -684,7 +684,7 @@ export default function DoctorProfile() {
                                         fetchAllProfiles();
                                         setShowAddStaffDialog(true);
                                     }}
-                                    className="bg-slate-900 text-white font-black uppercase text-[10px] tracking-widest px-8 rounded-full h-auto py-3 shadow-lg"
+                                    className="bg-slate-900 dark:bg-slate-50 dark:text-slate-900 text-white font-black uppercase text-[10px] tracking-widest px-8 rounded-full h-auto py-3 shadow-lg"
                                 >
                                     <Plus className="w-3.5 h-3.5 mr-2" /> Add Staff Member
                                 </Button>
@@ -693,27 +693,27 @@ export default function DoctorProfile() {
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {staff.map((s, i) => (
-                                <Card key={i} className="group relative border-slate-100 rounded-3xl hover:border-blue-200 transition-all hover:shadow-xl hover:-translate-y-1 bg-white overflow-hidden">
+                                <Card key={i} className="group relative border-slate-100 dark:border-slate-800 rounded-3xl hover:border-blue-200 dark:hover:border-blue-700 transition-all hover:shadow-xl hover:-translate-y-1 bg-white dark:bg-slate-800/50 overflow-hidden">
                                      <div className="absolute top-0 left-0 w-full h-1 bg-blue-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                                      <CardContent className="p-6 flex items-center gap-4">
-                                         <Avatar className="w-16 h-16 rounded-2xl border-4 border-slate-50">
-                                             <AvatarFallback className="bg-blue-100 text-blue-600 font-black text-xl">
+                                         <Avatar className="w-16 h-16 rounded-2xl border-4 border-slate-50 dark:border-slate-700">
+                                             <AvatarFallback className="bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 font-black text-xl">
                                                 {s.profiles?.full_name?.charAt(0)}
                                              </AvatarFallback>
                                          </Avatar>
                                          <div className="space-y-1">
-                                             <h4 className="font-black text-slate-900 leading-tight">{s.profiles?.full_name}</h4>
+                                             <h4 className="font-black text-slate-900 dark:text-slate-100 leading-tight">{s.profiles?.full_name}</h4>
                                              <div className="flex items-center gap-2">
-                                                 <span className="bg-emerald-50 text-emerald-600 text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest">
+                                                 <span className="bg-emerald-50 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest">
                                                      {s.role}
                                                  </span>
                                                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                                              </div>
                                          </div>
                                      </CardContent>
-                                     <div className="border-t border-slate-50 p-4 flex items-center justify-between text-[11px] font-black uppercase tracking-widest text-slate-400">
+                                     <div className="border-t border-slate-50 dark:border-slate-700 p-4 flex items-center justify-between text-[11px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
                                          <span>Last Active: Today</span>
-                                         <Button variant="ghost" size="sm" className="h-auto p-0 hover:bg-transparent hover:text-blue-600">Permissions <ArrowRight className="w-3 h-3 ml-1" /></Button>
+                                         <Button variant="ghost" size="sm" className="h-auto p-0 hover:bg-transparent hover:text-blue-600 dark:hover:text-blue-400">Permissions <ArrowRight className="w-3 h-3 ml-1" /></Button>
                                      </div>
                                 </Card>
                             ))}
@@ -733,46 +733,46 @@ export default function DoctorProfile() {
                     <form onSubmit={handleUpdateProfile} className="space-y-8">
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                              {/* Identity Card */}
-                            <Card className="border-slate-100 rounded-[2rem] p-8 space-y-8 bg-white shadow-sm">
+                            <Card className="border-slate-100 dark:border-slate-800 rounded-[2rem] p-8 space-y-8 bg-white dark:bg-slate-900 shadow-sm">
                                 <div className="flex items-center gap-3">
-                                    <div className="p-3 bg-blue-50 rounded-2xl">
-                                        <User className="w-6 h-6 text-blue-600" />
+                                    <div className="p-3 bg-blue-50 dark:bg-blue-900/40 rounded-2xl">
+                                        <User className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                                     </div>
-                                    <h3 className="text-2xl font-black tracking-tight">Professional Identity</h3>
+                                    <h3 className="text-2xl font-black tracking-tight dark:text-slate-100">Professional Identity</h3>
                                 </div>
                                 
                                 <div className="space-y-6">
                                     <div className="space-y-2">
-                                        <Label className="text-xs font-black uppercase tracking-widest text-slate-400">Display Name</Label>
+                                        <Label className="text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Display Name</Label>
                                         <Input 
                                             value={profile?.full_name} 
                                             onChange={e => setProfile(p => ({ ...p!, full_name: e.target.value }))}
-                                            className="h-12 border-slate-200 rounded-xl px-4 font-bold focus:ring-blue-500" 
+                                            className="h-12 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 rounded-xl px-4 font-bold focus:ring-blue-500" 
                                         />
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="space-y-2">
-                                            <Label className="text-xs font-black uppercase tracking-widest text-slate-400">Primary Qualifications</Label>
+                                            <Label className="text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Primary Qualifications</Label>
                                             <Input 
                                                 value={profile?.qualifications} 
                                                 onChange={e => setProfile(p => ({ ...p!, qualifications: e.target.value }))}
                                                 placeholder="MBBS, MD (Cardiology)"
-                                                className="h-12 border-slate-200 rounded-xl px-4 font-bold" 
+                                                className="h-12 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 rounded-xl px-4 font-bold" 
                                             />
                                         </div>
                                         <div className="space-y-2">
-                                            <Label className="text-xs font-black uppercase tracking-widest text-slate-400">Medical Registration ID</Label>
+                                            <Label className="text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Medical Registration ID</Label>
                                             <Input 
                                                 value={profile?.registration_id} 
                                                 onChange={e => setProfile(p => ({ ...p!, registration_id: e.target.value }))}
                                                 placeholder="Reg #12345"
-                                                className="h-12 border-slate-200 rounded-xl px-4 font-bold" 
+                                                className="h-12 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 rounded-xl px-4 font-bold" 
                                             />
                                         </div>
                                     </div>
                                     <div className="space-y-4">
-                                        <Label className="text-xs font-black uppercase tracking-widest text-slate-400">Select Passport Vector Avatar</Label>
-                                        <div className="grid grid-cols-3 sm:grid-cols-5 gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100 shadow-inner max-h-48 overflow-y-auto">
+                                        <Label className="text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Select Passport Vector Avatar</Label>
+                                        <div className="grid grid-cols-3 sm:grid-cols-5 gap-3 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-inner max-h-48 overflow-y-auto">
                                             {AVATAR_OPTIONS.map((opt) => (
                                                 <button
                                                     key={opt.url}
@@ -780,7 +780,7 @@ export default function DoctorProfile() {
                                                     onClick={() => setProfile(p => ({ ...p!, avatar_url: opt.url }))}
                                                     className={cn(
                                                         "relative aspect-square rounded-xl overflow-hidden border-4 transition-all hover:scale-105",
-                                                        profile?.avatar_url === opt.url ? "border-blue-600 ring-4 ring-blue-100" : "border-white"
+                                                        profile?.avatar_url === opt.url ? "border-blue-600 ring-4 ring-blue-100 dark:ring-blue-900/40" : "border-white dark:border-slate-700"
                                                     )}
                                                 >
                                                     <img src={opt.url} className="w-full h-full object-cover" alt={opt.name} />
@@ -797,54 +797,54 @@ export default function DoctorProfile() {
                             </Card>
 
                             {/* Clinic Branding */}
-                            <Card className="border-slate-100 rounded-[2rem] p-8 space-y-8 bg-white shadow-sm">
+                            <Card className="border-slate-100 dark:border-slate-800 rounded-[2rem] p-8 space-y-8 bg-white dark:bg-slate-900 shadow-sm">
                                 <div className="flex items-center gap-3">
-                                    <div className="p-3 bg-emerald-50 rounded-2xl">
-                                        <HeartPulse className="w-6 h-6 text-emerald-600" />
+                                    <div className="p-3 bg-emerald-50 dark:bg-emerald-900/40 rounded-2xl">
+                                        <HeartPulse className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
                                     </div>
-                                    <h3 className="text-2xl font-black tracking-tight">Clinic Branding</h3>
+                                    <h3 className="text-2xl font-black tracking-tight dark:text-slate-100">Clinic Branding</h3>
                                 </div>
 
                                 <div className="space-y-6">
                                     <div className="space-y-2">
-                                        <Label className="text-xs font-black uppercase tracking-widest text-slate-400">Clinic Name</Label>
+                                        <Label className="text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Clinic Name</Label>
                                         <Input 
                                             value={profile?.clinic_name} 
                                             onChange={e => setProfile(p => ({ ...p!, clinic_name: e.target.value }))}
                                             placeholder="Lifeline Diagnostic Centre"
-                                            className="h-12 border-slate-200 rounded-xl px-4 font-bold" 
+                                            className="h-12 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 rounded-xl px-4 font-bold" 
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label className="text-xs font-black uppercase tracking-widest text-slate-400">Clinic Address</Label>
+                                        <Label className="text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Clinic Address</Label>
                                         <Input 
                                             value={profile?.clinic_address} 
                                             onChange={e => setProfile(p => ({ ...p!, clinic_address: e.target.value }))}
                                             placeholder="123 Health Street, City"
-                                            className="h-12 border-slate-200 rounded-xl px-4 font-bold" 
+                                            className="h-12 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 rounded-xl px-4 font-bold" 
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label className="text-xs font-black uppercase tracking-widest text-slate-400">Clinic Contact</Label>
+                                        <Label className="text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Clinic Contact</Label>
                                         <Input 
                                             value={profile?.clinic_phone} 
                                             onChange={e => setProfile(p => ({ ...p!, clinic_phone: e.target.value }))}
                                             placeholder="+91 00000 00000"
-                                            className="h-12 border-slate-200 rounded-xl px-4 font-bold" 
+                                            className="h-12 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 rounded-xl px-4 font-bold" 
                                         />
                                     </div>
                                 </div>
                             </Card>
 
                             {/* Digital Signature */}
-                            <Card className="border-slate-100 rounded-[2rem] p-8 space-y-6 bg-white shadow-sm lg:col-span-2">
+                            <Card className="border-slate-100 dark:border-slate-800 rounded-[2rem] p-8 space-y-6 bg-white dark:bg-slate-900 shadow-sm lg:col-span-2">
                                 <div className="flex items-center gap-3">
-                                    <div className="p-3 bg-amber-50 rounded-2xl">
-                                        <FileSignature className="w-6 h-6 text-amber-600" />
+                                    <div className="p-3 bg-amber-50 dark:bg-amber-900/40 rounded-2xl">
+                                        <FileSignature className="w-6 h-6 text-amber-600 dark:text-amber-400" />
                                     </div>
                                     <div>
-                                        <h3 className="text-2xl font-black tracking-tight">Digital Signature</h3>
-                                        <p className="text-xs font-bold text-slate-400">Used for validating digital prescriptions</p>
+                                        <h3 className="text-2xl font-black tracking-tight dark:text-slate-100">Digital Signature</h3>
+                                        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">Used for validating digital prescriptions</p>
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
@@ -852,10 +852,10 @@ export default function DoctorProfile() {
                                         initialSignature={profile?.signature_data}
                                         onSave={(data) => setProfile(p => ({ ...p!, signature_data: data }))}
                                     />
-                                    <div className="bg-slate-50 rounded-3xl p-8 border-2 border-dashed border-slate-200 flex flex-col items-center justify-center min-h-[150px]">
+                                    <div className="bg-slate-50 dark:bg-slate-800/50 rounded-3xl p-8 border-2 border-dashed border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center min-h-[150px]">
                                         {profile?.signature_data ? (
                                             <div className="space-y-4 text-center">
-                                                <img src={profile.signature_data} className="max-h-24 mx-auto contrast-125" alt="Preview" />
+                                                <img src={profile.signature_data} className="max-h-24 mx-auto contrast-125 dark:invert" alt="Preview" />
                                                 <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500">Live Signature Active</p>
                                             </div>
                                         ) : (
@@ -885,15 +885,15 @@ export default function DoctorProfile() {
 
             {/* Add Staff Dialog */}
             <Dialog open={showAddStaffDialog} onOpenChange={setShowAddStaffDialog}>
-                <DialogContent className="max-w-2xl w-[95vw] p-0 overflow-hidden border-none bg-slate-50 rounded-[2.5rem] shadow-2xl">
-                    <DialogHeader className="p-8 bg-white border-b">
+                <DialogContent className="max-w-2xl w-[95vw] p-0 overflow-hidden border-none bg-slate-50 dark:bg-slate-900 rounded-[2.5rem] shadow-2xl">
+                    <DialogHeader className="p-8 bg-white dark:bg-slate-800 border-b dark:border-slate-700">
                         <div className="flex items-center gap-4">
-                            <div className="p-3 bg-blue-50 rounded-2xl">
-                                <UserPlus className="w-6 h-6 text-blue-600" />
+                            <div className="p-3 bg-blue-50 dark:bg-blue-900/40 rounded-2xl">
+                                <UserPlus className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                             </div>
                             <div>
-                                <DialogTitle className="text-2xl font-black tracking-tight text-slate-900">System Staff Members</DialogTitle>
-                                <DialogDescription className="font-bold text-slate-400 uppercase tracking-widest text-[10px] mt-1">Select an existing user to add to your clinic team</DialogDescription>
+                                <DialogTitle className="text-2xl font-black tracking-tight text-slate-900 dark:text-slate-100">System Staff Members</DialogTitle>
+                                <DialogDescription className="font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest text-[10px] mt-1">Select an existing user to add to your clinic team</DialogDescription>
                             </div>
                         </div>
                     </DialogHeader>
@@ -905,7 +905,7 @@ export default function DoctorProfile() {
                                 placeholder="Search by name or email..." 
                                 value={staffSearchQuery}
                                 onChange={e => setStaffSearchQuery(e.target.value)}
-                                className="h-12 pl-12 bg-white border-slate-200 rounded-2xl font-bold shadow-sm focus:ring-blue-500"
+                                className="h-12 pl-12 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-2xl font-bold shadow-sm focus:ring-blue-500"
                             />
                         </div>
 
@@ -918,21 +918,21 @@ export default function DoctorProfile() {
                                 .filter(p => !staff.some(s => s.profiles?.user_id === p.user_id)) // Hide already added
                                 .filter(p => p.user_id !== user?.id) // Hide self
                                 .map(p => (
-                                    <div key={p.user_id} className="flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-100 group hover:border-blue-200 transition-all shadow-sm">
+                                    <div key={p.user_id} className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 group hover:border-blue-200 dark:hover:border-blue-700 transition-all shadow-sm">
                                         <div className="flex items-center gap-4">
-                                            <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center font-black text-slate-400 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                                            <div className="w-10 h-10 rounded-full bg-slate-50 dark:bg-slate-700 flex items-center justify-center font-black text-slate-400 dark:text-slate-500 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/40 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                                                 {p.full_name?.charAt(0)}
                                             </div>
                                             <div>
-                                                <p className="font-bold text-slate-800 leading-tight">{p.full_name}</p>
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase">{p.email || 'No email synced'}</p>
+                                                <p className="font-bold text-slate-800 dark:text-slate-100 leading-tight">{p.full_name}</p>
+                                                <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">{p.email || 'No email synced'}</p>
                                             </div>
                                         </div>
                                         <Button 
                                             size="sm" 
                                             onClick={() => handleAddStaff(p.user_id)}
                                             disabled={addingStaffId === p.user_id}
-                                            className="rounded-full bg-slate-900 hover:bg-slate-800 text-white font-black text-[9px] uppercase tracking-widest h-9 px-4 border-none shadow-lg shadow-slate-200"
+                                            className="rounded-full bg-slate-900 dark:bg-slate-50 dark:text-slate-900 text-white font-black text-[9px] uppercase tracking-widest h-9 px-4 border-none shadow-lg shadow-slate-200"
                                         >
                                             {addingStaffId === p.user_id ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Activate as Staff'}
                                         </Button>
@@ -940,19 +940,19 @@ export default function DoctorProfile() {
                                 ))}
                             {allProfiles.length === 0 && (
                                 <div className="text-center py-10 space-y-3">
-                                    <RefreshCw className="w-8 h-8 text-slate-200 mx-auto animate-spin" />
-                                    <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">Loading profiles...</p>
+                                    <RefreshCw className="w-8 h-8 text-slate-200 dark:text-slate-800 mx-auto animate-spin" />
+                                    <p className="text-slate-400 dark:text-slate-500 font-bold uppercase text-[10px] tracking-widest">Loading profiles...</p>
                                 </div>
                             )}
                             {allProfiles.length > 0 && allProfiles.filter(p => p.full_name?.toLowerCase().includes(staffSearchQuery.toLowerCase()) || p.email?.toLowerCase().includes(staffSearchQuery.toLowerCase())).length === 0 && (
-                                <p className="text-center py-10 text-slate-400 font-bold uppercase text-[10px] tracking-widest italic">No matching users found</p>
+                                <p className="text-center py-10 text-slate-400 dark:text-slate-500 font-bold uppercase text-[10px] tracking-widest italic">No matching users found</p>
                             )}
                         </div>
                     </div>
 
-                    <DialogFooter className="p-6 bg-slate-50 border-t flex items-center justify-between">
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest hidden sm:block">Need to create a new user? Visit User Management.</p>
-                        <Button variant="ghost" onClick={() => setShowAddStaffDialog(false)} className="rounded-full font-bold h-11 px-6 uppercase text-[10px] tracking-widest">Close</Button>
+                    <DialogFooter className="p-6 bg-slate-50 dark:bg-slate-800 border-t dark:border-slate-700 flex items-center justify-between">
+                        <p className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest hidden sm:block">Need to create a new user? Visit User Management.</p>
+                        <Button variant="ghost" onClick={() => setShowAddStaffDialog(false)} className="rounded-full font-bold h-11 px-6 uppercase text-[10px] tracking-widest dark:text-slate-300">Close</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
