@@ -1100,7 +1100,7 @@ export default function DoctorConsultation() {
               <div className="w-20" /> {/* Spacer for symmetry with print button */}
             </div>
           </DialogHeader>
-          <div className="p-4 md:p-8 overflow-auto max-h-[85vh] flex justify-center bg-muted" id="consultation-print-preview">
+          <div className="p-4 md:p-8 overflow-auto max-h-[85vh] bg-muted min-h-[500px]" id="consultation-print-preview">
             <PrescriptionTemplate
               patient={patient}
               visit={selectedVisit}
@@ -1114,7 +1114,7 @@ export default function DoctorConsultation() {
             />
           </div>
         </DialogContent>
-      </Dialog>
+        </Dialog>
 
       {/* History Preview Dialog */}
       <Dialog open={!!viewingHistoryRx} onOpenChange={open => !open && setViewingHistoryRx(null)}>
@@ -1130,7 +1130,7 @@ export default function DoctorConsultation() {
               <div className="w-20" /> {/* Spacer */}
             </div>
           </div>
-          <div className="p-4 md:p-8 overflow-y-auto max-h-[85vh] flex justify-center bg-muted scrollbar-thin scrollbar-thumb-muted-foreground/20" id="history-print-preview">
+          <div className="p-4 md:p-8 overflow-y-auto max-h-[85vh] bg-muted scrollbar-thin scrollbar-thumb-muted-foreground/20 min-h-[500px]" id="history-print-preview">
             {viewingHistoryRx && (() => {
               const rx = viewingHistoryRx.prescriptions?.[0];
               const isWritingMode = rx?.is_writing_mode ?? (!!rx?.advice_image && (rx.advice_image.startsWith('data:image') || rx.advice_image.startsWith('[')));

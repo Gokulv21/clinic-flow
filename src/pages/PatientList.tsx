@@ -307,7 +307,7 @@ export default function PatientList() {
               <Printer className="w-4 h-4" /> Print
             </Button>
           </div>
-          <div className="p-4 md:p-8 overflow-y-auto max-h-[85vh] flex justify-center scrollbar-thin scrollbar-thumb-muted-foreground/20">
+          <div className="p-4 md:p-8 overflow-y-auto max-h-[85vh] scrollbar-thin scrollbar-thumb-muted-foreground/20 min-h-[500px]">
             {viewingRx && (() => {
               const rx = viewingRx.prescriptions?.[0];
               const isWritingMode = rx?.is_writing_mode ?? (!!rx?.advice_image && (rx.advice_image.startsWith('data:image') || rx.advice_image.startsWith('[')));

@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
+import { useAuth } from '@/lib/auth';
 import { supabase } from "@/integrations/supabase/client";
 import { format, formatDistanceToNow } from "date-fns";
 import { formatAge } from '@/lib/utils';
@@ -35,17 +36,19 @@ const PrescriptionTemplate = React.memo(({
     isWritingMode = false,
 }: PrescriptionTemplateProps) => {
 
+    const { user: authUser } = useAuth();
     const [doctorProfile, setDoctorProfile] = useState<any>(null);
 
     useEffect(() => {
         const fetchDoctorProfile = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
+            if (!authUser) return;
+
+            try {
                 // First check if current user is a doctor
                 const { data: roleData } = await supabase
                     .from('user_roles')
                     .select('role')
-                    .eq('user_id', user.id)
+                    .eq('user_id', authUser.id)
                     .eq('role', 'doctor')
                     .maybeSingle();
 
@@ -54,11 +57,11 @@ const PrescriptionTemplate = React.memo(({
                     const { data } = await supabase
                         .from('profiles')
                         .select('*')
-                        .eq('user_id', user.id)
-                        .single();
+                        .eq('user_id', authUser.id)
+                        .maybeSingle();
                     if (data) setDoctorProfile(data);
                 } else {
-                    // Current user is NOT a doctor (e.g. staff), fetch the first available doctor's profile
+                    // Current user is NOT a doctor, fetch the first available doctor
                     const { data: doctorRole } = await supabase
                         .from('user_roles')
                         .select('user_id')
@@ -71,14 +74,16 @@ const PrescriptionTemplate = React.memo(({
                             .from('profiles')
                             .select('*')
                             .eq('user_id', doctorRole.user_id)
-                            .single();
+                            .maybeSingle();
                         if (data) setDoctorProfile(data);
                     }
                 }
+            } catch (err) {
+                console.error("Error in fetchDoctorProfile:", err);
             }
         };
         fetchDoctorProfile();
-    }, []);
+    }, [authUser]); 
 
 
     const today = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -111,7 +116,7 @@ const PrescriptionTemplate = React.memo(({
     }
 
     const images = rawImages.filter(isValidImage);
-    const showHandwritten = images.length > 0;
+    const showHandwritten = isWritingMode && images.length > 0;
 
     // If no handwriting or not in writing mode, we still need one "page" for typed content
     const pagesToShow = showHandwritten ? images : [null];
@@ -124,10 +129,11 @@ const PrescriptionTemplate = React.memo(({
                     id={idx === 0 ? "prescription-template" : undefined}
                     className="single-page-prescription"
                     style={{
-                        width: isPrint ? '210mm' : 'min(100%, 800px)',
-                        maxWidth: '100%',
+                        width: isPrint ? '210mm' : '100%',
+                        maxWidth: isPrint ? undefined : '800px',
                         height: isPrint ? '296mm' : undefined,
-                        maxHeight: isPrint ? '100%' : undefined,
+                        minHeight: isPrint ? undefined : '500px',
+                        margin: '0 auto',
                         aspectRatio: isPrint ? undefined : '1 / 1.414',
                         containerType: 'inline-size' as any,
                         position: 'relative',
@@ -174,8 +180,8 @@ const PrescriptionTemplate = React.memo(({
                             style={{
                                 position: 'absolute', top: 0, left: 0,
                                 width: '100%', height: '100%',
-                                objectFit: 'fill',
-                                zIndex: 20,
+                                objectFit: 'contain', // Change back to contain for better quality
+                                zIndex: 100, // Ensure it's on top of everything
                                 pointerEvents: 'none',
                             }}
                         />
@@ -211,7 +217,7 @@ function PageOne({ patient, visit, today, time, clinicalNotes, diagnosis, medici
                 fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
                 fontSize: '1.8cqw', // Further increased base font size
                 color: '#0f172a',
-                overflow: isWritingMode ? 'hidden' : 'visible',
+                overflow: 'visible',
             }}
         >
             <div className="margin-line margin-line-left" />
