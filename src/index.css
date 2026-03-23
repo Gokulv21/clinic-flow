@@ -51,32 +51,32 @@
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --background: 0 0% 0%; /* True Black #000000 */
+    --foreground: 0 0% 100%;
+    --card: 0 0% 7%; /* Very Dark #121212 */
+    --card-foreground: 0 0% 100%;
+    --popover: 0 0% 7%;
+    --popover-foreground: 0 0% 100%;
     --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 15%; /* #262626 */
+    --secondary-foreground: 0 0% 100%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 65%;
+    --accent: 0 0% 15%;
+    --accent-foreground: 0 0% 100%;
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 15%; /* #262626 */
+    --input: 0 0% 15%;
     --ring: 224.3 76.3% 48%;
-    --sidebar-background: 222.2 84% 3.9%;
-    --sidebar-foreground: 210 40% 98%;
+    --sidebar-background: 0 0% 0%;
+    --sidebar-foreground: 0 0% 100%;
     --sidebar-primary: 217.2 91.2% 59.8%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 217.2 32.6% 17.5%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 217.2 32.6% 17.5%;
+    --sidebar-accent: 0 0% 15%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 0 0% 15%;
     --sidebar-ring: 224.3 76.3% 48%;
   }
 }
@@ -101,7 +101,8 @@
     background: linear-gradient(135deg, hsl(199 89% 38%), hsl(199 89% 48%));
   }
   .gradient-sidebar {
-    background: linear-gradient(180deg, hsl(199 89% 15%), hsl(199 89% 10%));
+    background: hsl(var(--sidebar-background));
+    border-right: 1px solid hsl(var(--sidebar-border));
   }
 }
 
@@ -119,18 +120,22 @@
 
   body.is-printing #print-mount {
     display: block !important;
-    position: static !important;
+    position: relative !important;
     margin: 0 auto !important;
-    width: 210mm !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 210mm !important; /* Cap at A4 width but allow smaller */
     visibility: visible !important;
     opacity: 1 !important;
     background: #fff !important;
+    border: none !important;
   }
 
   /* Force all descendants of print-mount to be visible */
   #print-mount * {
     visibility: visible !important;
     opacity: 1 !important;
+    border-color: inherit;
   }
 
   /* Fallback: Hide common UI elements if not using is-printing logic */
@@ -154,7 +159,8 @@
     padding: 0 !important;
     background: #fff !important;
     height: auto !important;
-    width: 100% !important;
+    width: auto !important;
+    overflow: visible !important;
   }
 
   /* Force exact color printing */

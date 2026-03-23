@@ -74,6 +74,7 @@ export default function DoctorConsultation() {
   const [isWritingMode, setIsWritingMode] = useState(false);
   const [clinicalNotes, setClinicalNotes] = useState('');
   const [showVitalsEdit, setShowVitalsEdit] = useState(false);
+  const [lastInputWay, setLastInputWay] = useState<'typing' | 'writing'>('typing');
   const lastLoadedVisitId = useRef<string | null>(null);
 
   useEffect(() => {
@@ -134,6 +135,7 @@ export default function DoctorConsultation() {
           prescriptionImage,
           prescriptionPaths,
           isWritingMode,
+          lastInputWay,
           timestamp: Date.now()
         };
         localStorage.setItem(`draft_${selectedVisit.id}`, JSON.stringify(draft));
@@ -142,7 +144,7 @@ export default function DoctorConsultation() {
       
       return () => clearTimeout(timer);
     }
-  }, [selectedVisit?.id, diagnosis, clinicalNotes, medicines, advice, prescriptionImage, prescriptionPaths, isWritingMode]);
+  }, [selectedVisit?.id, diagnosis, clinicalNotes, medicines, advice, prescriptionImage, prescriptionPaths, isWritingMode, lastInputWay]);
 
   const selectVisit = async (visit: any, checkForDrafts = false) => {
     setSelectedVisit(visit);
@@ -167,6 +169,7 @@ export default function DoctorConsultation() {
           setPrescriptionImage(draft.prescriptionImage);
           setPrescriptionPaths(draft.prescriptionPaths || []);
           setIsWritingMode(draft.isWritingMode ?? false);
+          setLastInputWay(draft.lastInputWay || (draft.isWritingMode ? 'writing' : 'typing'));
           lastLoadedVisitId.current = visit.id;
           return;
         }
@@ -203,11 +206,13 @@ export default function DoctorConsultation() {
     }
 
     setIsWritingMode(rxData?.is_writing_mode ?? (!!rxImage && (rxImage.startsWith('data:image') || rxImage.startsWith('['))));
+    setLastInputWay(rxData?.is_writing_mode ? 'writing' : 'typing');
     setPrescriptionPaths(rxPaths);
     
-    // If there's a drawing, force writing mode
+    // If there's a drawing, force writing mode preference initially
     if (rxPaths && rxPaths.length > 0 && rxPaths[0].length > 0) {
       setIsWritingMode(true);
+      setLastInputWay('writing');
     }
 
     // Update status to in_consultation
@@ -344,20 +349,20 @@ export default function DoctorConsultation() {
   const savePrescription = async () => {
     if (!selectedVisit || !patient) return;
     
-    // In writing mode, we ignore typed medicines/diagnosis/advice
-    // In typing mode, we ignore handwritten image/paths
-    const finalDiagnosis = isWritingMode ? null : (diagnosis || null);
-    const finalClinicalNotes = isWritingMode ? null : (clinicalNotes || null);
-    const finalMedicines = isWritingMode ? [] : medicines.filter(m => m.name.trim());
-    const finalAdviceImage = isWritingMode ? prescriptionImage : (advice || null);
-    const finalPaths = isWritingMode ? prescriptionPaths : [];
+    // Prioritize the last way of record
+    const isWriting = lastInputWay === 'writing';
+    const finalDiagnosis = isWriting ? null : (diagnosis || null);
+    const finalClinicalNotes = isWriting ? null : (clinicalNotes || null);
+    const finalMedicines = isWriting ? [] : medicines.filter(m => m.name.trim());
+    const finalAdviceImage = isWriting ? prescriptionImage : (advice || null);
+    const finalPaths = isWriting ? prescriptionPaths : [];
 
-    if (!isWritingMode && !finalDiagnosis && finalMedicines.length === 0 && !advice && !finalClinicalNotes) {
+    if (!isWriting && !finalDiagnosis && finalMedicines.length === 0 && !advice && !finalClinicalNotes) {
       toast.error('Please add diagnosis, notes, medicines or advice');
       return;
     }
     
-    if (isWritingMode && !prescriptionImage) {
+    if (isWriting && !prescriptionImage) {
       toast.error('Please add handwriting using the template');
       return;
     }
@@ -415,6 +420,7 @@ export default function DoctorConsultation() {
     setPrescriptionPaths(pages as any);
     setShowDigitalRx(false);
     setIsWritingMode(true);
+    setLastInputWay('writing');
     // Clear typed advice since we are in writing mode
     setAdvice('');
   };
@@ -735,7 +741,10 @@ export default function DoctorConsultation() {
                       <Label className="text-[12px] font-extrabold text-slate-500 uppercase tracking-widest ml-1">Clinical Notes</Label>
                       <Textarea 
                         value={clinicalNotes} 
-                        onChange={e => setClinicalNotes(e.target.value)} 
+                        onChange={e => {
+                          setClinicalNotes(e.target.value);
+                          setLastInputWay('typing');
+                        }} 
                         placeholder="Enter clinical examination notes, symptoms, etc." 
                         className="min-h-[120px] text-base font-bold bg-slate-50/50 border-slate-100 focus:bg-white focus:ring-blue-500 transition-all rounded-xl resize-none shadow-inner"
                       />
@@ -745,7 +754,10 @@ export default function DoctorConsultation() {
                       <Label className="text-[12px] font-extrabold text-slate-500 uppercase tracking-widest ml-1">Diagnosis</Label>
                       <Input 
                         value={diagnosis} 
-                        onChange={e => setDiagnosis(e.target.value)} 
+                        onChange={e => {
+                          setDiagnosis(e.target.value);
+                          setLastInputWay('typing');
+                        }} 
                         placeholder="Enter diagnosis" 
                         className="h-12 text-base font-bold bg-slate-50/50 border-slate-100 focus:bg-white focus:ring-blue-500 transition-all rounded-xl shadow-inner"
                       />
@@ -793,7 +805,10 @@ export default function DoctorConsultation() {
                                   <Input 
                                     placeholder="Medicine Name" 
                                     value={med.name} 
-                                    onChange={e => updateMedicine(i, 'name', e.target.value)}
+                                    onChange={e => {
+                                      updateMedicine(i, 'name', e.target.value);
+                                      setLastInputWay('typing');
+                                    }}
                                     onKeyDown={e => handleMedicineKeyDown(e, i, 'name')}
                                     className="h-10 text-sm font-bold border-slate-200 bg-white rounded-lg" 
                                   />
@@ -1094,7 +1109,7 @@ export default function DoctorConsultation() {
               diagnosis={diagnosis}
               medicines={medicines.filter(m => m.name.trim())}
               advice={advice}
-              isWritingMode={isWritingMode}
+              isWritingMode={lastInputWay === 'writing'}
               isPrint={true}
             />
           </div>

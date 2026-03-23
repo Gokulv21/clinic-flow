@@ -3,10 +3,17 @@ import { useAuth, AppRole } from '@/lib/auth';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import {
-  Stethoscope, ClipboardPlus, Printer, BarChart3, Users, LogOut, Home, Menu, HelpCircle
+  Stethoscope, ClipboardPlus, Printer, BarChart3, Users, LogOut, Home, Menu, HelpCircle, Sun, Moon, Monitor, ChevronUp
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useTheme } from '@/components/ThemeProvider';
 import logo from '@/assets/logo.png';
 
 interface NavItem {
@@ -30,6 +37,7 @@ const navItems: NavItem[] = [
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const { profile, roles, signOut } = useAuth();
+  const { theme, setTheme } = useTheme();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -40,8 +48,6 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   };
 
   const visibleItems = navItems.filter(item => item.roles.some(r => roles.includes(r)));
-  console.log("Current Roles:", roles);
-  console.log("Visible Items:", visibleItems.map(i => i.label));
 
   return (
     <div className="min-h-screen flex bg-background">
@@ -82,13 +88,42 @@ export default function AppLayout({ children }: { children: ReactNode }) {
               )}>
                 {item.label}
               </span>
-              
-              {/* Tooltip for when collapsed (if needed, but group-hover handles it now) */}
             </button>
           ))}
         </nav>
 
-        <div className="p-3 border-t border-sidebar-border mt-auto">
+        <div className="px-3 py-2 border-t border-sidebar-border">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-sidebar-foreground/60 hover:text-white hover:bg-white/10 transition-all font-medium"
+              >
+                <div className="shrink-0 w-6 flex justify-center">
+                  {theme === 'light' ? <Sun className="w-5 h-5" /> : theme === 'dark' ? <Moon className="w-5 h-5" /> : <Monitor className="w-5 h-5" />}
+                </div>
+                <span className={cn(
+                  "transition-all duration-300 whitespace-nowrap opacity-0 group-hover:opacity-100 flex-1 text-left capitalize"
+                )}>
+                  {theme} Mode
+                </span>
+                <ChevronUp className={cn("w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity")} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" side="right" className="w-48 rounded-xl bg-card border-border">
+              <DropdownMenuItem onClick={() => setTheme("light")} className="gap-2 cursor-pointer rounded-lg m-1">
+                <Sun className="w-4 h-4" /> <span>Light</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTheme("dark")} className="gap-2 cursor-pointer rounded-lg m-1">
+                <Moon className="w-4 h-4" /> <span>Dark</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTheme("system")} className="gap-2 cursor-pointer rounded-lg m-1">
+                <Monitor className="w-4 h-4" /> <span>System</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        <div className="p-3 border-t border-sidebar-border">
           <button
             onClick={signOut}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-sidebar-foreground/60 hover:text-white hover:bg-destructive/20 transition-all overflow-hidden"
@@ -169,13 +204,36 @@ export default function AppLayout({ children }: { children: ReactNode }) {
                 </div>
                 <span>Sign Out</span>
               </button>
+              
+              {/* Mobile Theme Toggle */}
+              <div className="col-span-3 mt-4 pt-4 border-t flex items-center justify-between px-2">
+                <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Appearance</span>
+                <div className="flex bg-secondary p-1 rounded-xl">
+                  {[
+                    { val: 'light', icon: <Sun className="w-4 h-4" /> },
+                    { val: 'dark', icon: <Moon className="w-4 h-4" /> },
+                    { val: 'system', icon: <Monitor className="w-4 h-4" /> },
+                  ].map(t => (
+                    <button
+                      key={t.val}
+                      onClick={() => setTheme(t.val as any)}
+                      className={cn(
+                        "p-2 rounded-lg transition-all",
+                        theme === t.val ? "bg-background text-primary shadow-sm" : "text-muted-foreground"
+                      )}
+                    >
+                      {t.icon}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </SheetContent>
         </Sheet>
       </nav>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto pb-20 md:pb-0 bg-slate-50/50">
+      <main className="flex-1 overflow-auto pb-20 md:pb-0 bg-background">
         <div className="min-h-full">
           {children}
         </div>

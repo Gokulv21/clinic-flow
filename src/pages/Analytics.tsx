@@ -16,6 +16,7 @@ export default function Analytics() {
   const [stats, setStats] = useState({ todayPatients: 0, monthPatients: 0, totalPatients: 0 });
   const [timeRange, setTimeRange] = useState<TimeRange>('week');
   const [volumeData, setVolumeData] = useState<any[]>([]);
+  const [trends, setTrends] = useState({ today: '', month: '' });
   const [diagnosisData, setDiagnosisData] = useState<any[]>([]);
   const [seasonalityData, setSeasonalityData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,20 +31,50 @@ export default function Analytics() {
   }, [timeRange]);
 
   const fetchGeneralStats = async () => {
-    const today = new Date().toISOString().split('T')[0];
-    const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const lastMonthStart = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1);
+    const lastMonthEnd = new Date(new Date().getFullYear(), new Date().getMonth(), 0);
 
-    const [todayRes, monthRes, totalRes] = await Promise.all([
-      supabase.from('visits').select('id', { count: 'exact', head: true }).gte('created_at', today),
-      supabase.from('visits').select('id', { count: 'exact', head: true }).gte('created_at', monthStart),
+    const [todayRes, yesterdayRes, monthRes, lastMonthRes, totalRes] = await Promise.all([
+      supabase.from('visits').select('id', { count: 'exact', head: true }).gte('created_at', today.toISOString()),
+      supabase.from('visits').select('id', { count: 'exact', head: true }).gte('created_at', yesterday.toISOString()).lt('created_at', today.toISOString()),
+      supabase.from('visits').select('id', { count: 'exact', head: true }).gte('created_at', monthStart.toISOString()),
+      supabase.from('visits').select('id', { count: 'exact', head: true }).gte('created_at', lastMonthStart.toISOString()).lte('created_at', lastMonthEnd.toISOString()),
       supabase.from('patients').select('id', { count: 'exact', head: true }),
     ]);
 
+    const todayCount = todayRes.count || 0;
+    const yesterdayCount = yesterdayRes.count || 0;
+    const monthCount = monthRes.count || 0;
+    const lastMonthCount = lastMonthRes.count || 0;
+
+    // Calculate Today Trend
+    let todayTrend = 'No change';
+    if (yesterdayCount > 0) {
+      const diff = ((todayCount - yesterdayCount) / yesterdayCount) * 100;
+      todayTrend = `${diff >= 0 ? '+' : ''}${diff.toFixed(0)}% from yesterday`;
+    } else if (todayCount > 0) {
+      todayTrend = '+100% from yesterday';
+    }
+
+    // Calculate Month Trend
+    let monthTrend = 'Stable';
+    if (lastMonthCount > 0) {
+      const diff = ((monthCount - lastMonthCount) / lastMonthCount) * 100;
+      monthTrend = diff > 0 ? 'Growing' : 'Slight dip';
+    }
+
     setStats({
-      todayPatients: todayRes.count || 0,
-      monthPatients: monthRes.count || 0,
+      todayPatients: todayCount,
+      monthPatients: monthCount,
       totalPatients: totalRes.count || 0,
     });
+    setTrends({ today: todayTrend, month: monthTrend });
 
     // Diagnosis distribution
     const { data: rxData } = await supabase.from('prescriptions').select('diagnosis').not('diagnosis', 'is', null).limit(200);
@@ -75,9 +106,13 @@ export default function Analytics() {
         const { count } = await supabase.from('visits').select('id', { count: 'exact', head: true })
           .gte('created_at', start).lte('created_at', end);
         
+        const countVal = count || 0;
+        const prevCount = data.length > 0 ? data[data.length - 1].patients : 0;
+        
         data.push({ 
           name: d.toLocaleDateString('en', { weekday: i < 7 ? 'short' : undefined, day: 'numeric', month: 'short' }), 
-          patients: count || 0 
+          patients: countVal,
+          color: countVal >= prevCount ? '#22c55e' : '#ef4444' // Green for up, red for down
         });
       }
     } else {
@@ -90,9 +125,13 @@ export default function Analytics() {
         const { count } = await supabase.from('visits').select('id', { count: 'exact', head: true })
           .gte('created_at', start).lte('created_at', end);
         
+        const countVal = count || 0;
+        const prevCount = data.length > 0 ? data[data.length - 1].patients : 0;
+
         data.push({ 
           name: d.toLocaleDateString('en', { month: 'short' }), 
-          patients: count || 0 
+          patients: countVal,
+          color: countVal >= prevCount ? '#22c55e' : '#ef4444'
         });
       }
     }
@@ -162,8 +201,8 @@ export default function Analytics() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {[
-          { label: "Today's Patients", value: stats.todayPatients, icon: <CalendarDays className="w-5 h-5" />, color: 'bg-blue-50 text-blue-600', trend: '+12% from yesterday' },
-          { label: 'Monthly Volume', value: stats.monthPatients, icon: <Activity className="w-5 h-5" />, color: 'bg-emerald-50 text-emerald-600', trend: 'Solid growth' },
+          { label: "Today's Patients", value: stats.todayPatients, icon: <CalendarDays className="w-5 h-5" />, color: 'bg-blue-50 text-blue-600', trend: trends.today },
+          { label: 'Monthly Volume', value: stats.monthPatients, icon: <Activity className="w-5 h-5" />, color: 'bg-emerald-50 text-emerald-600', trend: trends.month },
           { label: 'Total Database', value: stats.totalPatients, icon: <Users className="w-5 h-5" />, color: 'bg-amber-50 text-amber-600', trend: 'Lifetime records' },
         ].map(s => (
           <Card key={s.label} className="border-none shadow-sm hover:shadow-md transition-shadow bg-white overflow-hidden group">
@@ -222,7 +261,11 @@ export default function Analytics() {
                     cursor={{ fill: '#f8fafc' }}
                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', padding: '12px' }}
                   />
-                  <Bar dataKey="patients" fill="hsl(199,89%,38%)" radius={[6, 6, 0, 0]} barSize={timeRange === 'year' ? 30 : 20} />
+                  <Bar dataKey="patients" radius={[6, 6, 0, 0]} barSize={timeRange === 'year' ? 30 : 20}>
+                    {volumeData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>

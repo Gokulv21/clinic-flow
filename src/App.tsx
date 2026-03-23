@@ -121,29 +121,33 @@ function PublicRoute({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+import { ThemeProvider } from "@/components/ThemeProvider";
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter basename="/prescripto">
-        <AuthProvider>
-          <Routes>
-            <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-            <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/nurse" element={<ProtectedRoute allowedRoles={['staff', 'doctor']}><NurseEntry /></ProtectedRoute>} />
-            <Route path="/consultation" element={<ProtectedRoute allowedRoles={['doctor']}><DoctorConsultation /></ProtectedRoute>} />
-            <Route path="/print" element={<ProtectedRoute allowedRoles={['staff', 'doctor']}><PrintQueue /></ProtectedRoute>} />
-            <Route path="/patients" element={<ProtectedRoute allowedRoles={['staff', 'doctor']}><PatientList /></ProtectedRoute>} />
-            <Route path="/analytics" element={<ProtectedRoute allowedRoles={['doctor']}><Analytics /></ProtectedRoute>} />
-            <Route path="/profile" element={<ProtectedRoute allowedRoles={['doctor']}><DoctorProfile /></ProtectedRoute>} />
-            <Route path="/users" element={<ProtectedRoute allowedRoles={['doctor']}><UserManagement /></ProtectedRoute>} />
-            <Route path="/help" element={<ProtectedRoute><Help /></ProtectedRoute>} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
+    <ThemeProvider defaultTheme="system" storageKey="clinic-flow-theme">
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter basename="/prescripto">
+          <AuthProvider>
+            <Routes>
+              <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+              <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+              <Route path="/nurse" element={<ProtectedRoute allowedRoles={['staff', 'doctor']}><NurseEntry /></ProtectedRoute>} />
+              <Route path="/consultation" element={<ProtectedRoute allowedRoles={['doctor']}><DoctorConsultation /></ProtectedRoute>} />
+              <Route path="/print" element={<ProtectedRoute allowedRoles={['staff', 'doctor']}><PrintQueue /></ProtectedRoute>} />
+              <Route path="/patients" element={<ProtectedRoute allowedRoles={['staff', 'doctor']}><PatientList /></ProtectedRoute>} />
+              <Route path="/analytics" element={<ProtectedRoute allowedRoles={['doctor']}><Analytics /></ProtectedRoute>} />
+              <Route path="/profile" element={<ProtectedRoute allowedRoles={['doctor']}><DoctorProfile /></ProtectedRoute>} />
+              <Route path="/users" element={<ProtectedRoute allowedRoles={['doctor']}><UserManagement /></ProtectedRoute>} />
+              <Route path="/help" element={<ProtectedRoute><Help /></ProtectedRoute>} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </ThemeProvider>
   </QueryClientProvider>
 );
 

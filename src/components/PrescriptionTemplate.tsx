@@ -210,12 +210,14 @@ function PageOne({ patient, visit, today, time, clinicalNotes, diagnosis, medici
                         background-color: #ffffff !important; 
                         -webkit-print-color-adjust: exact !important; 
                         print-color-adjust: exact !important;
-                        height: 296mm !important;
-                        width: 210mm !important;
-                        margin: 0 !important;
+                        height: 295.7mm !important; /* Slightly reduced A4 height to prevent overflow on some browsers */
+                        width: 100% !important; 
+                        max-width: 210mm !important;
+                        margin: 0 auto !important;
                         border: none !important;
                         box-shadow: none !important;
-                        page-break-after: always !important;
+                        page-break-after: auto !important;
+                        page-break-inside: avoid !important;
                     }
                     .no-print { display: none !important; }
                 }
