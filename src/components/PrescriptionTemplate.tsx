@@ -370,7 +370,7 @@ function PageOne({ patient, visit, today, time, clinicalNotes, diagnosis, medici
             <div style={{ background: '#fff', borderTop: '2px solid #0f172a', padding: '1em 2em', display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, position: 'relative' }}>
                 {doctorProfile?.signature_data && !isWritingMode && (
                     <div style={{ position: 'absolute', right: '3.5em', bottom: '4.5em', textAlign: 'center' }}>
-                        <img src={doctorProfile.signature_data} alt="Signature" style={{ maxHeight: '7.5em', width: 'auto', marginBottom: '0.3em', mixBlendMode: 'multiply' }} />
+                        <img src={doctorProfile.signature_data} alt="Signature" style={{ maxHeight: '10em', width: 'auto', marginBottom: '0.3em', mixBlendMode: 'multiply' }} />
                         <div style={{ fontSize: '0.75em', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Digital Signature</div>
                     </div>
                 )}
