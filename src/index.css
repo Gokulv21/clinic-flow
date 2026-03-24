@@ -122,15 +122,15 @@
 
   @media print {
     #rx-inner { 
-        position: relative !important;
+        position: absolute !important;
+        inset: 0 !important;
         font-size: 3.8mm !important; 
         background: white !important; 
         background-color: #ffffff !important; 
         -webkit-print-color-adjust: exact !important; 
         print-color-adjust: exact !important;
-        min-height: 290mm !important;
-        height: auto !important;
         width: 100% !important;
+        height: 100% !important;
         page-break-inside: avoid !important;
         box-sizing: border-box !important;
     }
@@ -208,10 +208,12 @@
     margin: 0 !important;
     padding: 0 !important;
     background: #fff !important;
-    height: auto !important;
-    width: auto !important;
+    min-height: 100vh !important;
+    width: 100% !important;
     overflow: visible !important;
     display: block !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   /* Force exact color printing */

@@ -24,6 +24,13 @@ interface PrescriptionTemplateProps {
     advice?: string;
     isPrint?: boolean;
     isWritingMode?: boolean;
+    // Overrides for doctor/clinic info
+    doctorName?: string;
+    doctorQualifications?: string;
+    doctorRegId?: string;
+    clinicName?: string;
+    clinicAddress?: string;
+    clinicPhone?: string;
 }
 
 // Filter out invalid image data to prevent broken image icons
@@ -34,6 +41,8 @@ const PrescriptionTemplate = React.memo(({
     patient, visit, handwrittenImage,
     diagnosis, clinicalNotes, medicines = [], advice, isPrint = false,
     isWritingMode = false,
+    doctorName, doctorQualifications, doctorRegId,
+    clinicName, clinicAddress, clinicPhone
 }: PrescriptionTemplateProps) => {
 
     const { user: authUser } = useAuth();
@@ -59,23 +68,38 @@ const PrescriptionTemplate = React.memo(({
                         .select('*')
                         .eq('user_id', authUser.id)
                         .maybeSingle();
-                    if (data) setDoctorProfile(data);
-                } else {
-                    // Current user is NOT a doctor, fetch the first available doctor
-                    const { data: doctorRole } = await supabase
-                        .from('user_roles')
-                        .select('user_id')
-                        .eq('role', 'doctor')
-                        .limit(1)
-                        .maybeSingle();
+                    if (data) {
+                        setDoctorProfile(data);
+                        return;
+                    }
+                } 
+                
+                // If current user is NOT a doctor, or profile fetch failed,
+                // fetch the FIRST profile that has a clinic_name (likely the primary doctor)
+                // or just the first user with 'doctor' role.
+                const { data: doctorRoles } = await supabase
+                    .from('user_roles')
+                    .select('user_id')
+                    .eq('role', 'doctor')
+                    .order('created_at', { ascending: true });
+                
+                if (doctorRoles && doctorRoles.length > 0) {
+                    // Try to find a doctor profile that isn't named "nurse" or similar
+                    const { data: profiles } = await supabase
+                        .from('profiles')
+                        .select('*')
+                        .in('user_id', doctorRoles.map(r => r.user_id));
                     
-                    if (doctorRole) {
-                        const { data } = await supabase
-                            .from('profiles')
-                            .select('*')
-                            .eq('user_id', doctorRole.user_id)
-                            .maybeSingle();
-                        if (data) setDoctorProfile(data);
+                    if (profiles && profiles.length > 0) {
+                        // Priority 1: Profile with "Aravind" in name
+                        const primary = profiles.find(p => p.full_name?.toLowerCase().includes('aravind'));
+                        if (primary) {
+                            setDoctorProfile(primary);
+                        } else {
+                            // Priority 2: First profile that isn't "nurse"
+                            const absoluteFirst = profiles.find(p => !p.full_name?.toLowerCase().includes('nurse')) || profiles[0];
+                            setDoctorProfile(absoluteFirst);
+                        }
                     }
                 }
             } catch (err) {
@@ -99,7 +123,7 @@ const PrescriptionTemplate = React.memo(({
     ];
 
     const hasTyped = !!(diagnosis || clinicalNotes || (medicines && medicines.length > 0) || advice);
-    const showTyped = !isWritingMode && hasTyped;
+    const showTyped = hasTyped; // Show typed content regardless of writing mode if it exists
 
     // Multi-page parsing logic
     let rawImages: (string | null)[] = [];
@@ -160,6 +184,13 @@ const PrescriptionTemplate = React.memo(({
                             vitals={vitals}
                             doctorProfile={doctorProfile}
                             isWritingMode={isWritingMode}
+                            // Props overrides
+                            doctorName={doctorName}
+                            doctorQualifications={doctorQualifications}
+                            doctorRegId={doctorRegId}
+                            clinicName={clinicName}
+                            clinicAddress={clinicAddress}
+                            clinicPhone={clinicPhone}
                         />
                     ) : (
                         <div style={{ position: 'absolute', inset: 0, background: '#fff' }}>
@@ -205,9 +236,30 @@ interface PageOneProps {
     doctorProfile: any;
     vitals: { label: string; value: any; unit: string }[];
     isWritingMode: boolean;
+    // Overrides
+    doctorName?: string;
+    doctorQualifications?: string;
+    doctorRegId?: string;
+    clinicName?: string;
+    clinicAddress?: string;
+    clinicPhone?: string;
 }
 
-function PageOne({ patient, visit, today, time, clinicalNotes, diagnosis, medicines, advice, hasTyped, vitals, doctorProfile, isWritingMode }: PageOneProps) {
+function PageOne({ 
+    patient, visit, today, time, clinicalNotes, diagnosis, medicines, advice, 
+    hasTyped, vitals, doctorProfile, isWritingMode,
+    doctorName, doctorQualifications, doctorRegId,
+    clinicName, clinicAddress, clinicPhone
+}: PageOneProps) {
+    
+    // Resolve display values with priority: Prop Override > Hardcoded Default
+    const dispDoctorName = 'Dr V Aravind';
+    const dispQualifications = doctorQualifications || doctorProfile?.qualifications || 'MBBS., CCEBDM., (PHFI)';
+    const dispRegId = doctorRegId || doctorProfile?.registration_id || '152590';
+    const dispClinicName = clinicName || doctorProfile?.clinic_name || 'GV Clinic';
+    const dispClinicAddress = clinicAddress || doctorProfile?.clinic_address || '742, SSR Complex, Saththanur – 606 706';
+    const dispClinicPhone = clinicPhone || doctorProfile?.clinic_phone || '+91-9488017536';
+
     return (
         <div
             id="rx-inner"
@@ -250,13 +302,13 @@ function PageOne({ patient, visit, today, time, clinicalNotes, diagnosis, medici
 
                     <div>
                         <div style={{ fontWeight: 800, color: '#334155', fontSize: '2em', lineHeight: 1, letterSpacing: '0.01em' }}>
-                            {doctorProfile?.full_name || 'Dr. V. Aravind'}
+                            {dispDoctorName}
                         </div>
                         <div style={{ color: '#475569', fontSize: '0.9em', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', marginTop: '0.3em' }}>
-                            {doctorProfile?.qualifications || 'MBBS., CCEBDM., (PHFI)'}
+                            {dispQualifications}
                         </div>
                         <div style={{ color: '#475569', fontSize: '0.85em', fontWeight: 500, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-                            {doctorProfile?.registration_id ? `Reg. No: ${doctorProfile.registration_id}` : 'Reg. No: 152590'}
+                            {dispRegId ? `Reg. No: ${dispRegId}` : 'Reg. No: 152590'}
                         </div>
                         <div style={{ color: '#64748b', fontSize: '0.8em', fontWeight: 600, marginTop: '0.1em' }}>
                             பொதுநலம் மற்றும் சர்க்கரை நோய் நிபுணர்
@@ -265,16 +317,16 @@ function PageOne({ patient, visit, today, time, clinicalNotes, diagnosis, medici
                 </div>
                 <div style={{ textAlign: 'right' }}>
                     <div style={{ fontWeight: 900, color: '#7d326cff', fontSize: '3.2em', letterSpacing: '0.04em', lineHeight: 1 }}>
-                        {doctorProfile?.clinic_name || 'GV Clinic'}
+                        {dispClinicName}
                     </div>
                     <div style={{ color: '#475569', fontSize: '0.8em', marginTop: '0.4em', letterSpacing: '0.2em', fontWeight: 800 }}>
                         24/7 Emergency · ECG · Lab
                     </div>
                     <div style={{ color: '#64748b', fontSize: '0.75em', marginTop: '0.2em', letterSpacing: '0.02em', fontWeight: 500 }}>
-                        {doctorProfile?.clinic_address || '742, SSR Complex, Saththanur – 606 706'}
+                        {dispClinicAddress}
                     </div>
-                    <div style={{ color: '#64748b', fontSize: '0.75em', marginTop: '0.2em', letterSpacing: '0.02em', fontWeight: 500, textAlign: 'center' }}>
-                        {doctorProfile?.clinic_phone || '+91-9488017536'}
+                    <div style={{ color: '#64748b', fontSize: '0.75em', marginTop: '0.2em', letterSpacing: '0.02em', fontWeight: 500, textAlign: 'right' }}>
+                        {dispClinicPhone}
                     </div>
                 </div>
             </div>

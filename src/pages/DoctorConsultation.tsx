@@ -351,9 +351,9 @@ export default function DoctorConsultation() {
     
     // Prioritize the last way of record
     const isWriting = lastInputWay === 'writing';
-    const finalDiagnosis = isWriting ? null : (diagnosis || null);
-    const finalClinicalNotes = isWriting ? null : (clinicalNotes || null);
-    const finalMedicines = isWriting ? [] : medicines.filter(m => m.name.trim());
+    const finalDiagnosis = diagnosis || null;
+    const finalClinicalNotes = clinicalNotes || null;
+    const finalMedicines = medicines.filter(m => m.name.trim());
     const finalAdviceImage = isWriting ? prescriptionImage : (advice || null);
     const finalPaths = isWriting ? prescriptionPaths : [];
 

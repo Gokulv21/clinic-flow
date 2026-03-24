@@ -312,18 +312,16 @@ export default function PatientList() {
               const rx = viewingRx.prescriptions?.[0];
               const isWritingMode = rx?.is_writing_mode ?? (!!rx?.advice_image && (rx.advice_image.startsWith('data:image') || rx.advice_image.startsWith('[')));
               return (
-                <div className="print-container">
-                  <PrescriptionTemplate
-                    patient={selectedPatient}
-                    visit={viewingRx}
-                    handwrittenImage={rx?.advice_image}
-                    clinicalNotes={rx?.clinical_notes}
-                    diagnosis={rx?.diagnosis || viewingRx.diagnosis}
-                    medicines={rx?.medicines || []}
-                    advice={!isWritingMode ? rx?.advice_image : null}
-                    isWritingMode={isWritingMode}
-                  />
-                </div>
+                <PrescriptionTemplate
+                  patient={selectedPatient}
+                  visit={viewingRx}
+                  handwrittenImage={rx?.advice_image}
+                  clinicalNotes={rx?.clinical_notes}
+                  diagnosis={rx?.diagnosis || viewingRx.diagnosis}
+                  medicines={rx?.medicines || []}
+                  advice={!isWritingMode ? rx?.advice_image : null}
+                  isWritingMode={isWritingMode}
+                />
               );
             })()}
           </div>

@@ -14,9 +14,28 @@ export function printPrescription(selector: string = '.print-container'): void {
     // ── 1. Preparation: Clone the container ──────────────────────────
     const printMount = document.createElement('div');
     printMount.id = 'print-mount';
-    // Style it correctly for print
+    // Style it correctly for print - Ensure it's hidden from screen but visible to print
     printMount.style.cssText = 'position:fixed;top:0;left:0;width:100%;opacity:0;z-index:-9999;pointer-events:none;background:white;';
     
+    // Inject a style tag to ensure this specific mount is visible during print
+    const style = document.createElement('style');
+    style.innerHTML = `
+        @media print {
+            #print-mount { 
+                display: block !important; 
+                visibility: visible !important; 
+                opacity: 1 !important; 
+                position: relative !important;
+                z-index: 9999 !important;
+            }
+            #print-mount * { 
+                visibility: visible !important; 
+                opacity: 1 !important; 
+            }
+        }
+    `;
+    printMount.appendChild(style);
+
     // Deep clone the container instead of just innerHTML
     const clone = container.cloneNode(true) as HTMLElement;
     clone.id = 'prescription-to-print-cloned';
