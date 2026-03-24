@@ -24,6 +24,9 @@ interface PrescriptionTemplateProps {
     advice?: string;
     isPrint?: boolean;
     isWritingMode?: boolean;
+    // Audit data
+    doctorId?: string;
+    prescriptionCreatedAt?: string;
     // Overrides for doctor/clinic info
     doctorName?: string;
     doctorQualifications?: string;
@@ -41,6 +44,7 @@ const PrescriptionTemplate = React.memo(({
     patient, visit, handwrittenImage,
     diagnosis, clinicalNotes, medicines = [], advice, isPrint = false,
     isWritingMode = false,
+    doctorId, prescriptionCreatedAt,
     doctorName, doctorQualifications, doctorRegId,
     clinicName, clinicAddress, clinicPhone
 }: PrescriptionTemplateProps) => {
@@ -50,33 +54,45 @@ const PrescriptionTemplate = React.memo(({
 
     useEffect(() => {
         const fetchDoctorProfile = async () => {
-            if (!authUser) return;
+            // Priority 1: Use the specific doctor_id if provided (Saved Rx)
+            // Priority 2: Use current user ID ONLY if this is a fresh preview (unsaved draft)
+            let targetId = doctorId;
+            const isSavedRecord = !!prescriptionCreatedAt;
+            
+            if (!targetId && !isSavedRecord) {
+                targetId = authUser?.id;
+            }
 
-            try {
-                // First check if current user is a doctor
-                const { data: roleData } = await supabase
-                    .from('user_roles')
-                    .select('role')
-                    .eq('user_id', authUser.id)
-                    .eq('role', 'doctor')
-                    .maybeSingle();
-
-                if (roleData) {
-                    // Current user is a doctor, fetch their profile
-                    const { data } = await supabase
+            if (targetId) {
+                try {
+                    // Fetch the specific profile
+                    const { data: profile } = await supabase
                         .from('profiles')
                         .select('*')
-                        .eq('user_id', authUser.id)
+                        .eq('user_id', targetId)
                         .maybeSingle();
-                    if (data) {
-                        setDoctorProfile(data);
-                        return;
+                    
+                    if (profile) {
+                        // For a reliable header, verify this user is actually a doctor
+                        const { data: roleCheck } = await supabase
+                            .from('user_roles')
+                            .select('role')
+                            .eq('user_id', targetId)
+                            .eq('role', 'doctor')
+                            .maybeSingle();
+
+                        if (roleCheck || doctorId) {
+                            setDoctorProfile(profile);
+                            return;
+                        }
                     }
-                } 
-                
-                // If current user is NOT a doctor, or profile fetch failed,
-                // fetch the FIRST profile that has a clinic_name (likely the primary doctor)
-                // or just the first user with 'doctor' role.
+                } catch (err) {
+                    console.error("Error fetching specific doctor profile:", err);
+                }
+            }
+
+            // Fallback: Fetch the primary/first doctor for historical records with no ID
+            try {
                 const { data: doctorRoles } = await supabase
                     .from('user_roles')
                     .select('user_id')
@@ -84,34 +100,27 @@ const PrescriptionTemplate = React.memo(({
                     .order('created_at', { ascending: true });
                 
                 if (doctorRoles && doctorRoles.length > 0) {
-                    // Try to find a doctor profile that isn't named "nurse" or similar
                     const { data: profiles } = await supabase
                         .from('profiles')
                         .select('*')
                         .in('user_id', doctorRoles.map(r => r.user_id));
                     
                     if (profiles && profiles.length > 0) {
-                        // Priority 1: Profile with "Aravind" in name
                         const primary = profiles.find(p => p.full_name?.toLowerCase().includes('aravind'));
-                        if (primary) {
-                            setDoctorProfile(primary);
-                        } else {
-                            // Priority 2: First profile that isn't "nurse"
-                            const absoluteFirst = profiles.find(p => !p.full_name?.toLowerCase().includes('nurse')) || profiles[0];
-                            setDoctorProfile(absoluteFirst);
-                        }
+                        setDoctorProfile(primary || profiles[0]);
                     }
                 }
             } catch (err) {
-                console.error("Error in fetchDoctorProfile:", err);
+                console.error("Error fetching fallback doctor profile:", err);
             }
         };
         fetchDoctorProfile();
-    }, [authUser]); 
+    }, [authUser, doctorId, prescriptionCreatedAt]); 
 
 
-    const today = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-    const time = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    const displayDate = prescriptionCreatedAt ? new Date(prescriptionCreatedAt) : (visit?.created_at ? new Date(visit.created_at) : new Date());
+    const today = displayDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    const time = displayDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
     const vitals = [
         { label: 'Weight', value: visit?.weight, unit: ' kg' },
@@ -252,8 +261,8 @@ function PageOne({
     clinicName, clinicAddress, clinicPhone
 }: PageOneProps) {
     
-    // Resolve display values with priority: Prop Override > Hardcoded Default
-    const dispDoctorName = 'Dr V Aravind';
+    // Resolve display values with priority: Prop Override > Fetched Profile > Hardcoded Default
+    const dispDoctorName = doctorName || doctorProfile?.full_name || 'Dr V Aravind';
     const dispQualifications = doctorQualifications || doctorProfile?.qualifications || 'MBBS., CCEBDM., (PHFI)';
     const dispRegId = doctorRegId || doctorProfile?.registration_id || '152590';
     const dispClinicName = clinicName || doctorProfile?.clinic_name || 'GV Clinic';

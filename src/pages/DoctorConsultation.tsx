@@ -379,7 +379,8 @@ export default function DoctorConsultation() {
           medicines: finalMedicines as any,
           advice_image: finalAdviceImage,
           raw_paths: finalPaths as any,
-          is_writing_mode: isWritingMode
+          is_writing_mode: isWritingMode,
+          doctor_id: user?.id
         }),
         supabase.from('visits').update({ 
           status: 'completed', 
@@ -1111,6 +1112,8 @@ export default function DoctorConsultation() {
               advice={advice}
               isWritingMode={lastInputWay === 'writing'}
               isPrint={true}
+              doctorId={user?.id}
+              prescriptionCreatedAt={new Date().toISOString()}
             />
           </div>
         </DialogContent>
@@ -1145,6 +1148,8 @@ export default function DoctorConsultation() {
                   advice={!isWritingMode ? rx?.advice_image : null}
                   isWritingMode={isWritingMode}
                   isPrint={true}
+                  doctorId={rx?.doctor_id}
+                  prescriptionCreatedAt={rx?.created_at}
                 />
               );
             })()}

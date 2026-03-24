@@ -321,6 +321,8 @@ export default function PatientList() {
                   medicines={rx?.medicines || []}
                   advice={!isWritingMode ? rx?.advice_image : null}
                   isWritingMode={isWritingMode}
+                  doctorId={rx?.doctor_id}
+                  prescriptionCreatedAt={rx?.created_at}
                 />
               );
             })()}

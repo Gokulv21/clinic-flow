@@ -109,6 +109,8 @@ export default function PrintQueue() {
                 handwrittenImage={printData.advice_image || null}
                 isWritingMode={isWritingMode}
                 isPrint={true}
+                doctorId={printData.doctor_id}
+                prescriptionCreatedAt={printData.created_at}
               />
             );
           })()}
