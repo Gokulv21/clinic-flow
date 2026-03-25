@@ -160,9 +160,10 @@ const PrescriptionTemplate = React.memo(({
         }
 
         message += `\n*View Digital Prescription:* ${publicLink}\n`;
+        message += `\n_Note: This link will expire in 24 hours. Kindly save it as a PDF for your records._\n`;
         message += `\n_Sent via ${clinic}_`;
 
-        const url = `https://wa.me/${cleanPhone}/?text=${encodeURIComponent(message)}`;
+        const url = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(message)}`;
         window.open(url, '_blank');
     };
 

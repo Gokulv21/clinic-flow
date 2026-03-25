@@ -71,11 +71,14 @@ const PublicPrescription = () => {
 
     return (
         <div className="min-h-screen bg-slate-100 overflow-auto py-4 sm:py-8 px-2 sm:px-4">
-            <div className="max-w-4xl mx-auto mb-6 flex flex-col items-center gap-2 no-print">
+            <div className="max-w-4xl mx-auto mb-6 flex flex-col items-center gap-3 no-print">
                <div className="bg-blue-600 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-md">
                    Official Digital Prescription
                </div>
-               <p className="text-slate-400 text-xs font-bold">You can print or save this page as PDF</p>
+               <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col items-center gap-1 text-center shadow-sm max-w-md">
+                   <p className="text-amber-800 text-[13px] font-black uppercase tracking-tight">⚠️ Link Expires in 24 Hours</p>
+                   <p className="text-amber-700 text-xs font-bold">Kindly save this as a PDF or Print it for your future records.</p>
+               </div>
             </div>
 
             <PrescriptionTemplate 
