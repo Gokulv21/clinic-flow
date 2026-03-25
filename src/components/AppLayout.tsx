@@ -41,6 +41,14 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Reset scroll position when route changes
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = 0;
+    }
+  }, [location.pathname]);
 
   const handleMobileNav = (path: string) => {
     navigate(path);
@@ -233,7 +241,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       </nav>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto pb-20 md:pb-0 bg-background">
+      <main ref={scrollRef} className="flex-1 overflow-auto pb-20 md:pb-0 bg-background">
         <div className="min-h-full">
           {children}
         </div>
