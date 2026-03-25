@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
+import { MessageCircle } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { supabase } from "@/integrations/supabase/client";
 import { format, formatDistanceToNow } from "date-fns";
@@ -122,6 +123,49 @@ const PrescriptionTemplate = React.memo(({
     const today = displayDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
     const time = displayDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
+    const shareToWhatsApp = () => {
+        const patientName = patient?.name || 'Patient';
+        const clinic = clinicName || doctorProfile?.clinic_name || 'GV Clinic';
+        const patientPhone = patient?.phone || '';
+        
+        // Format phone number: remove non-digits
+        let cleanPhone = patientPhone.replace(/\D/g, '');
+        // If it's a 10-digit number, assume India (+91)
+        if (cleanPhone.length === 10) {
+            cleanPhone = '91' + cleanPhone;
+        }
+
+        const publicLink = `${window.location.protocol}//${window.location.host}/prescripto/rx/${visit?.id}`;
+        
+        let message = `*${clinic} Prescription*\n\n`;
+        message += `*Date:* ${today} ${time}\n`;
+        message += `*Patient:* ${patientName}\n`;
+        message += `*Token:* ${visit?.token_number || '—'}\n\n`;
+
+        if (diagnosis) message += `*Diagnosis:* ${diagnosis}\n`;
+        
+        if (medicines && medicines.length > 0 && medicines.some(m => m.name.trim())) {
+            message += `\n*Medicines:*\n`;
+            medicines.forEach((m, i) => {
+                if (m.name.trim()) {
+                    message += `${i + 1}. ${m.type || ''} ${m.name} ${m.dosage || ''} (${m.frequency || ''}) - ${m.duration || ''}\n`;
+                }
+            });
+        }
+
+        if (advice && !isWritingMode) {
+            message += `\n*Advice:* ${advice}\n`;
+        } else if (isWritingMode) {
+            message += `\n_Note: This prescription includes handwritten instructions._\n`;
+        }
+
+        message += `\n*View Digital Prescription:* ${publicLink}\n`;
+        message += `\n_Sent via ${clinic}_`;
+
+        const url = `https://wa.me/${cleanPhone}/?text=${encodeURIComponent(message)}`;
+        window.open(url, '_blank');
+    };
+
     const vitals = [
         { label: 'Weight', value: visit?.weight, unit: ' kg' },
         { label: 'BP', value: visit?.blood_pressure, unit: ' mmHg' },
@@ -228,6 +272,19 @@ const PrescriptionTemplate = React.memo(({
                     )}
                 </div>
             ))}
+
+            {/* WhatsApp Share Button - Screen Only */}
+            {!isPrint && (
+                <div className="mt-4 mb-8 print:hidden">
+                    <button
+                        onClick={shareToWhatsApp}
+                        className="flex items-center gap-2 px-8 py-3 bg-[#25D366] hover:bg-[#20ba59] text-white font-black uppercase tracking-widest text-[10px] rounded-full shadow-xl transition-all hover:scale-105 active:scale-95"
+                    >
+                        <MessageCircle className="w-4 h-4" />
+                        Share to WhatsApp
+                    </button>
+                </div>
+            )}
         </div>
     );
 });

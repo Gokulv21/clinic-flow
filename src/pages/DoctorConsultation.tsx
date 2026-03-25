@@ -272,28 +272,18 @@ export default function DoctorConsultation() {
         .eq('patient_id', patientId)
         .limit(1);
 
-      let regIdUpdated = false;
+      let patientDeleted = false;
       if (!otherVisits || otherVisits.length === 0) {
-        // No other visits, keep the patient but refresh their Registration ID
-        const { data: regId, error: regError } = await (supabase.rpc as any)('get_next_registration_id');
-        
-        let newRegId = regId;
-        if (regError) {
-          const timestamp = Date.now().toString().slice(-6);
-          const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-          const yy = new Date().getFullYear().toString().slice(-2);
-          newRegId = `${yy}${timestamp}${random}`;
-        }
-
-        const { error: updateError } = await supabase
+        // No other visits, delete the patient entirely
+        const { error: patientDeleteError } = await supabase
           .from('patients')
-          .update({ registration_id: String(newRegId) })
+          .delete()
           .eq('id', patientId);
         
-        if (!updateError) regIdUpdated = true;
+        if (!patientDeleteError) patientDeleted = true;
       }
 
-      toast.success(regIdUpdated ? 'Patient saved with new Reg ID' : 'Visit cancelled');
+      toast.success(patientDeleted ? 'Patient record removed' : 'Visit cancelled');
       
       // Clear selection
       localStorage.removeItem(`draft_${selectedVisit.id}`);

@@ -18,6 +18,7 @@ import Analytics from "@/pages/Analytics";
 import UserManagement from "@/pages/UserManagement";
 import DoctorProfile from "@/pages/DoctorProfile";
 import Help from "@/pages/Help";
+import PublicPrescription from "@/pages/PublicPrescription";
 import NotFound from "./pages/NotFound.tsx";
 import { ReactNode } from "react";
 
@@ -142,6 +143,7 @@ const App = () => (
               <Route path="/profile" element={<ProtectedRoute allowedRoles={['doctor']}><DoctorProfile /></ProtectedRoute>} />
               <Route path="/users" element={<ProtectedRoute allowedRoles={['doctor']}><UserManagement /></ProtectedRoute>} />
               <Route path="/help" element={<ProtectedRoute><Help /></ProtectedRoute>} />
+              <Route path="/rx/:visitId" element={<PublicPrescription />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AuthProvider>
