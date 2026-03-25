@@ -60,7 +60,7 @@ const PrescriptionTemplate = React.memo(({
             // Priority 2: Use current user ID ONLY if this is a fresh preview (unsaved draft)
             let targetId = doctorId;
             const isSavedRecord = !!prescriptionCreatedAt;
-            
+
             if (!targetId && !isSavedRecord) {
                 targetId = authUser?.id;
             }
@@ -73,7 +73,7 @@ const PrescriptionTemplate = React.memo(({
                         .select('*')
                         .eq('user_id', targetId)
                         .maybeSingle();
-                    
+
                     if (profile) {
                         // For a reliable header, verify this user is actually a doctor
                         const { data: roleCheck } = await supabase
@@ -100,13 +100,13 @@ const PrescriptionTemplate = React.memo(({
                     .select('user_id')
                     .eq('role', 'doctor')
                     .order('created_at', { ascending: true });
-                
+
                 if (doctorRoles && doctorRoles.length > 0) {
                     const { data: profiles } = await supabase
                         .from('profiles')
                         .select('*')
                         .in('user_id', doctorRoles.map(r => r.user_id));
-                    
+
                     if (profiles && profiles.length > 0) {
                         const primary = profiles.find(p => p.full_name?.toLowerCase().includes('aravind'));
                         setDoctorProfile(primary || profiles[0]);
@@ -117,7 +117,7 @@ const PrescriptionTemplate = React.memo(({
             }
         };
         fetchDoctorProfile();
-    }, [authUser, doctorId, prescriptionCreatedAt]); 
+    }, [authUser, doctorId, prescriptionCreatedAt]);
 
 
     const displayDate = prescriptionCreatedAt ? new Date(prescriptionCreatedAt) : (visit?.created_at ? new Date(visit.created_at) : new Date());
@@ -126,7 +126,7 @@ const PrescriptionTemplate = React.memo(({
 
     const shareToWhatsApp = () => {
         const patientPhone = patient?.phone || '';
-        
+
         // Format phone number: remove non-digits
         let cleanPhone = patientPhone.replace(/\D/g, '');
         // If it's a 10-digit number, assume India (+91)
@@ -141,7 +141,7 @@ const PrescriptionTemplate = React.memo(({
 
         const message = `Hello ${patientName},  
 
-Your prescription from Dr. ${resolvedDoctorName} (${resolvedClinicName}) is ready.  
+Your prescription from ${resolvedDoctorName} (${resolvedClinicName}) is ready.  
 Access it here:  
 
 🔗 ${publicLink}  
@@ -302,13 +302,13 @@ interface PageOneProps {
     clinicPhone?: string;
 }
 
-function PageOne({ 
-    patient, visit, today, time, clinicalNotes, diagnosis, medicines, advice, 
+function PageOne({
+    patient, visit, today, time, clinicalNotes, diagnosis, medicines, advice,
     hasTyped, vitals, doctorProfile, isWritingMode,
     doctorName, doctorQualifications, doctorRegId,
     clinicName, clinicAddress, clinicPhone
 }: PageOneProps) {
-    
+
     // Resolve display values with priority: Prop Override > Fetched Profile > Hardcoded Default
     const dispDoctorName = doctorName || doctorProfile?.full_name || 'Dr V Aravind';
     const dispQualifications = doctorQualifications || doctorProfile?.qualifications || 'MBBS., CCEBDM., (PHFI)';
