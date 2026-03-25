@@ -5,6 +5,13 @@
  * and triggering the native print dialog. This approach is highly reliable on mobile/tablets.
  */
 export function printPrescription(selector: string = '.print-container'): void {
+    // ── 0. Pre-cleanup: Remove any existing/stale print mounts ─────
+    const existingMount = document.getElementById('print-mount');
+    if (existingMount) {
+        document.body.removeChild(existingMount);
+    }
+    document.body.classList.remove('is-printing');
+
     const container = document.querySelector(selector);
     if (!container) {
         console.error('[printPrescription] .print-container not found');
@@ -61,15 +68,27 @@ export function printPrescription(selector: string = '.print-container'): void {
         // Final buffer for rendering engine
         await new Promise(r => setTimeout(r, 500));
         
-        window.print();
-        
-        // ── 3. Cleanup ─────────────────────────────────────────────
-        setTimeout(() => {
+        // ── 3. Cleanup Strategy ─────────────────────────────────────────
+        let cleanedUp = false;
+        const cleanup = () => {
+            if (cleanedUp) return;
+            cleanedUp = true;
             document.body.classList.remove('is-printing');
             if (document.getElementById('print-mount')) {
                 document.body.removeChild(printMount);
             }
-        }, 1500); 
+            console.log('[printPrescription] Cleanup completed.');
+        };
+
+        // Modern browsers: afterprint fires when dialog closes
+        window.addEventListener('afterprint', cleanup, { once: true });
+        
+        // Mobile/Tablet Strategy: Keep the mount for much longer (5 minutes)
+        // because users often change settings in the print dialog.
+        // A short 1500ms timeout was causing the background to leak on re-renders.
+        setTimeout(cleanup, 300000); // 5 minute safety fallback
+        
+        window.print();
     };
 
     // Initial settle time for DOM injection

@@ -266,21 +266,30 @@ export default function DoctorConsultation() {
       if (deleteError) throw new Error(`Failed to delete visit record: ${deleteError.message}`);
 
       // 4. Check if this patient has ANY other visits
-      const { data: otherVisits } = await supabase
+      const { data: otherVisits, error: countError } = await supabase
         .from('visits')
         .select('id')
         .eq('patient_id', patientId)
         .limit(1);
 
+      if (countError) throw new Error(`Failed to check patient history: ${countError.message}`);
+
       let patientDeleted = false;
       if (!otherVisits || otherVisits.length === 0) {
         // No other visits, delete the patient entirely
+        console.log("No other visits found for patient, deleting patient record...");
         const { error: patientDeleteError } = await supabase
           .from('patients')
           .delete()
           .eq('id', patientId);
         
-        if (!patientDeleteError) patientDeleted = true;
+        if (patientDeleteError) {
+          console.error("Patient deletion failed:", patientDeleteError);
+          // Don't throw here, as visit was already deleted. Just toast about it.
+          toast.error(`Could not remove patient record: ${patientDeleteError.message}`);
+        } else {
+          patientDeleted = true;
+        }
       }
 
       toast.success(patientDeleted ? 'Patient record removed' : 'Visit cancelled');
