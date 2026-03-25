@@ -5,12 +5,18 @@
  * and triggering the native print dialog. This approach is highly reliable on mobile/tablets.
  */
 export function printPrescription(selector: string = '.print-container'): void {
-    // ── 0. Pre-cleanup: Remove any existing/stale print mounts ─────
-    const existingMount = document.getElementById('print-mount');
-    if (existingMount) {
-        document.body.removeChild(existingMount);
+    // ── 0. Setup/Reuse Persistent Print Mount ────────────────────────
+    let printMount = document.getElementById('print-mount');
+    if (!printMount) {
+        printMount = document.createElement('div');
+        printMount.id = 'print-mount';
+        // Ensure it's hidden from screen but visible to print engine
+        printMount.style.cssText = 'position:fixed;top:0;left:0;width:100%;opacity:0;z-index:-99999;pointer-events:none;background:white;';
+        document.body.insertBefore(printMount, document.body.firstChild);
     }
-    document.body.classList.remove('is-printing');
+    
+    // Clear any previous content
+    printMount.innerHTML = '';
 
     const container = document.querySelector(selector);
     if (!container) {
@@ -19,12 +25,7 @@ export function printPrescription(selector: string = '.print-container'): void {
     }
 
     // ── 1. Preparation: Clone the container ──────────────────────────
-    const printMount = document.createElement('div');
-    printMount.id = 'print-mount';
-    // Style it correctly for print - Ensure it's hidden from screen but visible to print
-    printMount.style.cssText = 'position:fixed;top:0;left:0;width:100%;opacity:0;z-index:-9999;pointer-events:none;background:white;';
-    
-    // Inject a style tag to ensure this specific mount is visible during print
+    // Inject a style tag to ensure visibility during print
     const style = document.createElement('style');
     style.innerHTML = `
         @media print {
@@ -33,64 +34,51 @@ export function printPrescription(selector: string = '.print-container'): void {
                 visibility: visible !important; 
                 opacity: 1 !important; 
                 position: relative !important;
-                z-index: 9999 !important;
-            }
-            #print-mount * { 
-                visibility: visible !important; 
-                opacity: 1 !important; 
+                z-index: 99999 !important;
             }
         }
     `;
     printMount.appendChild(style);
 
-    // Deep clone the container instead of just innerHTML
+    // Deep clone the container
     const clone = container.cloneNode(true) as HTMLElement;
     clone.id = 'prescription-to-print-cloned';
     printMount.appendChild(clone);
     
-    // Insert at the VERY BEGINNING of body to prevent layout space from above elements
-    document.body.insertBefore(printMount, document.body.firstChild);
-    document.body.classList.add('is-printing');
-
     // ── 2. Trigger Print ────────────────────────────────────────────
     const monitorImagesAndPrint = async () => {
-        const images = Array.from(printMount.querySelectorAll('img'));
+        const images = Array.from(printMount!.querySelectorAll('img'));
         
-        // Wait for all images to be 'complete'
+        // Wait for all images to settle
         await Promise.all(images.map(img => {
             if (img.complete) return Promise.resolve();
             return new Promise(resolve => {
                 img.onload = resolve;
-                img.onerror = resolve; // Continue regardless
+                img.onerror = resolve;
             });
         }));
 
         // Final buffer for rendering engine
         await new Promise(r => setTimeout(r, 500));
         
-        // ── 3. Cleanup Strategy ─────────────────────────────────────────
-        let cleanedUp = false;
-        const cleanup = () => {
-            if (cleanedUp) return;
-            cleanedUp = true;
-            document.body.classList.remove('is-printing');
-            if (document.getElementById('print-mount')) {
-                document.body.removeChild(printMount);
-            }
-            console.log('[printPrescription] Cleanup completed.');
-        };
-
-        // Modern browsers: afterprint fires when dialog closes
-        window.addEventListener('afterprint', cleanup, { once: true });
-        
-        // Mobile/Tablet Strategy: Keep the mount for much longer (5 minutes)
-        // because users often change settings in the print dialog.
-        // A short 1500ms timeout was causing the background to leak on re-renders.
-        setTimeout(cleanup, 300000); // 5 minute safety fallback
+        // No more flaky 'afterprint' or short timeouts.
+        // The aggressive CSS shield in index.css handles hiding the background 
+        // as long as #print-mount is not empty.
         
         window.print();
+
+        // ── 3. Delayed Cleanup ─────────────────────────────────────────
+        // We keep the content in #print-mount for 30 minutes to support 
+        // slow format changes or long print dialog sessions.
+        // It will be purged automatically the next time printPrescription is called anyway.
+        const currentMount = printMount;
+        setTimeout(() => {
+            if (currentMount && currentMount.innerHTML !== '') {
+                console.log('[printPrescription] Purging stale print content.');
+                currentMount.innerHTML = '';
+            }
+        }, 1800000); // 30 minutes
     };
 
-    // Initial settle time for DOM injection
-    setTimeout(monitorImagesAndPrint, 500);
+    setTimeout(monitorImagesAndPrint, 300);
 }

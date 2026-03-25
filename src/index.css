@@ -173,12 +173,14 @@
     margin: 0 !important;
   }
 
-  /* Hide everything except print mount */
-  body.is-printing > *:not(#print-mount) {
+  /* ── Aggressive Global Print Shield ─────────────────────────── */
+  /* If #print-mount exists and contains content, it becomes the ONLY thing printed */
+  
+  #print-mount {
     display: none !important;
   }
 
-  body.is-printing #print-mount {
+  #print-mount:not(:empty) {
     display: block !important;
     position: relative !important;
     margin: 0 auto !important;
@@ -191,6 +193,13 @@
     opacity: 1 !important;
     background: #fff !important;
     border: none !important;
+    z-index: 99999 !important;
+  }
+
+  /* Crucial: Hide ALL siblings of #print-mount if it's not empty */
+  /* Since we insert #print-mount at the start of body, this hides everything else (#root, portals, etc.) */
+  #print-mount:not(:empty) ~ * {
+    display: none !important;
   }
 
   /* Force all descendants of print-mount to be visible */
