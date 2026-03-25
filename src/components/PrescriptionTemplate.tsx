@@ -141,13 +141,13 @@ const PrescriptionTemplate = React.memo(({
 
         const message = `Hello ${patientName},  
 
-Your prescription from ${resolvedDoctorName} (${resolvedClinicName}) is ready.  
-Access it here:  
+Your prescription 📝 from ${resolvedDoctorName} (${resolvedClinicName}) is ready.  
+Access it here:  👇🏻 
 
 🔗 ${publicLink}  
 
 Follow the instructions carefully.  
-Wishing you a quick recovery!  
+💖 Wishing you a quick recovery!  
 
 — ${resolvedClinicName}`;
 
