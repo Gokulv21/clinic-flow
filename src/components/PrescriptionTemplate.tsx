@@ -163,8 +163,20 @@ const PrescriptionTemplate = React.memo(({
         message += `\n_Note: This link will expire in 24 hours. Kindly save it as a PDF for your records._\n`;
         message += `\n_Sent via ${clinic}_`;
 
-        const url = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(message)}`;
-        window.open(url, '_blank');
+        const encodedMsg = encodeURIComponent(message);
+        const appUrl = `whatsapp://send?phone=${cleanPhone}&text=${encodedMsg}`;
+        const webUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedMsg}`;
+
+        // Attempt to open the app directly via protocol
+        window.location.href = appUrl;
+
+        // Fallback: If the window is still in focus after 500ms, it likely means 
+        // the app didn't open, so we fallback to the web URL in a new tab.
+        setTimeout(() => {
+            if (document.hasFocus()) {
+                window.open(webUrl, '_blank');
+            }
+        }, 500);
     };
 
     const vitals = [
