@@ -153,6 +153,16 @@
         box-sizing: border-box !important;
     }
     .no-print { display: none !important; }
+    
+    .print-wrapper {
+        padding: 0 !important;
+        margin: 0 !important;
+        background: white !important;
+        background-color: #ffffff !important;
+        min-height: auto !important;
+        height: auto !important;
+        overflow: visible !important;
+    }
   }
 }
 
@@ -175,6 +185,8 @@
     padding: 0 !important;
     width: 100% !important;
     max-width: 210mm !important; /* Cap at A4 width but allow smaller */
+    height: auto !important;
+    min-height: auto !important;
     visibility: visible !important;
     opacity: 1 !important;
     background: #fff !important;
@@ -208,7 +220,9 @@
     margin: 0 !important;
     padding: 0 !important;
     background: #fff !important;
-    min-height: 100vh !important;
+    background-color: #ffffff !important;
+    min-height: auto !important;
+    height: auto !important;
     width: 100% !important;
     overflow: visible !important;
     display: block !important;

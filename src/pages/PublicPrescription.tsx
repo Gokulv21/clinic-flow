@@ -70,7 +70,7 @@ const PublicPrescription = () => {
     const prescription = data.prescriptions?.[0];
 
     return (
-        <div className="min-h-screen bg-slate-100 overflow-auto py-4 sm:py-8 px-2 sm:px-4">
+        <div className="min-h-screen bg-slate-100 overflow-auto py-4 sm:py-8 px-2 sm:px-4 print-wrapper">
             <div className="max-w-4xl mx-auto mb-6 flex flex-col items-center gap-3 no-print">
                <div className="bg-blue-600 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-md">
                    Official Digital Prescription
