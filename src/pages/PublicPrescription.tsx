@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import PrescriptionTemplate from '@/components/PrescriptionTemplate';
-import { Loader2, FileWarning } from 'lucide-react';
+import { Loader2, FileWarning, Printer, HelpCircle } from 'lucide-react';
 
 const PublicPrescription = () => {
     const { visitId } = useParams();
@@ -99,14 +99,26 @@ const PublicPrescription = () => {
                 doctorId={prescription?.doctor_id}
                 prescriptionCreatedAt={prescription?.created_at}
                 isPrint={false}
+                hideShare={true}
             />
 
-            <div className="max-w-4xl mx-auto mt-12 text-center text-slate-400 pb-12 no-print">
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em]">Generated via GV Clinic Portal</p>
-                <div className="mt-4 flex items-center justify-center gap-4 text-[11px] font-bold">
-                    <a href="#" onClick={(e) => { e.preventDefault(); window.print(); }} className="hover:text-blue-600 transition-colors">Print Prescription</a>
-                    <span className="w-1 h-1 bg-slate-300 rounded-full" />
-                    <a href="mailto:support@gvclinic.com" className="hover:text-blue-600 transition-colors">Contact Support</a>
+            <div className="max-w-4xl mx-auto mt-12 flex flex-col items-center gap-6 pb-20 no-print">
+                <button 
+                    onClick={() => window.print()}
+                    className="flex items-center gap-3 px-10 py-4 bg-slate-900 text-white font-black uppercase tracking-widest text-xs rounded-2xl shadow-2xl hover:bg-slate-800 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                >
+                    <Printer className="w-5 h-5" />
+                    Save as PDF / Print
+                </button>
+
+                <div className="flex flex-col items-center gap-4">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Generated via GV Clinic Portal</p>
+                    <div className="flex items-center gap-4 text-[11px] font-bold text-slate-500">
+                        <a href="mailto:support@gvclinic.com" className="flex items-center gap-1.5 hover:text-blue-600 transition-colors">
+                            <HelpCircle className="w-4 h-4" />
+                            Contact Support
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>

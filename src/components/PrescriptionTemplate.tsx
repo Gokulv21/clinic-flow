@@ -28,6 +28,7 @@ interface PrescriptionTemplateProps {
     // Audit data
     doctorId?: string;
     prescriptionCreatedAt?: string;
+    hideShare?: boolean;
     // Overrides for doctor/clinic info
     doctorName?: string;
     doctorQualifications?: string;
@@ -45,7 +46,7 @@ const PrescriptionTemplate = React.memo(({
     patient, visit, handwrittenImage,
     diagnosis, clinicalNotes, medicines = [], advice, isPrint = false,
     isWritingMode = false,
-    doctorId, prescriptionCreatedAt,
+    doctorId, prescriptionCreatedAt, hideShare = false,
     doctorName, doctorQualifications, doctorRegId,
     clinicName, clinicAddress, clinicPhone
 }: PrescriptionTemplateProps) => {
@@ -124,8 +125,6 @@ const PrescriptionTemplate = React.memo(({
     const time = displayDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
     const shareToWhatsApp = () => {
-        const patientName = patient?.name || 'Patient';
-        const clinic = clinicName || doctorProfile?.clinic_name || 'GV Clinic';
         const patientPhone = patient?.phone || '';
         
         // Format phone number: remove non-digits
@@ -135,40 +134,22 @@ const PrescriptionTemplate = React.memo(({
             cleanPhone = '91' + cleanPhone;
         }
 
-        const publicLink = `${window.location.protocol}//${window.location.host}/prescripto/rx/${visit?.id}`;
-        
-        let message = `*${clinic} Prescription*\n\n`;
-        message += `*Date:* ${today} ${time}\n`;
-        message += `*Patient:* ${patientName}\n`;
-        message += `*Token:* ${visit?.token_number || '—'}\n\n`;
+        const patientName = (patient?.title ? patient.title + ' ' : '') + (patient?.name ?? 'Patient');
+        const resolvedDoctorName = doctorName || doctorProfile?.full_name || 'Dr. Gokul';
+        const resolvedClinicName = clinicName || doctorProfile?.clinic_name || 'GV Clinic';
+        const publicLink = `${window.location.origin}/prescripto/rx/${visit.id}`;
 
-        if (diagnosis) message += `*Diagnosis:* ${diagnosis}\n`;
-        
-        if (medicines && medicines.length > 0 && medicines.some(m => m.name.trim())) {
-            message += `\n*Medicines:*\n`;
-            medicines.forEach((m, i) => {
-                if (m.name.trim()) {
-                    message += `${i + 1}. ${m.type || ''} ${m.name} ${m.dosage || ''} (${m.frequency || ''}) - ${m.duration || ''}\n`;
-                }
-            });
-        }
-
-        if (advice && !isWritingMode) {
-            message += `\n*Advice:* ${advice}\n`;
-        } else if (isWritingMode) {
-            message += `\n_Note: This prescription includes handwritten instructions._\n`;
-        }
-
-        message += `\n*View Digital Prescription:* ${publicLink}\n`;
-        message += `\n_Note: This link will expire in 24 hours. Kindly save it as a PDF for your records._\n`;
-        message += `\n_Sent via ${clinic}_`;
+        let message = `Hello ${patientName},  \n\n`;
+        message += `Your prescription from Dr. ${resolvedDoctorName} (${resolvedClinicName}) is ready.  \n`;
+        message += `Access it here:  \n\n`;
+        message += `🔗 ${publicLink}  \n\n`;
+        message += `Follow the instructions carefully.  \n`;
+        message += `Wishing you a quick recovery!  \n\n`;
+        message += `— ${resolvedClinicName}`;
 
         const encodedMsg = encodeURIComponent(message);
-        // Universal link is more robust for triggering the app on mobile AND desktop
         const whatsappUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedMsg}`;
 
-        // Opens in the same window to trigger the app prompt on mobile, 
-        // or a new tab if it's a desktop browser without the app.
         window.open(whatsappUrl, '_blank');
     };
 
@@ -280,7 +261,7 @@ const PrescriptionTemplate = React.memo(({
             ))}
 
             {/* WhatsApp Share Button - Screen Only */}
-            {!isPrint && (
+            {!isPrint && !hideShare && (
                 <div className="mt-4 mb-8 print:hidden">
                     <button
                         onClick={shareToWhatsApp}
