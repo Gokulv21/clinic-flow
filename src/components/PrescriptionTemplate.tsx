@@ -139,13 +139,17 @@ const PrescriptionTemplate = React.memo(({
         const resolvedClinicName = clinicName || doctorProfile?.clinic_name || 'GV Clinic';
         const publicLink = `${window.location.origin}/prescripto/rx/${visit.id}`;
 
-        let message = `Hello ${patientName},  \n\n`;
-        message += `Your prescription from Dr. ${resolvedDoctorName} (${resolvedClinicName}) is ready.  \n`;
-        message += `Access it here:  \n\n`;
-        message += `🔗 ${publicLink}  \n\n`;
-        message += `Follow the instructions carefully.  \n`;
-        message += `Wishing you a quick recovery!  \n\n`;
-        message += `— ${resolvedClinicName}`;
+        const message = `Hello ${patientName},  
+
+Your prescription from Dr. ${resolvedDoctorName} (${resolvedClinicName}) is ready.  
+Access it here:  
+
+🔗 ${publicLink}  
+
+Follow the instructions carefully.  
+Wishing you a quick recovery!  
+
+— ${resolvedClinicName}`;
 
         const encodedMsg = encodeURIComponent(message);
         const whatsappUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedMsg}`;
