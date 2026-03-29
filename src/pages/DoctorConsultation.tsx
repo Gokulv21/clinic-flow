@@ -1121,7 +1121,7 @@ export default function DoctorConsultation() {
       {/* History Preview Dialog */}
       <Dialog open={!!viewingHistoryRx} onOpenChange={open => !open && setViewingHistoryRx(null)}>
         <DialogContent className="max-w-[800px] p-0 overflow-hidden bg-background border-none shadow-2xl">
-          <div className="bg-muted/50 p-4 border-b flex items-center justify-between sticky top-0 z-20 backdrop-blur-sm">
+          <div className="bg-muted/50 p-4 border-b flex items-center justify-between sticky top-0 z-20 backdrop-blur-sm pr-12">
             <div className="flex items-center gap-4">
               <Button size="sm" onClick={() => printPrescription('#history-print-preview')} className="gap-2">
                 <Printer className="w-4 h-4" /> Print
@@ -1130,14 +1130,7 @@ export default function DoctorConsultation() {
             <h3 className="font-bold text-foreground">
               Prescription History
             </h3>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => setViewingHistoryRx(null)}
-              className="h-8 w-8 rounded-full hover:bg-muted"
-            >
-              <X className="w-4 h-4" />
-            </Button>
+            {/* Built-in Shadcn Close button will appear here in the pr-12 space */}
           </div>
           <div className="p-4 md:p-8 overflow-y-auto max-h-[80vh] bg-muted/30 scrollbar-thin scrollbar-thumb-muted-foreground/20 min-h-[500px]" id="history-print-preview">
             {viewingHistoryRx && (() => {

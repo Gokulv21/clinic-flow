@@ -438,7 +438,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
     return (
         <div
             style={{
-                position: 'fixed', inset: 0, zIndex: 100,
+                position: 'fixed', inset: 0, zIndex: 40,
                 background: 'rgba(0,0,0,0.85)',
                 backdropFilter: 'blur(12px)',
                 display: 'flex', flexDirection: 'column',
