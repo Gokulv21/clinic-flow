@@ -1120,36 +1120,45 @@ export default function DoctorConsultation() {
 
       {/* History Preview Dialog */}
       <Dialog open={!!viewingHistoryRx} onOpenChange={open => !open && setViewingHistoryRx(null)}>
-        <DialogContent className="max-w-[800px] p-0 overflow-hidden bg-background">
-          <div className="bg-muted/50 p-4 border-b relative sticky top-0 z-10">
-            <div className="flex items-center justify-between w-full">
-              <Button size="sm" onClick={() => printPrescription('#history-print-preview')} className="gap-2 z-10">
+        <DialogContent className="max-w-[800px] p-0 overflow-hidden bg-background border-none shadow-2xl">
+          <div className="bg-muted/50 p-4 border-b flex items-center justify-between sticky top-0 z-20 backdrop-blur-sm">
+            <div className="flex items-center gap-4">
+              <Button size="sm" onClick={() => printPrescription('#history-print-preview')} className="gap-2">
                 <Printer className="w-4 h-4" /> Print
               </Button>
-              <h3 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 font-bold whitespace-nowrap">
-                Prescription History
-              </h3>
-              <div className="w-20" /> {/* Spacer */}
             </div>
+            <h3 className="font-bold text-foreground">
+              Prescription History
+            </h3>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setViewingHistoryRx(null)}
+              className="h-8 w-8 rounded-full hover:bg-muted"
+            >
+              <X className="w-4 h-4" />
+            </Button>
           </div>
-          <div className="p-4 md:p-8 overflow-y-auto max-h-[85vh] bg-muted scrollbar-thin scrollbar-thumb-muted-foreground/20 min-h-[500px]" id="history-print-preview">
+          <div className="p-4 md:p-8 overflow-y-auto max-h-[80vh] bg-muted/30 scrollbar-thin scrollbar-thumb-muted-foreground/20 min-h-[500px]" id="history-print-preview">
             {viewingHistoryRx && (() => {
               const rx = viewingHistoryRx.prescriptions?.[0];
               const isWritingMode = rx?.is_writing_mode ?? (!!rx?.advice_image && (rx.advice_image.startsWith('data:image') || rx.advice_image.startsWith('[')));
               return (
-                <PrescriptionTemplate
-                  patient={patient}
-                  visit={viewingHistoryRx}
-                  handwrittenImage={rx?.advice_image}
-                  clinicalNotes={rx?.clinical_notes}
-                  diagnosis={rx?.diagnosis || viewingHistoryRx.diagnosis}
-                  medicines={rx?.medicines || []}
-                  advice={!isWritingMode ? rx?.advice_image : null}
-                  isWritingMode={isWritingMode}
-                  isPrint={true}
-                  doctorId={rx?.doctor_id}
-                  prescriptionCreatedAt={rx?.created_at}
-                />
+                <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm overflow-hidden">
+                  <PrescriptionTemplate
+                    patient={patient}
+                    visit={viewingHistoryRx}
+                    handwrittenImage={rx?.advice_image}
+                    clinicalNotes={rx?.clinical_notes}
+                    diagnosis={rx?.diagnosis || viewingHistoryRx.diagnosis}
+                    medicines={rx?.medicines || []}
+                    advice={!isWritingMode ? rx?.advice_image : null}
+                    isWritingMode={isWritingMode}
+                    isPrint={true}
+                    doctorId={rx?.doctor_id}
+                    prescriptionCreatedAt={rx?.created_at}
+                  />
+                </div>
               );
             })()}
           </div>

@@ -42,6 +42,8 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
     const [penSize, setPenSize] = useState(1);
     const [eraserSize, setEraserSize] = useState(7);
     const [isEraser, setIsEraser] = useState(false);
+    const [pointerPos, setPointerPos] = useState({ x: 0, y: 0 });
+    const [isPointerInCanvas, setIsPointerInCanvas] = useState(false);
 
 
 
@@ -299,7 +301,12 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
             currentPathRef.current.push({ ...cPos, pressure: ce.pressure || 0.5 });
         }
 
+        setPointerPos({ x: e.clientX, y: e.clientY });
         isDirtyRef.current = true;
+    };
+
+    const handlePointerMoveGlobal = (e: React.PointerEvent) => {
+        setPointerPos({ x: e.clientX, y: e.clientY });
     };
 
     // Shared commit logic for pointerup / pointercancel / pointerleave
@@ -432,23 +439,43 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
         <div
             style={{
                 position: 'fixed', inset: 0, zIndex: 100,
-                background: 'rgba(0,0,0,0.8)',
-                backdropFilter: 'blur(8px)',
+                background: 'rgba(0,0,0,0.85)',
+                backdropFilter: 'blur(12px)',
                 display: 'flex', flexDirection: 'column',
                 padding: isEnlarged ? 0 : '12px',
             }}
             onWheel={handleWheel}
+            onPointerMove={handlePointerMoveGlobal}
         >
+            {/* ── Eraser Cursor Overly */}
+            {isEraser && isPointerInCanvas && (
+                <div 
+                    style={{
+                        position: 'fixed',
+                        left: pointerPos.x,
+                        top: pointerPos.y,
+                        width: eraserSize * 5 * canvasTransform.scale * (800 / 1240), // Approximating canvas to screen scale
+                        height: eraserSize * 5 * canvasTransform.scale * (800 / 1240),
+                        border: '2px solid rgba(255, 255, 255, 0.5)',
+                        borderRadius: '50%',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        transform: 'translate(-50%, -50%)',
+                        pointerEvents: 'none',
+                        zIndex: 200,
+                        boxShadow: '0 0 10px rgba(0,0,0,0.2)'
+                    }}
+                />
+            )}
             {/* ── Toolbar */}
-            <div className="bg-white border-b px-2 py-2 md:px-4 md:py-3 flex flex-wrap items-center justify-between gap-y-2 shrink-0 drop-shadow-md sticky top-0 z-50 rounded-t-xl">
+            <div className="bg-background dark:bg-slate-900 border-b border-border px-2 py-2 md:px-4 md:py-3 flex flex-wrap items-center justify-between gap-y-2 shrink-0 shadow-lg sticky top-0 z-50 rounded-t-xl">
                 <div className="flex items-center gap-1 md:gap-2 min-w-0 flex-wrap">
-                    <Button variant="ghost" size="icon" onClick={onClose} className="shrink-0 h-8 w-8 md:h-10 md:w-10"><X className="w-5 h-5" /></Button>
+                    <Button variant="ghost" size="icon" onClick={onClose} className="shrink-0 h-8 w-8 md:h-10 md:w-10 text-foreground hover:bg-muted"><X className="w-5 h-5" /></Button>
 
-                    <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg shrink-0">
-                        <Button variant="ghost" size="sm" onClick={handleUndo} disabled={historyStep === 0} className="h-8">
+                    <div className="flex items-center gap-0.5 bg-muted p-0.5 rounded-lg shrink-0">
+                        <Button variant="ghost" size="sm" onClick={handleUndo} disabled={historyStep === 0} className="h-8 text-foreground disabled:opacity-30">
                             <Undo className="w-4 h-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={handleRedo} disabled={historyStep === history.length - 1} className="h-8">
+                        <Button variant="ghost" size="sm" onClick={handleRedo} disabled={historyStep === history.length - 1} className="h-8 text-foreground disabled:opacity-30">
                             <Redo className="w-4 h-4" />
                         </Button>
                         <AlertDialog>
@@ -480,23 +507,23 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                         </AlertDialog>
                     </div>
 
-                    <div className="flex items-center gap-1 md:gap-1.5 bg-slate-100 p-0.5 rounded-lg flex-wrap sm:flex-nowrap">
+                    <div className="flex items-center gap-1 md:gap-1.5 bg-muted p-0.5 rounded-lg flex-wrap sm:flex-nowrap">
                         <div className="flex items-center gap-1">
                             <Button
                                 variant={!isEraser ? "secondary" : "ghost"}
                                 size="sm"
                                 onClick={() => setIsEraser(false)}
-                                className={`h-8 w-8 p-0 ${!isEraser ? 'bg-white shadow-sm ring-1 ring-slate-200' : ''}`}
+                                className={`h-8 w-8 p-0 ${!isEraser ? 'bg-background shadow-sm ring-1 ring-border' : ''} text-foreground`}
                             >
-                                <PenTool className={`w-4 h-4 ${!isEraser ? 'text-blue-600' : 'text-slate-600'}`} />
+                                <PenTool className={`w-4 h-4 ${!isEraser ? 'text-blue-600' : 'text-muted-foreground'}`} />
                             </Button>
                             <Button
                                 variant={isEraser ? "secondary" : "ghost"}
                                 size="sm"
                                 onClick={() => setIsEraser(true)}
-                                className={`h-8 w-8 p-0 ${isEraser ? 'bg-white shadow-sm ring-1 ring-slate-200' : ''}`}
+                                className={`h-8 w-8 p-0 ${isEraser ? 'bg-background shadow-sm ring-1 ring-border' : ''} text-foreground`}
                             >
-                                <Eraser className={`w-4 h-4 ${isEraser ? 'text-blue-600' : 'text-slate-600'}`} />
+                                <Eraser className={`w-4 h-4 ${isEraser ? 'text-blue-600' : 'text-muted-foreground'}`} />
                             </Button>
 
                             {!isEraser && (
@@ -504,13 +531,13 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                                     type="color"
                                     value={penColor}
                                     onChange={(e) => setPenColor(e.target.value)}
-                                    className="w-7 h-7 p-0 border-0 rounded-md cursor-pointer ring-1 ring-slate-200"
+                                    className="w-7 h-7 p-0 border-0 rounded-md cursor-pointer ring-1 ring-border bg-transparent"
                                 />
                             )}
                         </div>
 
-                        <div className="flex items-center gap-2 px-2 border-l border-slate-200 h-6">
-                            <span className="text-[10px] font-bold text-slate-400 w-4">{isEraser ? eraserSize : penSize}</span>
+                        <div className="flex items-center gap-2 px-2 border-l border-border h-6">
+                            <span className="text-[10px] font-bold text-muted-foreground w-4">{isEraser ? eraserSize : penSize}</span>
                             <input
                                 type="range"
                                 min="1"
@@ -521,7 +548,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                                     if (isEraser) setEraserSize(val);
                                     else setPenSize(val);
                                 }}
-                                className="w-12 md:w-16 h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                                className="w-12 md:w-16 h-1 bg-muted rounded-lg appearance-none cursor-pointer accent-blue-600"
                             />
                         </div>
                     </div>
@@ -530,13 +557,13 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                 </div>
 
                 <div className="flex items-center gap-2 ml-auto pl-2">
-                    <div className="hidden sm:flex items-center gap-1 bg-slate-100 px-2 py-1 rounded-md">
-                        <span className="text-[10px] font-bold text-slate-500">{Math.round(canvasTransform.scale * 100)}%</span>
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCanvasTransform({ x: 0, y: 0, scale: 1 })}>
+                    <div className="hidden sm:flex items-center gap-1 bg-muted px-2 py-1 rounded-md">
+                        <span className="text-[10px] font-bold text-muted-foreground">{Math.round(canvasTransform.scale * 100)}%</span>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground" onClick={() => setCanvasTransform({ x: 0, y: 0, scale: 1 })}>
                             <Settings2 className="w-2.5 h-2.5" />
                         </Button>
                     </div>
-                    <Button size="sm" onClick={handleSave} className="h-8 md:h-9 px-3 md:px-4 bg-sky-600 hover:bg-sky-700 text-white shadow-lg shrink-0">
+                    <Button size="sm" onClick={handleSave} className="h-8 md:h-9 px-3 md:px-4 bg-blue-600 hover:bg-blue-700 text-white shadow-lg shrink-0 font-bold">
                         <Save className="w-4 h-4 mr-1 md:mr-2" /> <span className="text-xs md:text-sm">Save</span>
                     </Button>
                 </div>
@@ -620,7 +647,11 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                         onPointerDown={onPointerDown}
                         onPointerMove={onPointerMove}
                         onPointerUp={onPointerUp}
-                        onPointerLeave={onPointerUp}
+                        onPointerLeave={(e) => {
+                            onPointerUp(e);
+                            setIsPointerInCanvas(false);
+                        }}
+                        onPointerEnter={() => setIsPointerInCanvas(true)}
                         onPointerCancel={onPointerCancel}
                     />
                 </div>
@@ -628,7 +659,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
 
             {/* ── Pagination Bottom Bar */}
             <div
-                className="bg-white/90 backdrop-blur border-t px-6 py-4 flex items-center justify-between shrink-0 rounded-b-xl shadow-2xl"
+                className="bg-background/90 dark:bg-slate-900/95 backdrop-blur border-t border-border px-6 py-4 flex items-center justify-between shrink-0 rounded-b-xl shadow-2xl"
                 style={{
                     WebkitUserSelect: 'none',
                     userSelect: 'none',
@@ -636,29 +667,29 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                 }}
             >
                 <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+                    <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
                         <Button
                             variant="ghost" size="sm"
                             disabled={currentPageIndex === 0}
                             onClick={() => setCurrentPageIndex(p => p - 1)}
-                            className="h-8 w-8 p-0"
+                            className="h-8 w-8 p-0 text-foreground"
                         >
                             <ChevronLeft className="w-4 h-4" />
                         </Button>
-                        <span className="px-3 text-sm font-bold text-slate-700">
+                        <span className="px-3 text-sm font-bold text-foreground">
                             Page {currentPageIndex + 1} of {pages.length}
                         </span>
                         <Button
                             variant="ghost" size="sm"
                             disabled={currentPageIndex === pages.length - 1}
                             onClick={() => setCurrentPageIndex(p => p + 1)}
-                            className="h-8 w-8 p-0"
+                            className="h-8 w-8 p-0 text-foreground"
                         >
                             <ChevronRight className="w-4 h-4" />
                         </Button>
                     </div>
                     {pages.length > 1 && (
-                        <Button variant="ghost" size="sm" onClick={deleteCurrentPage} className="text-red-500 hover:text-red-700 h-8">
+                        <Button variant="ghost" size="sm" onClick={deleteCurrentPage} className="text-red-500 hover:text-red-600 h-8 font-bold">
                             Delete Page
                         </Button>
                     )}

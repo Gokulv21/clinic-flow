@@ -327,9 +327,9 @@ export default function NurseEntry() {
                         <CardContent className="pt-6">
                             <div className="flex flex-col md:flex-row gap-4 items-center">
                                 <div className="relative flex-1 w-full">
-                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground transition-colors group-focus-within:text-primary" />
                                     <Input
-                                        className="h-14 pl-12 text-lg border-border focus:border-primary focus:ring-primary/20 transition-all rounded-xl shadow-sm bg-card"
+                                        className="h-14 pl-12 text-lg border-border focus:border-primary focus:ring-primary/20 transition-all rounded-xl shadow-sm bg-background dark:bg-slate-900"
                                         placeholder="Search by Name, Phone, or Reg ID..."
                                         value={searchQuery}
                                         onFocus={() => setShowSearch(true)}
@@ -427,7 +427,7 @@ export default function NurseEntry() {
                 </div>
 
                 {/* Registration Form */}
-                <Card className="border-border shadow-lg animate-in slide-in-from-bottom-4 duration-500 overflow-hidden bg-card">
+                <Card className="border-border shadow-lg animate-in slide-in-from-bottom-4 duration-500 overflow-hidden bg-background dark:bg-slate-900/50">
                     <CardHeader className="bg-muted/30 border-b border-border py-6">
                         <div className="flex items-center justify-between">
                             <div>
