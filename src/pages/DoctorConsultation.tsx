@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { cn, formatAge } from '@/lib/utils';
-import { User, Clock, CheckCircle, Plus, Trash2, Save, Loader2, PenTool, Eye, Menu, Printer, ArrowLeft, Activity, ClipboardList, Scale, Heart, Wind, Thermometer, Droplet, Pencil, Calendar, RefreshCw, UserX, ChevronDown } from 'lucide-react';
+import { User, Clock, CheckCircle, Plus, Trash2, Save, Loader2, PenTool, Eye, Menu, Printer, ArrowLeft, Activity, ClipboardList, Scale, Heart, Wind, Thermometer, Droplet, Pencil, Calendar, RefreshCw, UserX, ChevronDown, X } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import DigitalPrescription from '@/components/DigitalPrescription';
 import PrescriptionTemplate from '@/components/PrescriptionTemplate';
