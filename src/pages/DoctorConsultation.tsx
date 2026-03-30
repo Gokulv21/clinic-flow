@@ -1121,7 +1121,7 @@ export default function DoctorConsultation() {
       {/* History Preview Dialog */}
       <Dialog open={!!viewingHistoryRx} onOpenChange={open => !open && setViewingHistoryRx(null)}>
         <DialogContent className="max-w-[800px] p-0 overflow-hidden bg-background border-none shadow-2xl">
-          <div className="bg-muted/50 p-4 border-b flex items-center justify-between sticky top-0 z-20 backdrop-blur-sm pr-12">
+          <div className="bg-background/80 p-4 border-b flex items-center justify-between sticky top-0 z-[60] backdrop-blur-md pr-16">
             <div className="flex items-center gap-4">
               <Button size="sm" onClick={() => printPrescription('#history-print-preview')} className="gap-2">
                 <Printer className="w-4 h-4" /> Print

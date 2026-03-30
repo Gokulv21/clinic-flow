@@ -264,8 +264,9 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
     const onPointerDown = (e: React.PointerEvent) => {
         e.preventDefault();
 
-        // Handle both Stylus (pen) and Touch (finger) input for maximum compatibility
-        if (e.pointerType !== 'pen' && e.pointerType !== 'touch') return;
+        // Restore Palm Rejection: Strictly ONLY allow Stylus/Pen for drawing. 
+        // This ensures fingers can still be used for Pinch-to-zoom gestures.
+        if (e.pointerType !== 'pen') return;
 
         // If another pen stroke is already active, ignore
         if (isDrawingRef.current) return;
@@ -286,10 +287,13 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
     const onPointerMove = (e: React.PointerEvent) => {
         e.preventDefault();
 
-        // Only track the active pointer (pen or touch)
-        if (e.pointerType !== 'pen' && e.pointerType !== 'touch') return;
+        // Restore palm rejection: Only track the active pen
+        if (e.pointerType !== 'pen') return;
         if (!isDrawingRef.current) return;
         if (e.pointerId !== activePointerIdRef.current) return;
+
+        // Track pointer for Eraser Cursor
+        setPointerPos({ x: e.clientX, y: e.clientY });
 
         // Process all coalesced (high-frequency) events for smooth strokes
         const coalescedEvents = (e.nativeEvent as any).getCoalescedEvents
@@ -306,12 +310,12 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
     };
 
     const handlePointerMoveGlobal = (e: React.PointerEvent) => {
-        setPointerPos({ x: e.clientX, y: e.clientY });
+        // No longer tracking global moves to prevent state churn and gesture interference
     };
 
     // Shared commit logic for pointerup / pointercancel / pointerleave
     const commitStroke = (e?: React.PointerEvent) => {
-        if (e && e.pointerType !== 'pen' && e.pointerType !== 'touch') return;
+        if (e && e.pointerType !== 'pen') return;
 
         // Always reset drawing state immediately (critical for pointercancel)
         const wasDrawing = isDrawingRef.current;
@@ -438,14 +442,13 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
     return (
         <div
             style={{
-                position: 'fixed', inset: 0, zIndex: 40,
+                position: 'fixed', inset: 0, zIndex: 60, // Increased to cover Sidebar (z-50)
                 background: 'rgba(0,0,0,0.85)',
                 backdropFilter: 'blur(12px)',
                 display: 'flex', flexDirection: 'column',
                 padding: isEnlarged ? 0 : '12px',
             }}
             onWheel={handleWheel}
-            onPointerMove={handlePointerMoveGlobal}
         >
             {/* ── Eraser Cursor Overly */}
             {isEraser && isPointerInCanvas && (
@@ -466,8 +469,8 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                     }}
                 />
             )}
-            {/* ── Toolbar */}
-            <div className="bg-background dark:bg-slate-900 border-b border-border px-2 py-2 md:px-4 md:py-3 flex flex-wrap items-center justify-between gap-y-2 shrink-0 shadow-lg sticky top-0 z-50 rounded-t-xl">
+            {/* ── Toolbar (Hidden on Mobile) */}
+            <div className="hidden md:flex bg-background dark:bg-slate-900 border-b border-border px-4 py-3 items-center justify-between gap-y-2 shrink-0 shadow-lg sticky top-0 z-50 rounded-t-xl">
                 <div className="flex items-center gap-1 md:gap-2 min-w-0 flex-wrap">
                     <Button variant="ghost" size="icon" onClick={onClose} className="shrink-0 h-8 w-8 md:h-10 md:w-10 text-foreground hover:bg-muted"><X className="w-5 h-5" /></Button>
 
@@ -484,7 +487,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                                     <Trash2 className="w-4 h-4" />
                                 </Button>
                             </AlertDialogTrigger>
-                            <AlertDialogContent className="rounded-[2rem] border-none shadow-2xl">
+                            <AlertDialogContent className="rounded-[2rem] border-none shadow-2xl z-[1000]">
                                 <AlertDialogHeader>
                                     <div className="flex items-center gap-3 text-red-600 mb-2">
                                         <AlertTriangle className="w-6 h-6" />
@@ -657,9 +660,34 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                 </div>
             </div>
 
-            {/* ── Pagination Bottom Bar */}
+            {/* ── Floating Mobile Controls (Show only on Mobile) */}
+            <div className="md:hidden fixed top-6 right-6 flex flex-col gap-4 z-[70]">
+                <Button 
+                    variant="secondary" 
+                    size="icon" 
+                    onClick={onClose} 
+                    className="h-12 w-12 rounded-full shadow-2xl bg-background/90 backdrop-blur border border-border"
+                >
+                    <X className="w-6 h-6 text-foreground" />
+                </Button>
+                <Button 
+                    variant="default" 
+                    size="icon" 
+                    onClick={handleSave} 
+                    className="h-12 w-12 rounded-full shadow-2xl bg-blue-600 hover:bg-blue-700"
+                >
+                    <Save className="w-6 h-6 text-white" />
+                </Button>
+                {pages.length > 1 && (
+                    <div className="h-12 w-12 rounded-full bg-background/90 backdrop-blur border border-border flex items-center justify-center text-xs font-black shadow-lg">
+                        {currentPageIndex + 1}/{pages.length}
+                    </div>
+                )}
+            </div>
+
+            {/* ── Pagination Bottom Bar (Hidden on Mobile) */}
             <div
-                className="bg-background/90 dark:bg-slate-900/95 backdrop-blur border-t border-border px-6 py-4 flex items-center justify-between shrink-0 rounded-b-xl shadow-2xl"
+                className="hidden md:flex bg-background/90 dark:bg-slate-900/95 backdrop-blur border-t border-border px-6 py-4 items-center justify-between shrink-0 rounded-b-xl shadow-2xl"
                 style={{
                     WebkitUserSelect: 'none',
                     userSelect: 'none',
