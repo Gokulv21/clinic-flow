@@ -126,7 +126,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <ThemeProvider defaultTheme="system" storageKey="clinic-flow-theme">
+    <ThemeProvider defaultTheme="system" storageKey="prescripto-theme">
       <TooltipProvider>
         <Toaster />
         <Sonner />

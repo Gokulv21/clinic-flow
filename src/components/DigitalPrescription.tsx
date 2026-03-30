@@ -264,8 +264,8 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
     const onPointerDown = (e: React.PointerEvent) => {
         e.preventDefault();
 
-        // Only handle Apple Pencil (pen) input
-        if (e.pointerType !== 'pen') return;
+        // Handle both Stylus (pen) and Touch (finger) input for maximum compatibility
+        if (e.pointerType !== 'pen' && e.pointerType !== 'touch') return;
 
         // If another pen stroke is already active, ignore
         if (isDrawingRef.current) return;
@@ -286,8 +286,8 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
     const onPointerMove = (e: React.PointerEvent) => {
         e.preventDefault();
 
-        // Only track the active pen pointer
-        if (e.pointerType !== 'pen') return;
+        // Only track the active pointer (pen or touch)
+        if (e.pointerType !== 'pen' && e.pointerType !== 'touch') return;
         if (!isDrawingRef.current) return;
         if (e.pointerId !== activePointerIdRef.current) return;
 
@@ -311,7 +311,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
 
     // Shared commit logic for pointerup / pointercancel / pointerleave
     const commitStroke = (e?: React.PointerEvent) => {
-        if (e && e.pointerType !== 'pen') return;
+        if (e && e.pointerType !== 'pen' && e.pointerType !== 'touch') return;
 
         // Always reset drawing state immediately (critical for pointercancel)
         const wasDrawing = isDrawingRef.current;

@@ -18,8 +18,8 @@ export default defineConfig(({ mode }) => ({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'prescriptionLogo.png'],
       manifest: {
-        name: 'Prescripto Clinic Flow',
-        short_name: 'ClinicFlow',
+        name: 'PreScripto',
+        short_name: 'PreScripto',
         description: 'Advanced Clinic Management & Prescription System',
         theme_color: '#0284c7',
         icons: [

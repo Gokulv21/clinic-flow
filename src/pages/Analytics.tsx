@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { startOfDay, endOfDay, isWithinInterval } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell } from 'recharts';
@@ -85,31 +86,46 @@ export default function Analytics() {
 
   const fetchVolumeData = async () => {
     let daysCount = 7;
-    let format: 'day' | 'month' = 'day';
+    let formatType: 'day' | 'month' = 'day';
     
     if (timeRange === 'today') daysCount = 1;
     else if (timeRange === 'month') daysCount = 30;
     else if (timeRange === 'year') {
       daysCount = 12;
-      format = 'month';
+      formatType = 'month';
     }
 
-    const data: any[] = [];
+    const startDate = new Date();
+    if (formatType === 'day') {
+      startDate.setDate(startDate.getDate() - (daysCount - 1));
+      startDate.setHours(0, 0, 0, 0);
+    } else {
+      startDate.setMonth(startDate.getMonth() - 11, 1);
+      startDate.setHours(0, 0, 0, 0);
+    }
+
+    const { data: visits } = await supabase
+      .from('visits')
+      .select('created_at')
+      .gte('created_at', startDate.toISOString());
+
+    const resultData: any[] = [];
     
-    if (format === 'day') {
+    if (formatType === 'day') {
       for (let i = daysCount - 1; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
-        const start = new Date(d.setHours(0, 0, 0, 0)).toISOString();
-        const end = new Date(d.setHours(23, 59, 59, 999)).toISOString();
+        const dayStart = startOfDay(d);
+        const dayEnd = endOfDay(d);
         
-        const { count } = await supabase.from('visits').select('id', { count: 'exact', head: true })
-          .gte('created_at', start).lte('created_at', end);
+        const countVal = visits?.filter(v => {
+          const vDate = new Date(v.created_at);
+          return isWithinInterval(vDate, { start: dayStart, end: dayEnd });
+        }).length || 0;
         
-        const countVal = count || 0;
-        const prevCount = data.length > 0 ? data[data.length - 1].patients : 0;
+        const prevCount = resultData.length > 0 ? resultData[resultData.length - 1].patients : 0;
         
-        data.push({ 
+        resultData.push({ 
           name: d.toLocaleDateString('en', { weekday: i < 7 ? 'short' : undefined, day: 'numeric', month: 'short' }), 
           patients: countVal,
           color: countVal >= prevCount ? '#22c55e' : '#ef4444' // Green for up, red for down
@@ -119,23 +135,24 @@ export default function Analytics() {
       for (let i = 11; i >= 0; i--) {
         const d = new Date();
         d.setMonth(d.getMonth() - i, 1);
-        const start = new Date(d.getFullYear(), d.getMonth(), 1).toISOString();
-        const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59).toISOString();
+        const mStart = startOfDay(new Date(d.getFullYear(), d.getMonth(), 1));
+        const mEnd = endOfDay(new Date(d.getFullYear(), d.getMonth() + 1, 0));
         
-        const { count } = await supabase.from('visits').select('id', { count: 'exact', head: true })
-          .gte('created_at', start).lte('created_at', end);
+        const countVal = visits?.filter(v => {
+          const vDate = new Date(v.created_at);
+          return isWithinInterval(vDate, { start: mStart, end: mEnd });
+        }).length || 0;
         
-        const countVal = count || 0;
-        const prevCount = data.length > 0 ? data[data.length - 1].patients : 0;
+        const prevCount = resultData.length > 0 ? resultData[resultData.length - 1].patients : 0;
 
-        data.push({ 
+        resultData.push({ 
           name: d.toLocaleDateString('en', { month: 'short' }), 
           patients: countVal,
           color: countVal >= prevCount ? '#22c55e' : '#ef4444'
         });
       }
     }
-    setVolumeData(data);
+    setVolumeData(resultData);
   };
 
   const fetchSeasonalityData = async () => {
@@ -191,166 +208,175 @@ export default function Analytics() {
         </div>
       </PageBanner>
 
-      <div className="px-4 md:px-8 space-y-8">
+      <div className="px-4 md:px-8 flex flex-col gap-10">
         <div className="bg-card p-1 rounded-xl shadow-sm border border-border hidden md:flex w-fit ml-auto">
-          <Button variant="ghost" size="sm" className="rounded-lg text-xs font-bold gap-2">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="rounded-lg text-xs font-bold gap-2"
+            onClick={() => {
+                fetchGeneralStats();
+                fetchVolumeData();
+                fetchSeasonalityData();
+            }}
+          >
             <Filter className="w-3.5 h-3.5" /> Filter Data
           </Button>
         </div>
-      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {[
-          { label: "Today's Patients", value: stats.todayPatients, icon: <CalendarDays className="w-5 h-5" />, color: 'bg-blue-500/10 text-blue-500', trend: trends.today },
-          { label: 'Monthly Volume', value: stats.monthPatients, icon: <Activity className="w-5 h-5" />, color: 'bg-emerald-500/10 text-emerald-500', trend: trends.month },
-          { label: 'Total Database', value: stats.totalPatients, icon: <Users className="w-5 h-5" />, color: 'bg-amber-500/10 text-amber-500', trend: 'Lifetime records' },
-        ].map(s => (
-          <Card key={s.label} className="border-none shadow-sm hover:shadow-md transition-shadow bg-card overflow-hidden group">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between mb-4">
-                 <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 ${s.color}`}>{s.icon}</div>
-                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{s.trend}</span>
-              </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[
+            { label: "Today's Patients", value: stats.todayPatients, icon: <CalendarDays className="w-5 h-5" />, color: 'bg-blue-500/10 text-blue-500', trend: trends.today },
+            { label: 'Monthly Volume', value: stats.monthPatients, icon: <Activity className="w-5 h-5" />, color: 'bg-emerald-500/10 text-emerald-500', trend: trends.month },
+            { label: 'Total Database', value: stats.totalPatients, icon: <Users className="w-5 h-5" />, color: 'bg-amber-500/10 text-amber-500', trend: 'Lifetime records' },
+          ].map(s => (
+            <Card key={s.label} className="border-none shadow-sm hover:shadow-md transition-shadow bg-card overflow-hidden group">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between mb-4">
+                   <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 ${s.color}`}>{s.icon}</div>
+                   <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{s.trend}</span>
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-muted-foreground">{s.label}</p>
+                  <p className="text-4xl font-extrabold text-foreground tracking-tighter mt-1">{s.value}</p>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <Card className="lg:col-span-2 border-none shadow-sm bg-card overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-7 border-b border-border">
               <div>
-                <p className="text-sm font-bold text-muted-foreground">{s.label}</p>
-                <p className="text-4xl font-extrabold text-foreground tracking-tighter mt-1">{s.value}</p>
+                <CardTitle className="text-lg font-bold text-foreground">Patient Traffic</CardTitle>
+                <p className="text-xs text-muted-foreground mt-0.5 font-medium">Visualization of visit frequency</p>
+              </div>
+              <Select value={timeRange} onValueChange={(v: TimeRange) => setTimeRange(v)}>
+                <SelectTrigger className="w-[130px] h-9 bg-muted border-none font-bold text-xs rounded-lg">
+                  <SelectValue placeholder="Select range" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="today">Today</SelectItem>
+                  <SelectItem value="week">Past Week</SelectItem>
+                  <SelectItem value="month">Past Month</SelectItem>
+                  <SelectItem value="year">Past Year</SelectItem>
+                </SelectContent>
+              </Select>
+            </CardHeader>
+            <CardContent className="pt-8">
+              <div className="h-[300px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={volumeData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
+                    <XAxis 
+                      dataKey="name" 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10, fontWeight: 600 }}
+                      dy={10}
+                    />
+                    <YAxis 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10, fontWeight: 600 }}
+                      allowDecimals={false}
+                    />
+                    <Tooltip 
+                      cursor={{ fill: 'hsl(var(--muted))', opacity: 0.4 }}
+                      contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '12px', border: '1px solid hsl(var(--border))', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', padding: '12px' }}
+                      labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 'bold' }}
+                    />
+                    <Bar dataKey="patients" radius={[6, 6, 0, 0]} barSize={timeRange === 'year' ? 30 : 20}>
+                      {volumeData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
             </CardContent>
           </Card>
-        ))}
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <Card className="lg:col-span-2 border-none shadow-sm bg-card overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-7 border-b border-border">
-            <div>
-              <CardTitle className="text-lg font-bold text-foreground">Patient Traffic</CardTitle>
-              <p className="text-xs text-muted-foreground mt-0.5 font-medium">Visualization of visit frequency</p>
-            </div>
-            <Select value={timeRange} onValueChange={(v: TimeRange) => setTimeRange(v)}>
-              <SelectTrigger className="w-[130px] h-9 bg-muted border-none font-bold text-xs rounded-lg">
-                <SelectValue placeholder="Select range" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="week">Past Week</SelectItem>
-                <SelectItem value="month">Past Month</SelectItem>
-                <SelectItem value="year">Past Year</SelectItem>
-              </SelectContent>
-            </Select>
-          </CardHeader>
-          <CardContent className="pt-8">
-            <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={volumeData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
-                  <XAxis 
-                    dataKey="name" 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10, fontWeight: 600 }}
-                    dy={10}
-                  />
-                  <YAxis 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10, fontWeight: 600 }}
-                    allowDecimals={false}
-                  />
-                  <Tooltip 
-                    cursor={{ fill: 'hsl(var(--muted))', opacity: 0.4 }}
-                    contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '12px', border: '1px solid hsl(var(--border))', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', padding: '12px' }}
-                    labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 'bold' }}
-                  />
-                  <Bar dataKey="patients" radius={[6, 6, 0, 0]} barSize={timeRange === 'year' ? 30 : 20}>
-                    {volumeData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
+          <Card className="border-none shadow-sm bg-card">
+            <CardHeader className="pb-2 border-b border-border mb-4">
+              <CardTitle className="text-lg font-bold text-foreground">Disease Distribution</CardTitle>
+              <p className="text-xs text-muted-foreground font-medium">Most frequent diagnoses</p>
+            </CardHeader>
+            <CardContent>
+              {diagnosisData.length > 0 ? (
+                <div className="space-y-6">
+                  <div className="h-[200px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie data={diagnosisData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                          {diagnosisData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {diagnosisData.map((d, i) => (
+                      <div key={d.name} className="flex items-center gap-2">
+                         <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                         <span className="text-[11px] font-bold text-foreground truncate">{d.name}</span>
+                         <span className="text-[10px] font-medium text-muted-foreground ml-auto">{d.value}</span>
+                      </div>
                     ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-none shadow-sm bg-card">
-          <CardHeader className="pb-2 border-b border-border mb-4">
-            <CardTitle className="text-lg font-bold text-foreground">Disease Distribution</CardTitle>
-            <p className="text-xs text-muted-foreground font-medium">Most frequent diagnoses</p>
-          </CardHeader>
-          <CardContent>
-            {diagnosisData.length > 0 ? (
-              <div className="space-y-6">
-                <div className="h-[200px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie data={diagnosisData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
-                        {diagnosisData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  {diagnosisData.map((d, i) => (
-                    <div key={d.name} className="flex items-center gap-2">
-                       <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                       <span className="text-[11px] font-bold text-foreground truncate">{d.name}</span>
-                       <span className="text-[10px] font-medium text-muted-foreground ml-auto">{d.value}</span>
-                    </div>
-                  ))}
+              ) : (
+                <div className="h-[250px] flex items-center justify-center text-muted-foreground italic text-sm">
+                  No diagnosis data available
                 </div>
-              </div>
-            ) : (
-              <div className="h-[250px] flex items-center justify-center text-muted-foreground italic text-sm">
-                No diagnosis data available
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              )}
+            </CardContent>
+          </Card>
 
-        {/* Disease Seasonality Chart */}
-        <Card className="lg:col-span-3 border-none shadow-sm bg-card overflow-hidden">
-          <CardHeader className="pb-6 border-b border-border">
-            <div className="flex items-center gap-2">
-               <div className="p-1.5 bg-primary/10 rounded-lg">
-                 <Activity className="w-4 h-4 text-primary" />
-               </div>
-               <div>
-                  <CardTitle className="text-lg font-bold text-foreground">Disease Seasonality</CardTitle>
-                  <p className="text-xs text-muted-foreground font-medium">Trends for common conditions over the last 6 months</p>
-               </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-8 px-2 md:px-6">
-            <div className="h-[350px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={seasonalityData}>
-                  <defs>
-                    {COLORS.map((color, i) => (
-                      <linearGradient key={i} id={`color${i}`} x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={color} stopOpacity={0.1}/>
-                        <stop offset="95%" stopColor={color} stopOpacity={0}/>
-                      </linearGradient>
-                    ))}
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
-                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11, fontWeight: 700 }} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10, fontWeight: 600 }} />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '12px', border: '1px solid hsl(var(--border))' }}
-                    labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 'bold' }}
-                  />
-                  <Area type="monotone" dataKey="Fever" stroke={COLORS[0]} fillOpacity={1} fill="url(#color0)" strokeWidth={3} />
-                  <Area type="monotone" dataKey="Cough" stroke={COLORS[1]} fillOpacity={1} fill="url(#color1)" strokeWidth={3} />
-                  <Area type="monotone" dataKey="Diabetes" stroke={COLORS[2]} fillOpacity={1} fill="url(#color2)" strokeWidth={3} />
-                  <Area type="monotone" dataKey="Hypertension" stroke={COLORS[3]} fillOpacity={1} fill="url(#color3)" strokeWidth={3} />
-                  <Area type="monotone" dataKey="Gastritis" stroke={COLORS[4]} fillOpacity={1} fill="url(#color4)" strokeWidth={3} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
+          {/* Disease Seasonality Chart */}
+          <Card className="lg:col-span-3 border-none shadow-sm bg-card overflow-hidden">
+            <CardHeader className="pb-6 border-b border-border">
+              <div className="flex items-center gap-2">
+                 <div className="p-1.5 bg-primary/10 rounded-lg">
+                   <Activity className="w-4 h-4 text-primary" />
+                 </div>
+                 <div>
+                    <CardTitle className="text-lg font-bold text-foreground">Disease Seasonality</CardTitle>
+                    <p className="text-xs text-muted-foreground font-medium">Trends for common conditions over the last 6 months</p>
+                 </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-8 px-2 md:px-6">
+              <div className="h-[350px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={seasonalityData}>
+                    <defs>
+                      {COLORS.map((color, i) => (
+                        <linearGradient key={i} id={`color${i}`} x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={color} stopOpacity={0.1}/>
+                          <stop offset="95%" stopColor={color} stopOpacity={0}/>
+                        </linearGradient>
+                      ))}
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
+                    <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11, fontWeight: 700 }} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10, fontWeight: 600 }} />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '12px', border: '1px solid hsl(var(--border))' }}
+                      labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 'bold' }}
+                    />
+                    <Area type="monotone" dataKey="Fever" stroke={COLORS[0]} fillOpacity={1} fill="url(#color0)" strokeWidth={3} />
+                    <Area type="monotone" dataKey="Cough" stroke={COLORS[1]} fillOpacity={1} fill="url(#color1)" strokeWidth={3} />
+                    <Area type="monotone" dataKey="Diabetes" stroke={COLORS[2]} fillOpacity={1} fill="url(#color2)" strokeWidth={3} />
+                    <Area type="monotone" dataKey="Hypertension" stroke={COLORS[3]} fillOpacity={1} fill="url(#color3)" strokeWidth={3} />
+                    <Area type="monotone" dataKey="Gastritis" stroke={COLORS[4]} fillOpacity={1} fill="url(#color4)" strokeWidth={3} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

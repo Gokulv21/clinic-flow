@@ -3,9 +3,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { 
-    Users, Calendar, Activity, Clock, ShieldCheck, User, Loader2, 
-    UserCheck, BarChart3, PieChart, Settings, Mail, Phone, MapPin, 
+import {
+    Users, Calendar, Activity, Clock, ShieldCheck, User, Loader2,
+    UserCheck, BarChart3, PieChart, Settings, Mail, Phone, MapPin,
     Medal, FileSignature, Save, RefreshCw, Plus, Stethoscope, Printer,
     ArrowRight, CheckCircle2, Circle, PanelLeft, LayoutDashboard,
     Group, Info, Moon, Sun, HeartPulse, TrendingUp, Search, UserPlus, Camera, Trash2, Eye, X
@@ -17,15 +17,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from 'sonner';
-import { 
-    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-    PieChart as RePieChart, Pie, Cell, LineChart, Line, AreaChart, Area
+import {
+    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+    PieChart as RePieChart, Pie, Cell, LineChart, Line, AreaChart, Area, Legend
 } from 'recharts';
 import SignaturePad from '@/components/SignaturePad';
 import { useTheme } from 'next-themes';
-import { 
-    Dialog, DialogContent, DialogHeader, DialogTitle, 
-    DialogDescription, DialogFooter 
+import {
+    Dialog, DialogContent, DialogHeader, DialogTitle,
+    DialogDescription, DialogFooter
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 
@@ -64,12 +64,15 @@ export default function DoctorProfile() {
     const { theme, setTheme } = useTheme();
     const navigate = useNavigate();
     const [profile, setProfile] = useState<ProfileData | null>(null);
+    const [activeTab, setActiveTab] = useState(() => {
+        return localStorage.getItem('profileActiveTab') || 'overview';
+    });
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    
+
     // Stats & Analytics State
     const [stats, setStats] = useState({
         totalPatients: 0,
@@ -135,11 +138,14 @@ export default function DoctorProfile() {
                 });
             }
 
-            // 4. Demographics (Gender)
+            // 4. Demographics (Age + Gender)
             const { data: patients } = await supabase.from('patients').select('sex, age');
-            const genderData = [
-                { name: 'Male', value: patients?.filter(p => p.sex === 'Male').length || 0, color: '#3b82f6' },
-                { name: 'Female', value: patients?.filter(p => p.sex === 'Female').length || 0, color: '#ec4899' },
+            const ageThreshold = 18;
+            const demoData = [
+                { name: 'Men (>= 18)', value: patients?.filter(p => p.sex === 'Male' && (p.age || 0) >= ageThreshold).length || 0, color: '#2563eb' },
+                { name: 'Women (>= 18)', value: patients?.filter(p => p.sex === 'Female' && (p.age || 0) >= ageThreshold).length || 0, color: '#db2777' },
+                { name: 'Boys (< 18)', value: patients?.filter(p => p.sex === 'Male' && (p.age || 0) < ageThreshold).length || 0, color: '#60a5fa' },
+                { name: 'Girls (< 18)', value: patients?.filter(p => p.sex === 'Female' && (p.age || 0) < ageThreshold).length || 0, color: '#f472b6' },
                 { name: 'Other', value: patients?.filter(p => p.sex === 'Other').length || 0, color: '#94a3b8' }
             ].filter(d => d.value > 0);
 
@@ -163,7 +169,7 @@ export default function DoctorProfile() {
                 totalPatients: totalCount || 0,
                 todayPatients: todayCount || 0,
                 weeklyData: last7Days,
-                demographics: genderData,
+                demographics: demoData,
                 recentActivity: recent || []
             });
 
@@ -189,6 +195,7 @@ export default function DoctorProfile() {
                     clinic_address: profile.clinic_address,
                     clinic_phone: profile.clinic_phone,
                     signature_data: profile.signature_data,
+                    // @ts-ignore
                     avatar_url: profile.avatar_url,
                     theme: theme
                 })
@@ -261,10 +268,10 @@ export default function DoctorProfile() {
 
     const handleDeletePhoto = async () => {
         if (!profile?.avatar_url || !user?.id) return;
-        
+
         // Only delete if it's a custom uploaded photo (contains Supabase storage path)
         const isCustomPhoto = profile.avatar_url.includes('/storage/v1/object/public/avatars/');
-        
+
         if (!isCustomPhoto) {
             // If it's just a default avatar, just reset it
             setProfile(prev => prev ? { ...prev, avatar_url: undefined } : null);
@@ -333,17 +340,22 @@ export default function DoctorProfile() {
             const { error: roleError } = await supabase
                 .from('user_roles')
                 .upsert({ user_id: userId, role: 'staff' }, { onConflict: 'user_id' });
-            
+
             if (roleError) throw roleError;
-            
+
             toast.success('Staff member added to team');
-            fetchData(); 
+            fetchData();
             setShowAddStaffDialog(false);
         } catch (err: any) {
             toast.error(err.message);
         } finally {
             setAddingStaffId(null);
         }
+    };
+
+    const handleTabChange = (value: string) => {
+        setActiveTab(value);
+        localStorage.setItem('profileActiveTab', value);
     };
 
     if (loading) {
@@ -356,19 +368,26 @@ export default function DoctorProfile() {
 
     return (
         <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-10 animate-in fade-in duration-700 font-jakarta-sans pb-24">
-            
+
             {/* Header Section */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                 <div className="flex items-center gap-6">
                     <div className="relative group perspective-1000">
                         <div className="w-28 h-36 md:w-32 md:h-44 rounded-[2rem] bg-gradient-to-b from-blue-500 to-blue-700 shadow-2xl overflow-hidden flex items-center justify-center transform transition-all duration-500 group-hover:rotate-y-12 group-hover:scale-105 border-4 border-white dark:border-slate-800">
-                                <img src={getAvatarUrl(profile?.avatar_url)} className="w-full h-full object-cover" alt="Profile" />
+                            <img
+                                src={getAvatarUrl(profile?.avatar_url)}
+                                className="w-full h-full object-cover"
+                                alt="Profile"
+                                onError={(e) => {
+                                    e.currentTarget.src = AVATAR_OPTIONS[0].url;
+                                }}
+                            />
                             <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/20 to-transparent" />
-                            
+
                             {/* Upload Overlay */}
                             <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white gap-3 cursor-pointer p-2 backdrop-blur-sm">
                                 <div className="grid grid-cols-2 gap-2 w-full px-4">
-                                    <button 
+                                    <button
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             setImagePreviewUrl(getAvatarUrl(profile?.avatar_url));
@@ -378,8 +397,8 @@ export default function DoctorProfile() {
                                         <Eye className="w-6 h-6" />
                                         <span className="text-[9px] font-black uppercase tracking-widest">Open</span>
                                     </button>
-                                    
-                                    <button 
+
+                                    <button
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             fileInputRef.current?.click();
@@ -391,9 +410,9 @@ export default function DoctorProfile() {
                                         <span className="text-[9px] font-black uppercase tracking-widest text-center">Browse</span>
                                     </button>
                                 </div>
-                                
+
                                 {profile?.avatar_url?.includes('http') && (
-                                    <button 
+                                    <button
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             handleDeletePhoto();
@@ -409,18 +428,18 @@ export default function DoctorProfile() {
                                 )}
                             </div>
                         </div>
-                        <input 
-                            type="file" 
-                            ref={fileInputRef} 
-                            onChange={handlePhotoUpload} 
-                            className="hidden" 
-                            accept="image/*" 
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={handlePhotoUpload}
+                            className="hidden"
+                            accept="image/*"
                         />
                         <div className="absolute -bottom-3 -right-3 bg-emerald-500 text-white p-2 rounded-2xl border-4 border-white dark:border-slate-800 shadow-xl">
                             <CheckCircle2 className="w-5 h-5" />
                         </div>
                     </div>
-                    
+
                     <div className="space-y-1">
                         <div className="flex flex-wrap items-center gap-2">
                             <h1 className="text-3xl md:text-5xl font-black tracking-tighter text-slate-900 dark:text-slate-50 group">
@@ -436,35 +455,35 @@ export default function DoctorProfile() {
                             {profile?.qualifications || "Update your credentials"}
                         </p>
                         <div className="flex items-center gap-4 text-slate-400 text-sm font-medium pt-2">
-                             <div className="flex items-center gap-1.5"><Mail className="w-4 h-4" /> {user?.email}</div>
-                             {profile?.registration_id && <div className="flex items-center gap-1.5"><ShieldCheck className="w-4 h-4" /> Reg: {profile.registration_id}</div>}
+                            <div className="flex items-center gap-1.5"><Mail className="w-4 h-4" /> {user?.email}</div>
+                            {profile?.registration_id && <div className="flex items-center gap-1.5"><ShieldCheck className="w-4 h-4" /> Reg: {profile.registration_id}</div>}
                         </div>
                     </div>
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <Button 
-                        variant="outline" 
-                        size="sm" 
+                    <Button
+                        variant="outline"
+                        size="sm"
                         className="rounded-2xl border-slate-200 dark:border-slate-800 gap-2 font-bold h-11 px-6 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-800"
                         onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                     >
                         {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
                         Theme
                     </Button>
-                    <Button 
+                    <Button
                         onClick={() => {
                             fetchData();
                             toast.success('Medical records synchronized');
                         }}
                         className="rounded-2xl bg-blue-600 hover:bg-blue-700 gap-2 font-bold h-11 px-6 shadow-lg shadow-blue-200 text-white border-none"
                     >
-                       <RefreshCw className="w-4 h-4" /> Sync Records
+                        <RefreshCw className="w-4 h-4" /> Sync Records
                     </Button>
                 </div>
             </div>
 
-            <Tabs defaultValue="overview" className="w-full space-y-8">
+            <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full space-y-8">
                 <TabsList className="bg-white/50 dark:bg-slate-900/50 backdrop-blur p-1.5 rounded-[2rem] border border-slate-200 dark:border-slate-800 w-full md:w-auto h-auto grid grid-cols-2 md:grid-cols-4 gap-2">
                     <TabsTrigger value="overview" className="rounded-full px-8 py-3 data-[state=active]:bg-slate-900 data-[state=active]:text-white dark:data-[state=active]:bg-slate-50 dark:data-[state=active]:text-slate-900 font-black text-xs uppercase tracking-widest gap-2">
                         <LayoutDashboard className="w-4 h-4" /> Overview
@@ -509,8 +528,8 @@ export default function DoctorProfile() {
                                     { icon: <Stethoscope className="w-5 h-5" />, label: "Queue", color: "bg-purple-50 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400", path: "/consultation" },
                                     { icon: <Printer className="w-5 h-5" />, label: "Print", color: "bg-emerald-50 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400", path: "/print" }
                                 ].map(a => (
-                                    <button 
-                                        key={a.label} 
+                                    <button
+                                        key={a.label}
                                         onClick={() => navigate(a.path)}
                                         className="flex flex-col items-center gap-1 hover:scale-105 transition-transform"
                                     >
@@ -525,8 +544,8 @@ export default function DoctorProfile() {
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-4">
-                         {/* Activity Timeline */}
-                         <Card className="border-slate-100 dark:border-slate-800 rounded-[2rem] shadow-sm bg-white dark:bg-slate-900 overflow-hidden">
+                        {/* Activity Timeline */}
+                        <Card className="border-slate-100 dark:border-slate-800 rounded-[2rem] shadow-sm bg-white dark:bg-slate-900 overflow-hidden">
                             <CardHeader className="border-b border-slate-50 dark:border-slate-800 px-8 py-6">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
@@ -546,7 +565,7 @@ export default function DoctorProfile() {
                                                         {visit.patients?.name?.charAt(0)}
                                                     </div>
                                                     <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-white dark:bg-slate-900 flex items-center justify-center shadow-sm">
-                                                       {visit.status === 'completed' ? <CheckCircle2 className="w-2.5 h-2.5 text-emerald-500" /> : <Clock className="w-2.5 h-2.5 text-amber-500" />}
+                                                        {visit.status === 'completed' ? <CheckCircle2 className="w-2.5 h-2.5 text-emerald-500" /> : <Clock className="w-2.5 h-2.5 text-amber-500" />}
                                                     </div>
                                                 </div>
                                                 <div>
@@ -565,48 +584,52 @@ export default function DoctorProfile() {
                                         </div>
                                     ))}
                                 </div>
-                                <Button variant="ghost" className="w-full h-14 rounded-none text-blue-600 dark:text-blue-400 font-bold text-xs uppercase tracking-widest hover:bg-slate-50 dark:hover:bg-slate-800 border-t border-slate-50 dark:border-slate-800">
+                                <Button
+                                    variant="ghost"
+                                    className="w-full h-14 rounded-none text-blue-600 dark:text-blue-400 font-bold text-xs uppercase tracking-widest hover:bg-slate-50 dark:hover:bg-slate-800 border-t border-slate-50 dark:border-slate-800"
+                                    onClick={() => handleTabChange('analytics')}
+                                >
                                     See All Activity <ArrowRight className="w-4 h-4 ml-2" />
                                 </Button>
                             </CardContent>
-                         </Card>
+                        </Card>
 
-                         {/* Mini Analytics */}
-                         <Card className="border-border dark:border-slate-800 rounded-[2rem] shadow-sm bg-card overflow-hidden p-8 flex flex-col">
-                             <div className="flex items-center justify-between mb-8">
+                        {/* Mini Analytics */}
+                        <Card className="border-border dark:border-slate-800 rounded-[2rem] shadow-sm bg-card overflow-hidden p-8 flex flex-col">
+                            <div className="flex items-center justify-between mb-8">
                                 <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground">Weekly Performance</h3>
                                 <TrendingUp className="w-5 h-5 text-emerald-500" />
-                             </div>
-                             <div className="h-64 mt-auto">
+                            </div>
+                            <div className="h-64 mt-auto">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <AreaChart data={stats.weeklyData}>
                                         <defs>
                                             <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                                                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                                                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                                                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                                             </linearGradient>
                                         </defs>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                        <XAxis 
-                                            dataKey="date" 
-                                            axisLine={false} 
-                                            tickLine={false} 
-                                            tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 800 }} 
+                                        <XAxis
+                                            dataKey="date"
+                                            axisLine={false}
+                                            tickLine={false}
+                                            tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 800 }}
                                         />
-                                        <Tooltip 
+                                        <Tooltip
                                             contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', fontWeight: 'bold' }}
                                         />
                                         <Area type="monotone" dataKey="count" stroke="#3b82f6" strokeWidth={4} fillOpacity={1} fill="url(#colorCount)" />
                                     </AreaChart>
                                 </ResponsiveContainer>
-                             </div>
-                         </Card>
+                            </div>
+                        </Card>
                     </div>
                 </TabsContent>
 
                 <TabsContent value="analytics" className="space-y-8 focus-visible:outline-none">
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        <Card className="lg:col-span-2 border-slate-100 dark:border-slate-800 rounded-[2rem] p-8 space-y-8 bg-white dark:bg-slate-900 shadow-sm">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <Card className="border-slate-100 dark:border-slate-800 rounded-[2rem] p-4 md:p-8 space-y-8 bg-white dark:bg-slate-900 shadow-sm transition-all duration-300">
                             <div className="flex items-center justify-between">
                                 <div>
                                     <CardTitle className="text-2xl font-black tracking-tight mb-1 dark:text-slate-100">Patient Volume Trend</CardTitle>
@@ -616,22 +639,22 @@ export default function DoctorProfile() {
                                     <Activity className="w-6 h-6" />
                                 </div>
                             </div>
-                            <div className="h-80 w-full">
+                            <div className="h-[300px] md:h-[400px] w-full">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart data={stats.weeklyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f8fafc" />
-                                        <XAxis 
-                                            dataKey="date" 
-                                            axisLine={false} 
-                                            tickLine={false} 
-                                            tick={{ fill: '#64748b', fontSize: 12, fontWeight: 700 }} 
+                                        <XAxis
+                                            dataKey="date"
+                                            axisLine={false}
+                                            tickLine={false}
+                                            tick={{ fill: '#64748b', fontSize: 12, fontWeight: 700 }}
                                         />
-                                        <YAxis 
-                                            axisLine={false} 
-                                            tickLine={false} 
-                                            tick={{ fill: '#94a3b8', fontSize: 10 }} 
+                                        <YAxis
+                                            axisLine={false}
+                                            tickLine={false}
+                                            tick={{ fill: '#94a3b8', fontSize: 10 }}
                                         />
-                                        <Tooltip 
+                                        <Tooltip
                                             cursor={{ fill: '#f1f5f9', radius: 8 }}
                                             contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }}
                                             labelStyle={{ fontWeight: 800 }}
@@ -642,33 +665,38 @@ export default function DoctorProfile() {
                             </div>
                         </Card>
 
-                        <Card className="border-slate-100 dark:border-slate-800 rounded-[2rem] p-8 space-y-8 bg-white dark:bg-slate-900 shadow-sm flex flex-col">
+                        <Card className="border-slate-100 dark:border-slate-800 rounded-[2rem] p-4 md:p-8 space-y-8 bg-white dark:bg-slate-900 shadow-sm flex flex-col transition-all duration-300">
                             <div>
                                 <CardTitle className="text-2xl font-black tracking-tight mb-1 dark:text-slate-100">Demographics</CardTitle>
-                                <CardDescription className="dark:text-slate-400">Patient gender distribution.</CardDescription>
+                                <CardDescription className="dark:text-slate-400">Patient age and gender distribution.</CardDescription>
                             </div>
-                            <div className="h-64 relative flex-1">
+                            <div className="h-[300px] md:h-[450px] relative flex-1">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <RePieChart>
                                         <Pie
                                             data={stats.demographics}
-                                            innerRadius={60}
-                                            outerRadius={90}
-                                            paddingAngle={8}
+                                            innerRadius="65%"
+                                            outerRadius="90%"
+                                            paddingAngle={2}
                                             dataKey="value"
+                                            stroke="none"
                                         >
                                             {stats.demographics.map((entry, index) => (
                                                 <Cell key={`cell-${index}`} fill={entry.color} />
                                             ))}
                                         </Pie>
-                                        <Tooltip />
+                                        <Tooltip
+                                            contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                                            itemStyle={{ fontWeight: 'bold' }}
+                                        />
                                     </RePieChart>
                                 </ResponsiveContainer>
                                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                    <p className="text-2xl font-black dark:text-slate-100">{stats.totalPatients}</p>
-                                    <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase">Total Patients</p>
+                                    <p className="text-3xl md:text-5xl font-black dark:text-slate-100 leading-none">{stats.totalPatients}</p>
+                                    <p className="text-[8px] md:text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1 text-center">Patients</p>
                                 </div>
                             </div>
+
                             <div className="space-y-3">
                                 {stats.demographics.map(d => (
                                     <div key={d.name} className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
@@ -692,7 +720,7 @@ export default function DoctorProfile() {
                                 <CardDescription className="dark:text-slate-400">Manage your nurse and support team access levels.</CardDescription>
                             </div>
                             {hasRole('doctor') && (
-                                <Button 
+                                <Button
                                     onClick={() => {
                                         fetchAllProfiles();
                                         setShowAddStaffDialog(true);
@@ -707,27 +735,27 @@ export default function DoctorProfile() {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {staff.map((s, i) => (
                                 <Card key={i} className="group relative border-slate-100 dark:border-slate-800 rounded-3xl hover:border-blue-200 dark:hover:border-blue-700 transition-all hover:shadow-xl hover:-translate-y-1 bg-white dark:bg-slate-800/50 overflow-hidden">
-                                     <div className="absolute top-0 left-0 w-full h-1 bg-blue-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                     <CardContent className="p-6 flex items-center gap-4">
-                                         <Avatar className="w-16 h-16 rounded-2xl border-4 border-slate-50 dark:border-slate-700">
-                                             <AvatarFallback className="bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 font-black text-xl">
+                                    <div className="absolute top-0 left-0 w-full h-1 bg-blue-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    <CardContent className="p-6 flex items-center gap-4">
+                                        <Avatar className="w-16 h-16 rounded-2xl border-4 border-slate-50 dark:border-slate-700">
+                                            <AvatarFallback className="bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 font-black text-xl">
                                                 {s.profiles?.full_name?.charAt(0)}
-                                             </AvatarFallback>
-                                         </Avatar>
-                                         <div className="space-y-1">
-                                             <h4 className="font-black text-slate-900 dark:text-slate-100 leading-tight">{s.profiles?.full_name}</h4>
-                                             <div className="flex items-center gap-2">
-                                                 <span className="bg-emerald-50 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest">
-                                                     {s.role}
-                                                 </span>
-                                                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                             </div>
-                                         </div>
-                                     </CardContent>
-                                     <div className="border-t border-slate-50 dark:border-slate-700 p-4 flex items-center justify-between text-[11px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
-                                         <span>Last Active: Today</span>
-                                         <Button variant="ghost" size="sm" className="h-auto p-0 hover:bg-transparent hover:text-blue-600 dark:hover:text-blue-400">Permissions <ArrowRight className="w-3 h-3 ml-1" /></Button>
-                                     </div>
+                                            </AvatarFallback>
+                                        </Avatar>
+                                        <div className="space-y-1">
+                                            <h4 className="font-black text-slate-900 dark:text-slate-100 leading-tight">{s.profiles?.full_name}</h4>
+                                            <div className="flex items-center gap-2">
+                                                <span className="bg-emerald-50 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest">
+                                                    {s.role}
+                                                </span>
+                                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                    <div className="border-t border-slate-50 dark:border-slate-700 p-4 flex items-center justify-between text-[11px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                                        <span>Last Active: Today</span>
+                                        <Button variant="ghost" size="sm" className="h-auto p-0 hover:bg-transparent hover:text-blue-600 dark:hover:text-blue-400">Permissions <ArrowRight className="w-3 h-3 ml-1" /></Button>
+                                    </div>
                                 </Card>
                             ))}
                             {staff.length === 0 && (
@@ -745,7 +773,7 @@ export default function DoctorProfile() {
                 <TabsContent value="settings" className="focus-visible:outline-none">
                     <form onSubmit={handleUpdateProfile} className="space-y-8">
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                             {/* Identity Card */}
+                            {/* Identity Card */}
                             <Card className="border-slate-100 dark:border-slate-800 rounded-[2rem] p-8 space-y-8 bg-white dark:bg-slate-900 shadow-sm">
                                 <div className="flex items-center gap-3">
                                     <div className="p-3 bg-blue-50 dark:bg-blue-900/40 rounded-2xl">
@@ -753,33 +781,33 @@ export default function DoctorProfile() {
                                     </div>
                                     <h3 className="text-2xl font-black tracking-tight dark:text-slate-100">Professional Identity</h3>
                                 </div>
-                                
+
                                 <div className="space-y-6">
                                     <div className="space-y-2">
                                         <Label className="text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Display Name</Label>
-                                        <Input 
-                                            value={profile?.full_name} 
+                                        <Input
+                                            value={profile?.full_name}
                                             onChange={e => setProfile(p => ({ ...p!, full_name: e.target.value }))}
-                                            className="h-12 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 rounded-xl px-4 font-bold focus:ring-blue-500" 
+                                            className="h-12 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 rounded-xl px-4 font-bold focus:ring-blue-500"
                                         />
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="space-y-2">
                                             <Label className="text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Primary Qualifications</Label>
-                                            <Input 
-                                                value={profile?.qualifications} 
+                                            <Input
+                                                value={profile?.qualifications}
                                                 onChange={e => setProfile(p => ({ ...p!, qualifications: e.target.value }))}
                                                 placeholder="MBBS, MD (Cardiology)"
-                                                className="h-12 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 rounded-xl px-4 font-bold" 
+                                                className="h-12 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 rounded-xl px-4 font-bold"
                                             />
                                         </div>
                                         <div className="space-y-2">
                                             <Label className="text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Medical Registration ID</Label>
-                                            <Input 
-                                                value={profile?.registration_id} 
+                                            <Input
+                                                value={profile?.registration_id}
                                                 onChange={e => setProfile(p => ({ ...p!, registration_id: e.target.value }))}
                                                 placeholder="Reg #12345"
-                                                className="h-12 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 rounded-xl px-4 font-bold" 
+                                                className="h-12 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 rounded-xl px-4 font-bold"
                                             />
                                         </div>
                                     </div>
@@ -821,29 +849,29 @@ export default function DoctorProfile() {
                                 <div className="space-y-6">
                                     <div className="space-y-2">
                                         <Label className="text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Clinic Name</Label>
-                                        <Input 
-                                            value={profile?.clinic_name} 
+                                        <Input
+                                            value={profile?.clinic_name}
                                             onChange={e => setProfile(p => ({ ...p!, clinic_name: e.target.value }))}
                                             placeholder="Lifeline Diagnostic Centre"
-                                            className="h-12 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 rounded-xl px-4 font-bold" 
+                                            className="h-12 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 rounded-xl px-4 font-bold"
                                         />
                                     </div>
                                     <div className="space-y-2">
                                         <Label className="text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Clinic Address</Label>
-                                        <Input 
-                                            value={profile?.clinic_address} 
+                                        <Input
+                                            value={profile?.clinic_address}
                                             onChange={e => setProfile(p => ({ ...p!, clinic_address: e.target.value }))}
                                             placeholder="123 Health Street, City"
-                                            className="h-12 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 rounded-xl px-4 font-bold" 
+                                            className="h-12 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 rounded-xl px-4 font-bold"
                                         />
                                     </div>
                                     <div className="space-y-2">
                                         <Label className="text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Clinic Contact</Label>
-                                        <Input 
-                                            value={profile?.clinic_phone} 
+                                        <Input
+                                            value={profile?.clinic_phone}
                                             onChange={e => setProfile(p => ({ ...p!, clinic_phone: e.target.value }))}
                                             placeholder="+91 00000 00000"
-                                            className="h-12 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 rounded-xl px-4 font-bold" 
+                                            className="h-12 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 rounded-xl px-4 font-bold"
                                         />
                                     </div>
                                 </div>
@@ -861,7 +889,7 @@ export default function DoctorProfile() {
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-                                    <SignaturePad 
+                                    <SignaturePad
                                         initialSignature={profile?.signature_data}
                                         onSave={(data) => setProfile(p => ({ ...p!, signature_data: data }))}
                                     />
@@ -883,8 +911,8 @@ export default function DoctorProfile() {
                         </div>
 
                         <div className="flex justify-end pt-6">
-                            <Button 
-                                type="submit" 
+                            <Button
+                                type="submit"
                                 disabled={saving}
                                 className="bg-blue-600 hover:bg-blue-700 text-white font-black uppercase text-[12px] tracking-widest px-12 h-16 rounded-[2rem] shadow-2xl shadow-blue-200"
                             >
@@ -910,12 +938,12 @@ export default function DoctorProfile() {
                             </div>
                         </div>
                     </DialogHeader>
-                    
+
                     <div className="p-6 space-y-6">
                         <div className="relative">
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                            <Input 
-                                placeholder="Search by name or email..." 
+                            <Input
+                                placeholder="Search by name or email..."
                                 value={staffSearchQuery}
                                 onChange={e => setStaffSearchQuery(e.target.value)}
                                 className="h-12 pl-12 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-2xl font-bold shadow-sm focus:ring-blue-500"
@@ -924,7 +952,7 @@ export default function DoctorProfile() {
 
                         <div className="max-h-[40vh] overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-slate-200">
                             {allProfiles
-                                .filter(p => 
+                                .filter(p =>
                                     p.full_name?.toLowerCase().includes(staffSearchQuery.toLowerCase()) ||
                                     p.email?.toLowerCase().includes(staffSearchQuery.toLowerCase())
                                 )
@@ -941,8 +969,8 @@ export default function DoctorProfile() {
                                                 <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">{p.email || 'No email synced'}</p>
                                             </div>
                                         </div>
-                                        <Button 
-                                            size="sm" 
+                                        <Button
+                                            size="sm"
                                             onClick={() => handleAddStaff(p.user_id)}
                                             disabled={addingStaffId === p.user_id}
                                             className="rounded-full bg-slate-900 dark:bg-slate-50 dark:text-slate-900 text-white font-black text-[9px] uppercase tracking-widest h-9 px-4 border-none shadow-lg shadow-slate-200"
@@ -973,12 +1001,12 @@ export default function DoctorProfile() {
             <Dialog open={!!imagePreviewUrl} onOpenChange={open => !open && setImagePreviewUrl(null)}>
                 <DialogContent className="max-w-3xl p-0 overflow-hidden border-none bg-black/90 rounded-[2.5rem] shadow-2xl backdrop-blur-xl">
                     <div className="relative aspect-auto flex items-center justify-center p-4">
-                        <img 
-                            src={imagePreviewUrl || ''} 
-                            className="max-w-full max-h-[85vh] rounded-2xl object-contain shadow-2xl" 
-                            alt="Full Preview" 
+                        <img
+                            src={imagePreviewUrl || ''}
+                            className="max-w-full max-h-[85vh] rounded-2xl object-contain shadow-2xl"
+                            alt="Full Preview"
                         />
-                        <button 
+                        <button
                             onClick={() => setImagePreviewUrl(null)}
                             className="absolute top-6 right-6 bg-white/10 hover:bg-white/20 p-3 rounded-full text-white transition-all backdrop-blur-md border border-white/20 group"
                         >

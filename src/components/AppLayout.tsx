@@ -60,7 +60,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen flex bg-background">
       {/* Sidebar - Hover to expand */}
-      <aside 
+      <aside
         className={cn(
           "gradient-sidebar flex flex-col shrink-0 hidden md:flex h-screen sticky top-0 transition-all duration-300 ease-in-out group z-50",
           "w-20 hover:w-64"
@@ -74,7 +74,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             <div className={cn(
               "transition-all duration-300 whitespace-nowrap opacity-0 group-hover:opacity-100"
             )}>
-              <h2 className="font-heading font-bold text-sidebar-foreground text-sm uppercase tracking-wider">Prescripto</h2>
+              <h2 className="font-heading font-bold text-sidebar-foreground text-sm uppercase tracking-wider">PreScripto</h2>
               <p className="text-[10px] text-sidebar-foreground/60 truncate max-w-[140px] uppercase font-medium">{profile?.full_name}</p>
             </div>
           </div>
@@ -168,7 +168,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             <span className="truncate w-full text-center px-1 font-medium">{item.label}</span>
           </button>
         ))}
-        
+
         {/* More Menu for Mobile */}
         <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
           <SheetTrigger asChild>
@@ -212,7 +212,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
                 </div>
                 <span>Sign Out</span>
               </button>
-              
+
               {/* Mobile Theme Toggle */}
               <div className="col-span-3 mt-4 pt-4 border-t flex items-center justify-between px-2">
                 <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Appearance</span>
