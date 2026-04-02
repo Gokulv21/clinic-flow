@@ -245,3 +245,16 @@
     print-color-adjust: exact !important;
   }
 }
+
+/* ── Video Call Utilities ── */
+.mirror {
+  transform: scaleX(-1);
+}
+
+video {
+  @apply bg-black rounded-lg;
+}
+
+.aspect-video video {
+  @apply w-full h-full object-cover;
+}

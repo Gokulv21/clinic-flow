@@ -10,7 +10,15 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { cn, formatAge } from '@/lib/utils';
-import { User, Clock, CheckCircle, Plus, Trash2, Save, Loader2, PenTool, Eye, Menu, Printer, ArrowLeft, Activity, ClipboardList, Scale, Heart, Wind, Thermometer, Droplet, Pencil, Calendar, RefreshCw, UserX, ChevronDown, X } from 'lucide-react';
+import { 
+  Plus, History, Clock, Search, ChevronRight, Stethoscope, 
+  User, CheckCircle2, AlertCircle, Trash2, Printer, 
+  ExternalLink, Phone, PhoneCall, Video, UserPlus, Info, 
+  MapPin, Loader2, Save, X, MoreVertical, LayoutGrid, List,
+  Activity, ClipboardList, Scale, Heart, Wind, Thermometer, 
+  Droplet, Pencil, Calendar, RefreshCw, UserX, ChevronDown,
+  Eye, PenTool, CheckCircle, ArrowLeft
+} from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import DigitalPrescription from '@/components/DigitalPrescription';
 import PrescriptionTemplate from '@/components/PrescriptionTemplate';
@@ -23,7 +31,7 @@ import { printPrescription } from '@/lib/printPrescription';
 import PageBanner from '@/components/PageBanner';
 import consultationBanner from '@/assets/consultation_banner.png';
 import { useCommunication } from '@/lib/communication';
-import { PhoneCall } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface Medicine {
   type: string;
@@ -43,12 +51,10 @@ const COMMON_FREQUENCIES = [
 
 export default function DoctorConsultation() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { user } = useAuth();
-  const { makeCall, onlineUsers, callState } = useCommunication();
+  const { makeCall, onlineUsers, callState, allUsers } = useCommunication();
   
-  // Find a staff member to call (simplified for now: calls the first available staff)
-  const firstAvailableStaff = Object.entries(onlineUsers).find(([_, u]) => u.role === 'staff');
-
   // 1. Fetch Queue via React Query
   const { data: queue = [], isLoading: isLoadingQueue, refetch: refetchQueue } = useQuery({
     queryKey: ['visitQueue'],
@@ -61,7 +67,7 @@ export default function DoctorConsultation() {
       if (error) throw error;
       return (data || []).filter(v => v.patients);
     },
-    staleTime: 30000, // Consider data fresh for 30s
+    staleTime: 30000,
     refetchOnWindowFocus: true,
   });
 
@@ -85,12 +91,10 @@ export default function DoctorConsultation() {
   const lastLoadedVisitId = useRef<string | null>(null);
 
   useEffect(() => {
-
     let debounceTimer: any;
     const channel = supabase
       .channel('visits-realtime-doctor')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'visits' }, () => {
-        // Debounce invalidation to prevent "request storms" under high traffic
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
           if (!document.hidden) {
@@ -98,14 +102,8 @@ export default function DoctorConsultation() {
           }
         }, 2000); 
       })
-      .subscribe((status) => {
-        console.log('Realtime subscription status:', status);
-        if (status === 'CHANNEL_ERROR') {
-          toast.error('Realtime connection issue. Check your internet.');
-        }
-      });
+      .subscribe();
 
-    // RESTORE STATE FROM LOCALSTORAGE
     const restoreState = async () => {
       const savedVisitId = localStorage.getItem('active_consultation_id');
       if (savedVisitId) {
@@ -116,9 +114,8 @@ export default function DoctorConsultation() {
           .single();
         
         if (data && (data.status === 'waiting' || data.status === 'in_consultation')) {
-          selectVisit(data, true); // true = check for drafts
+          selectVisit(data, true);
         } else {
-          // If the visit is completed or not found, clear the active consultation
           localStorage.removeItem('active_consultation_id');
           setSelectedVisit(null);
           setPatient(null);
@@ -130,7 +127,6 @@ export default function DoctorConsultation() {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  // AUTO-SAVE DRAFT TO LOCALSTORAGE (DEBOUNCED)
   useEffect(() => {
     if (selectedVisit?.id && selectedVisit.id === lastLoadedVisitId.current) {
       const timer = setTimeout(() => {
@@ -147,7 +143,7 @@ export default function DoctorConsultation() {
         };
         localStorage.setItem(`draft_${selectedVisit.id}`, JSON.stringify(draft));
         localStorage.setItem('active_consultation_id', selectedVisit.id);
-      }, 1000); // 1 second debounce
+      }, 1000);
       
       return () => clearTimeout(timer);
     }
@@ -160,26 +156,21 @@ export default function DoctorConsultation() {
     }
     
     if (saveError) {
-      toast.error('Previous save failed. Please retry or clear the error before switching patients.', {
-        description: `Error at step: ${saveError.step}. Click "Retry Save" to fix.`
-      });
+      toast.error('Previous save failed. Please retry or clear the error before switching patients.');
       return;
     }
 
     setSelectedVisit(visit);
     setPatient(visit.patients);
     
-    // Update last_opened_at for the patient
     if (visit.patients?.id) {
       supabase.from('patients').update({ last_opened_at: new Date().toISOString() }).eq('id', visit.patients.id).then();
     }
     
-    // Check for drafts in localStorage
     const savedDraft = localStorage.getItem(`draft_${visit.id}`);
     if (checkForDrafts && savedDraft) {
       try {
         const draft = JSON.parse(savedDraft);
-        // Only use draft if it's less than 24 hours old
         if (Date.now() - draft.timestamp < 24 * 60 * 60 * 1000) {
           setDiagnosis(draft.diagnosis || '');
           setClinicalNotes(draft.clinicalNotes || '');
@@ -197,17 +188,14 @@ export default function DoctorConsultation() {
       }
     }
 
-    // Default: Check if prescription image is an array of pages (stored as JSON string)
     const rxData = visit.prescriptions?.[0];
     let rxImage = rxData?.advice_image;
     const rxPaths = rxData?.raw_paths || [];
     
-    // Load existing prescription data
     setDiagnosis(rxData?.diagnosis || '');
     setClinicalNotes(rxData?.clinical_notes || '');
     setMedicines(rxData?.medicines || [{ type: 'Tab.', name: '', dosage: '', frequency: '', duration: '' }]);
     
-    // Determine if it's a handwritten prescription or typed advice
     if (rxImage && rxImage.startsWith('data:image')) {
       setPrescriptionImage(rxImage);
       setAdvice('');
@@ -228,20 +216,15 @@ export default function DoctorConsultation() {
     setLastInputWay(rxData?.is_writing_mode ? 'writing' : 'typing');
     setPrescriptionPaths(rxPaths);
     
-    // If there's a drawing, force writing mode preference initially
     if (rxPaths && rxPaths.length > 0 && rxPaths[0].length > 0) {
       setIsWritingMode(true);
       setLastInputWay('writing');
     }
 
-    // Update status to in_consultation
     if (visit.status === 'waiting') {
-      await supabase.from('visits').update({ 
-        status: 'in_consultation'
-      }).eq('id', visit.id);
+      await supabase.from('visits').update({ status: 'in_consultation' }).eq('id', visit.id);
     }
 
-    // Fetch history
     const { data } = await supabase
       .from('visits')
       .select('*, prescriptions(*)')
@@ -255,70 +238,23 @@ export default function DoctorConsultation() {
 
   const markAsNoShow = async () => {
     if (!selectedVisit) return;
-    
     setSaving(true);
     try {
       const patientId = selectedVisit.patient_id;
-
-      // 1. Update status to 'no_show' first as a safeguard (removes from active queue immediately)
-      const { error: statusError } = await supabase
-        .from('visits')
-        .update({ status: 'no_show' })
-        .eq('id', selectedVisit.id);
+      await supabase.from('visits').update({ status: 'no_show' }).eq('id', selectedVisit.id);
+      await supabase.from('prescriptions').delete().eq('visit_id', selectedVisit.id);
+      await supabase.from('visits').delete().eq('id', selectedVisit.id);
       
-      if (statusError) throw new Error(`Failed to update status: ${statusError.message}`);
-
-      // 2. Delete associated prescriptions (to avoid foreign key constraints)
-      const { error: rxDeleteError } = await supabase
-        .from('prescriptions')
-        .delete()
-        .eq('visit_id', selectedVisit.id);
-
-      if (rxDeleteError) throw new Error(`Failed to delete prescription: ${rxDeleteError.message}`);
-
-      // 3. Delete the visit record entirely
-      const { error: deleteError } = await supabase
-        .from('visits')
-        .delete()
-        .eq('id', selectedVisit.id);
-
-      if (deleteError) throw new Error(`Failed to delete visit record: ${deleteError.message}`);
-
-      // 4. Check if this patient has ANY other visits
-      const { data: otherVisits, error: countError } = await supabase
-        .from('visits')
-        .select('id')
-        .eq('patient_id', patientId)
-        .limit(1);
-
-      if (countError) throw new Error(`Failed to check patient history: ${countError.message}`);
-
-      let patientDeleted = false;
+      const { data: otherVisits } = await supabase.from('visits').select('id').eq('patient_id', patientId).limit(1);
       if (!otherVisits || otherVisits.length === 0) {
-        // No other visits, delete the patient entirely
-        console.log("No other visits found for patient, deleting patient record...");
-        const { error: patientDeleteError } = await supabase
-          .from('patients')
-          .delete()
-          .eq('id', patientId);
-        
-        if (patientDeleteError) {
-          console.error("Patient deletion failed:", patientDeleteError);
-          // Don't throw here, as visit was already deleted. Just toast about it.
-          toast.error(`Could not remove patient record: ${patientDeleteError.message}`);
-        } else {
-          patientDeleted = true;
-        }
+        await supabase.from('patients').delete().eq('id', patientId);
       }
 
-      toast.success(patientDeleted ? 'Patient record removed' : 'Visit cancelled');
-      
-      // Clear selection
+      toast.success('Visit cancelled');
       localStorage.removeItem(`draft_${selectedVisit.id}`);
       localStorage.removeItem('active_consultation_id');
       setSelectedVisit(null);
       setPatient(null);
-      
       queryClient.invalidateQueries({ queryKey: ['visitQueue'] });
     } catch (err: any) {
       toast.error(err.message);
@@ -337,27 +273,20 @@ export default function DoctorConsultation() {
       e.preventDefault();
       const form = (e.target as HTMLElement).closest('.medicine-row');
       if (!form) return;
-      
       const inputs = Array.from(form.querySelectorAll('input, select')) as HTMLElement[];
       const currentIndex = inputs.indexOf(e.target as HTMLElement);
-      
       if (currentIndex < inputs.length - 1) {
         inputs[currentIndex + 1].focus();
-      } else {
-        // If last field of current medicine, maybe add new medicine or go to advice
-        if (index === medicines.length - 1) {
-          addMedicine();
-          // Timeout to wait for new row to render
-          setTimeout(() => {
-            const nextRow = form.parentElement?.lastElementChild?.querySelector('input');
-            if (nextRow) nextRow.focus();
-          }, 0);
-        }
+      } else if (index === medicines.length - 1) {
+        addMedicine();
+        setTimeout(() => {
+          const nextRow = form.parentElement?.lastElementChild?.querySelector('input');
+          if (nextRow) nextRow.focus();
+        }, 0);
       }
     }
   };
 
-  // Memoize status color helper to prevent re-calculations during re-renders
   const getStatusColor = (s: string) => {
     if (s === 'waiting') return 'bg-warning/10 text-warning border-warning/30';
     if (s === 'in_consultation') return 'bg-info/10 text-info border-info/30';
@@ -366,8 +295,6 @@ export default function DoctorConsultation() {
 
   const savePrescription = async () => {
     if (!selectedVisit || !patient) return;
-    
-    // Prioritize the last way of record
     const isWriting = lastInputWay === 'writing';
     const finalDiagnosis = diagnosis || null;
     const finalClinicalNotes = clinicalNotes || null;
@@ -389,7 +316,6 @@ export default function DoctorConsultation() {
     setSaveError(null);
 
     try {
-      // Step 1: Save Prescription (if not already saved in a previous failed attempt)
       if (!saveError || saveError.step === 'prescription') {
         const { error: rxError } = await supabase.from('prescriptions').insert({
           visit_id: selectedVisit.id,
@@ -402,19 +328,12 @@ export default function DoctorConsultation() {
           is_writing_mode: isWritingMode,
           doctor_id: user?.id
         });
-
-        if (rxError) {
-          // If it's a "duplicate key" error, it might mean it was actually saved but the response was lost
-          if (rxError.code === '23505') {
-             console.log("Prescription likely already exists, proceeding to status update.");
-          } else {
-            setSaveError({ step: 'prescription', message: rxError.message });
-            throw rxError;
-          }
+        if (rxError && rxError.code !== '23505') {
+          setSaveError({ step: 'prescription', message: rxError.message });
+          throw rxError;
         }
       }
 
-      // Step 2: Update Visit Status
       const { error: visitError } = await supabase.from('visits').update({ 
         status: 'completed', 
         diagnosis: finalDiagnosis
@@ -425,12 +344,9 @@ export default function DoctorConsultation() {
         throw visitError;
       }
 
-      // SUCCESS: Clear everything
       toast.success('Prescription saved & sent to print queue');
-      
       localStorage.removeItem(`draft_${selectedVisit.id}`);
       localStorage.removeItem('active_consultation_id');
-      
       setAdvice('');
       setSelectedVisit(null);
       setPatient(null);
@@ -440,14 +356,9 @@ export default function DoctorConsultation() {
       setClinicalNotes('');
       setMedicines([{ type: 'Tab.', name: '', dosage: '', frequency: '', duration: '' }]);
       setSaveError(null);
-
       queryClient.invalidateQueries({ queryKey: ['visitQueue'] });
     } catch (err: any) {
-      console.error("Save error:", err);
-      toast.error(`Save Failed: ${err.message || 'Unknown error'}`, {
-        description: "Please try again. Your data is still here.",
-        duration: 5000,
-      });
+      toast.error(`Save Failed: ${err.message || 'Unknown error'}`);
     } finally {
       setSaving(false);
     }
@@ -459,7 +370,6 @@ export default function DoctorConsultation() {
     setShowDigitalRx(false);
     setIsWritingMode(true);
     setLastInputWay('writing');
-    // Clear typed advice since we are in writing mode
     setAdvice('');
   };
 
@@ -474,28 +384,16 @@ export default function DoctorConsultation() {
             <p className="text-xs text-muted-foreground/60 uppercase tracking-widest font-bold">Queue is Empty</p>
           )}
         </div>
-        <div className="flex items-center gap-2">
-           <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => refetchQueue()}
-            disabled={isLoadingQueue}
-            className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors"
-            title="Refresh Queue"
-          >
-            {isLoadingQueue ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-          </Button>
-        </div>
+        <Button variant="ghost" size="icon" onClick={() => refetchQueue()} disabled={isLoadingQueue} className="h-8 w-8">
+          {isLoadingQueue ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+        </Button>
       </div>
       <div className="flex-1 overflow-auto">
         {queue.map(visit => (
           <button
             key={visit.id}
             onClick={() => selectVisit(visit, true)}
-            className={cn(
-              "w-full text-left p-4 border-b border-border hover:bg-secondary/50 transition-colors",
-              selectedVisit?.id === visit.id && "bg-secondary"
-            )}
+            className={cn("w-full text-left p-4 border-b border-border hover:bg-secondary/50 transition-colors", selectedVisit?.id === visit.id && "bg-secondary")}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -513,75 +411,26 @@ export default function DoctorConsultation() {
             </div>
           </button>
         ))}
-        {queue.length === 0 && (
-          <div className="p-8 text-center text-muted-foreground">
-            <Clock className="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p>No patients in queue</p>
-          </div>
-        )}
       </div>
     </div>
   );
 
   return (
     <div className="flex flex-col md:flex-row h-[calc(100vh-64px)] md:h-[calc(100vh-0px)] overflow-hidden">
-      {/* 
-          MOBILE UI REFACTOR: WhatsApp-style Master-Detail 
-          - On mobile: If NO selectedVisit, show queue list.
-          - On mobile: If selectedVisit, show consultation details.
-          - On desktop: Always show both (sidebar + main).
-      */}
-
-      {/* Queue List (Sidebar on desktop, full screen on mobile when no patient selected) */}
-      <div className={cn(
-        "w-full md:w-80 border-r border-border shrink-0 h-full",
-        selectedVisit ? "hidden md:block" : "block"
-      )}>
+      <div className={cn("w-full md:w-80 border-r border-border shrink-0 h-full", selectedVisit ? "hidden md:block" : "block")}>
         {queuePanel}
       </div>
 
-      {/* Consultation Details (Main content) */}
-      <div className={cn(
-        "flex-1 overflow-auto bg-muted/30 h-full",
-        !selectedVisit ? "hidden md:block" : "block"
-      )}>
+      <div className={cn("flex-1 overflow-auto bg-muted/30 h-full", !selectedVisit ? "hidden md:block" : "block")}>
         {!selectedVisit ? (
           <div className="flex items-center justify-center h-full text-muted-foreground">
             <div className="text-center p-6">
               <User className="w-16 h-16 mx-auto mb-4 opacity-10" />
               <p className="text-lg font-medium opacity-50">Select a patient for consultation</p>
-              <p className="text-sm opacity-40 mt-1">Tap a patient from the queue to start</p>
             </div>
           </div>
         ) : (
           <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-6 animate-slide-in pb-[40vh] font-jakarta-sans">
-            {/* Mobile-only Header with Back Button */}
-            <div className="md:hidden flex items-center justify-between mb-4 bg-background/80 backdrop-blur sticky top-[-1rem] z-20 py-2 -mx-4 px-4 border-b border-border shadow-sm">
-              <div className="flex items-center gap-3">
-                <Button variant="ghost" size="icon" onClick={() => {
-                  if (saving) {
-                    toast.warning('Save in progress...');
-                    return;
-                  }
-                  if (saveError) {
-                    toast.error('Please retry the failed save first');
-                    return;
-                  }
-                  localStorage.removeItem('active_consultation_id');
-                  setSelectedVisit(null);
-                }} className="-ml-2">
-                  <ArrowLeft className="w-5 h-5 text-primary" />
-                </Button>
-                <div>
-                  <h3 className="font-bold text-sm leading-tight">Consultation</h3>
-                  <p className="text-xs text-muted-foreground">Token #{selectedVisit.token_number} · {(patient?.title ? patient.title + ' ' : '') + patient?.name}</p>
-                </div>
-              </div>
-              <Badge variant="outline" className={cn("text-[10px]", getStatusColor(selectedVisit.status))}>
-                {selectedVisit.status === 'waiting' ? 'Wait' : selectedVisit.status === 'in_consultation' ? 'Active' : 'Done'}
-              </Badge>
-            </div>
-            {/* Patient Info */}
             <Card className="border-none shadow-sm bg-card">
               <CardHeader className="pb-3 px-6">
                 <CardTitle className="flex items-center justify-between">
@@ -594,33 +443,13 @@ export default function DoctorConsultation() {
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={markAsNoShow}
-                      disabled={saving}
-                      className="h-8 px-2 text-red-500 hover:text-red-700 hover:bg-red-50 gap-1 rounded-lg"
-                      title="Patient left without consultation"
-                    >
+                    <Button variant="ghost" size="sm" onClick={markAsNoShow} disabled={saving} className="h-8 px-2 text-red-500 hover:text-red-700 hover:bg-red-50 gap-1 rounded-lg">
                       <UserX className="w-3.5 h-3.5" />
                       <span className="text-[11px] font-bold">No Show</span>
                     </Button>
                     <Badge variant="outline" className="text-[10px] font-bold px-2 py-0.5 border-slate-200">
                       TOKEN #{selectedVisit.token_number}
                     </Badge>
-                    {firstAvailableStaff && (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => makeCall(firstAvailableStaff[0], firstAvailableStaff[1].full_name)}
-                        disabled={callState !== 'idle'}
-                        className="h-8 px-2 bg-emerald-500 hover:bg-emerald-600 text-white gap-1 rounded-lg shadow-sm animate-in fade-in zoom-in duration-300"
-                        title="Quick Call Staff"
-                      >
-                        <PhoneCall className="w-3.5 h-3.5" />
-                        <span className="text-[11px] font-bold">Call Staff</span>
-                      </Button>
-                    )}
                   </div>
                 </CardTitle>
               </CardHeader>
@@ -634,10 +463,6 @@ export default function DoctorConsultation() {
                     <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Phone</p>
                     <p className="text-base font-bold text-foreground">{patient?.phone}</p>
                   </div>
-                  <div className="bg-muted/50 p-3 rounded-xl border border-border col-span-2">
-                    <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Address</p>
-                    <p className="text-base font-bold text-foreground truncate">{patient?.address || '—'}</p>
-                  </div>
                 </div>
 
                 <div className="mt-8">
@@ -646,12 +471,35 @@ export default function DoctorConsultation() {
                       <Activity className="w-4 h-4 text-blue-500" />
                       <h4 className="text-[12px] font-extrabold text-muted-foreground uppercase tracking-widest">Clinical Vitals</h4>
                     </div>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => setShowVitalsEdit(true)}
-                      className="h-8 px-2 text-blue-600 hover:bg-blue-50 gap-1 rounded-lg"
-                    >
+                    <div className="flex items-center gap-1.5 ml-2 mr-2 border-l border-r px-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-8 w-8 p-0 rounded-full hover:bg-blue-500/10 text-blue-500"
+                        onClick={() => {
+                          const firstStaff = allUsers.find(u => u.role === 'staff' && !!onlineUsers[u.id]);
+                          if (firstStaff) makeCall(firstStaff.id, firstStaff.full_name, 'video');
+                          else navigate('/calls');
+                        }}
+                        title="Video Consult Staff"
+                      >
+                        <Video className="w-4 h-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-8 w-8 p-0 rounded-full hover:bg-primary/10 text-primary"
+                        onClick={() => {
+                          const firstStaff = allUsers.find(u => u.role === 'staff' && !!onlineUsers[u.id]);
+                          if (firstStaff) makeCall(firstStaff.id, firstStaff.full_name, 'audio');
+                          else navigate('/calls');
+                        }}
+                        title="Audio Call Staff"
+                      >
+                        <Phone className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => setShowVitalsEdit(true)} className="h-8 px-2 text-blue-600 hover:bg-blue-50 gap-1 rounded-lg">
                       <Pencil className="w-3.5 h-3.5" />
                       <span className="text-[11px] font-bold">Edit</span>
                     </Button>

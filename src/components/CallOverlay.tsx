@@ -5,22 +5,38 @@ import { cn } from '@/lib/utils';
 import { useEffect, useRef } from 'react';
 
 export default function CallOverlay() {
-  const { callState, incomingCall, activeCall, acceptCall, declineCall, endCall } = useCommunication();
+  const { callState, callMode, incomingCall, activeCall, acceptCall, declineCall, endCall } = useCommunication();
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const localVideoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    if (activeCall?.stream && remoteAudioRef.current) {
-        console.log('[CallOverlay] Attaching remote stream to audio element');
-        remoteAudioRef.current.srcObject = activeCall.stream;
-        remoteAudioRef.current.play().catch(e => console.error('Play failed:', e));
+    if (activeCall?.stream) {
+        if (callMode === 'audio' && remoteAudioRef.current) {
+            remoteAudioRef.current.srcObject = activeCall.stream;
+            remoteAudioRef.current.play().catch(e => console.error('Audio play failed:', e));
+        } else if (callMode === 'video' && remoteVideoRef.current) {
+            remoteVideoRef.current.srcObject = activeCall.stream;
+            remoteVideoRef.current.play().catch(e => console.error('Video play failed:', e));
+        }
     }
-  }, [activeCall?.stream]);
+  }, [activeCall?.stream, callMode]);
+
+  useEffect(() => {
+    if (activeCall?.localStream && localVideoRef.current && callMode === 'video') {
+        localVideoRef.current.srcObject = activeCall.localStream;
+        localVideoRef.current.play().catch(e => console.error('Local video play failed:', e));
+    }
+  }, [activeCall?.localStream, callMode]);
 
   if (callState === 'idle') return null;
 
   return (
     <div className="fixed inset-x-0 top-6 z-[100] flex justify-center pointer-events-none px-4">
-      <div className="pointer-events-auto bg-card border border-border shadow-2xl rounded-2xl p-6 min-w-[320px] max-w-md animate-in slide-in-from-top-4 duration-300">
+      <div className={cn(
+          "pointer-events-auto bg-card border border-border shadow-2xl rounded-2xl p-6 min-w-[320px] transition-all animate-in slide-in-from-top-4 duration-300",
+          callState === 'connected' && callMode === 'video' ? "max-w-xl w-full" : "max-w-md"
+      )}>
         <audio ref={remoteAudioRef} autoPlay />
 
         {/* Incoming Call UI */}
@@ -83,23 +99,42 @@ export default function CallOverlay() {
 
         {/* Active Call UI */}
         {callState === 'connected' && (
-          <div className="flex flex-col items-center gap-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center border-2 border-emerald-500">
-                <User className="w-6 h-6 text-emerald-500" />
-              </div>
-              <div>
-                <h3 className="font-bold">Consultation Active</h3>
-                <p className="text-xs text-emerald-500 font-bold flex items-center gap-1.5 uppercase tracking-widest">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Live Call with {activeCall?.partnerName}
-                </p>
-              </div>
-            </div>
+          <div className="flex flex-col items-center gap-4 relative">
+             {callMode === 'video' ? (
+                <div className="w-full aspect-video rounded-xl bg-black border border-border overflow-hidden relative shadow-inner">
+                    <video ref={remoteVideoRef} className="w-full h-full object-cover" autoPlay playsInline />
+                    
+                    {/* Local Preview (PIP) */}
+                    <div className="absolute bottom-2 right-2 w-24 md:w-32 aspect-video rounded-lg border-2 border-white/20 shadow-lg overflow-hidden bg-muted transition-all">
+                        <video ref={localVideoRef} className="w-full h-full object-cover mirror" autoPlay playsInline muted />
+                    </div>
+
+                    <div className="absolute top-2 left-2 px-2 py-1 bg-black/40 backdrop-blur-md rounded-md border border-white/10 flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="text-[10px] text-white font-bold uppercase tracking-wider">{activeCall?.partnerName}</span>
+                    </div>
+                </div>
+             ) : (
+                <div className="flex items-center gap-4 w-full">
+                  <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center border-2 border-emerald-500">
+                    <User className="w-6 h-6 text-emerald-500" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold">Consultation Active</h3>
+                    <p className="text-xs text-emerald-500 font-bold flex items-center gap-1.5 uppercase tracking-widest">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Live Audio with {activeCall?.partnerName}
+                    </p>
+                  </div>
+                </div>
+             )}
 
             <Button 
               onClick={endCall} 
               variant="destructive" 
-              className="w-full rounded-xl h-12 gap-2"
+              className={cn(
+                "w-full rounded-xl h-12 gap-2 shadow-lg",
+                callMode === 'video' && "mt-2"
+              )}
             >
               <PhoneOff className="w-4 h-4" /> End Consultation
             </Button>

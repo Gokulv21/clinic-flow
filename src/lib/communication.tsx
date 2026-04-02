@@ -11,9 +11,10 @@ interface CommunicationContextType {
   allUsers: Array<{ id: string, full_name: string, role: string }>;
   onlineUsers: Record<string, { full_name: string, role: string, last_seen: string }>;
   callState: 'idle' | 'dialing' | 'ringing' | 'connected' | 'ended';
-  incomingCall: { from: string, fromName: string, peerId: string } | null;
-  activeCall: { partnerId: string, partnerName: string, stream: MediaStream | null } | null;
-  makeCall: (targetUserId: string, targetName: string) => Promise<void>;
+  callMode: 'audio' | 'video';
+  incomingCall: { from: string, fromName: string, peerId: string, mode: 'audio' | 'video' } | null;
+  activeCall: { partnerId: string, partnerName: string, stream: MediaStream | null, localStream: MediaStream | null } | null;
+  makeCall: (targetUserId: string, targetName: string, mode?: 'audio' | 'video') => Promise<void>;
   acceptCall: () => void;
   declineCall: () => void;
   endCall: () => void;
@@ -28,8 +29,9 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
   const [allUsers, setAllUsers] = useState<Array<{ id: string, full_name: string, role: string }>>([]);
   const [onlineUsers, setOnlineUsers] = useState<Record<string, any>>({});
   const [callState, setCallState] = useState<'idle' | 'dialing' | 'ringing' | 'connected' | 'ended'>('idle');
-  const [incomingCall, setIncomingCall] = useState<{ from: string, fromName: string, peerId: string } | null>(null);
-  const [activeCall, setActiveCall] = useState<{ partnerId: string, partnerName: string, stream: MediaStream | null } | null>(null);
+  const [callMode, setCallMode] = useState<'audio' | 'video'>('audio');
+  const [incomingCall, setIncomingCall] = useState<{ from: string, fromName: string, peerId: string, mode: 'audio' | 'video' } | null>(null);
+  const [activeCall, setActiveCall] = useState<{ partnerId: string, partnerName: string, stream: MediaStream | null, localStream: MediaStream | null } | null>(null);
   
   const peerRef = useRef<Peer | null>(null);
   const currentCallRef = useRef<MediaConnection | null>(null);
@@ -37,6 +39,12 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
   const ringtoneRef = useRef<HTMLAudioElement | null>(null);
   const presenceChannelRef = useRef<any>(null);
   const signalingChannelRef = useRef<any>(null);
+  const waitingToAnswerRef = useRef(false);
+  const incomingCallRef = useRef<any>(null);
+
+  useEffect(() => {
+    incomingCallRef.current = incomingCall;
+  }, [incomingCall]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -120,9 +128,33 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
       peerRef.current = newPeer;
     });
 
-    newPeer.on('call', (call: any) => {
+    newPeer.on('call', async (call: any) => {
       console.log('[Peer] Incoming stream call from:', call.peer);
       currentCallRef.current = call;
+      
+      // AUTO-ANSWER: If the user already clicked "Accept" in the UI, we should answer the media call immediately
+      if (waitingToAnswerRef.current) {
+         console.log('[Peer] Auto-answering call as user already accepted UI');
+         try {
+            const constraints = {
+                audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+                video: incomingCallRef.current?.mode === 'video' ? { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } : false
+            };
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            localStreamRef.current = stream;
+            call.answer(stream);
+            setCallState('connected');
+            waitingToAnswerRef.current = false;
+            
+            call.on('stream', (remoteStream: MediaStream) => {
+                setActiveCall(prev => prev ? { ...prev, stream: remoteStream, localStream: stream } : null);
+            });
+            call.on('close', cleanupCall);
+         } catch (err) {
+            console.error('[Peer] Failed to auto-answer:', err);
+            cleanupCall();
+         }
+      }
     });
 
     newPeer.on('error', (err: any) => {
@@ -182,8 +214,10 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
           setIncomingCall({ 
             from: payload.fromId, 
             fromName: payload.fromName, 
-            peerId: payload.peerId 
+            peerId: payload.peerId,
+            mode: payload.mode || 'audio'
           });
+          setCallMode(payload.mode || 'audio');
           setCallState('ringing');
           ringtoneRef.current?.play().catch(e => console.warn('Autoplay blocked:', e));
         }
@@ -223,11 +257,12 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
     setTimeout(() => setCallState('idle'), 1000);
   };
 
-  const makeCall = async (targetUserId: string, targetName: string) => {
+  const makeCall = async (targetUserId: string, targetName: string, mode: 'audio' | 'video' = 'audio') => {
     if (!peerRef.current || !user || !profile) return;
 
+    setCallMode(mode);
     setCallState('dialing');
-    setActiveCall({ partnerId: targetUserId, partnerName: targetName, stream: null });
+    setActiveCall({ partnerId: targetUserId, partnerName: targetName, stream: null, localStream: null });
 
     // Send Invite via Supabase Broadcast to the target's signaling channel
     await supabase.channel(`signal-${targetUserId}`).send({
@@ -236,37 +271,31 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
       payload: {
         fromId: user.id,
         fromName: profile.full_name,
-        peerId: peerRef.current.id
+        peerId: peerRef.current.id,
+        mode: mode
       }
     });
   };
 
   const acceptCall = async () => {
-    if (!incomingCall || !currentCallRef.current) return;
+    if (!incomingCallRef.current || !currentCallRef.current) return;
 
     ringtoneRef.current?.pause();
+    if (ringtoneRef.current) ringtoneRef.current.currentTime = 0;
+    
+    // Send accept signal to the dialer
+    await supabase.channel(`signal-${incomingCallRef.current.from}`).send({
+        type: 'broadcast',
+        event: 'call-accept',
+        payload: { 
+            peerId: peerRef.current?.id,
+            partnerName: profile?.full_name || 'Staff',
+            mode: incomingCallRef.current.mode
+        }
+    });
 
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      localStreamRef.current = stream;
-      
-      currentCallRef.current.answer(stream);
-      setCallState('connected');
-      setActiveCall({ 
-        partnerId: incomingCall.from, 
-        partnerName: incomingCall.fromName, 
-        stream: null // Partner stream comes via 'stream' event
-      });
-
-      currentCallRef.current.on('stream', (remoteStream) => {
-        setActiveCall(prev => prev ? { ...prev, stream: remoteStream } : null);
-      });
-
-      currentCallRef.current.on('close', cleanupCall);
-    } catch (err) {
-      console.error('Failed to get local stream', err);
-      declineCall();
-    }
+    waitingToAnswerRef.current = true;
+    setCallState('ringing'); // Maintain UI state until PeerJS stream arrives via 'on call'
   };
 
   const declineCall = async () => {
@@ -294,69 +323,16 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
     cleanupCall();
   };
 
-  // Logic for the dialer side to handle call response
-  useEffect(() => {
-    if (callState === 'dialing' && activeCall && peerRef.current) {
-        // Listen for standard PeerJS call events if we are the one dialing
-        // Wait, PeerJS "dialing" is usually done by calling peer.call()
-        // In our case, we send an invite first. If they answer, THEY call us or WE call them?
-        // Let's make it simpler: The CALLER sends an invite. The RECEIVER answers by calling back.
-        
-        const signaling = supabase.channel(`signal-${user?.id}`);
-        const subscription = signaling
-          .on('broadcast', { event: 'call-accept' }, async ({ payload }) => {
-             console.log('[Signal] Call accepted by:', payload.partnerName);
-             // Now the caller initiates the PeerJS call
-             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                localStreamRef.current = stream;
-                const call = peerRef.current!.call(payload.peerId, stream);
-                currentCallRef.current = call;
-                setCallState('connected');
-                
-                call.on('stream', (remoteStream) => {
-                    setActiveCall(prev => prev ? { ...prev, stream: remoteStream } : null);
-                });
-                call.on('close', cleanupCall);
-             } catch (err) {
-                console.error('Call initialization failed', err);
-                endCall();
-             }
-          })
-          .subscribe();
-          
-        return () => { signaling.unsubscribe(); };
-    }
-  }, [callState, activeCall, user?.id]);
-
-  // If we are answering, we need to send an 'accept' signal back
-  const originalAcceptCall = acceptCall;
-  const enhancedAcceptCall = async () => {
-      if (!incomingCall || !user || !profile) return;
-      
-      // Send accept signal
-      await supabase.channel(`signal-${incomingCall.from}`).send({
-          type: 'broadcast',
-          event: 'call-accept',
-          payload: { 
-              peerId: peerRef.current?.id,
-              partnerName: profile.full_name
-          }
-      });
-      
-      // Now wait for the caller to initiate the WebRTC stream
-      setCallState('ringing'); // Still ringing/connecting UI-wise
-  };
-
   return (
     <CommunicationContext.Provider value={{ 
       allUsers,
       onlineUsers, 
       callState, 
+      callMode,
       incomingCall, 
       activeCall, 
       makeCall, 
-      acceptCall: enhancedAcceptCall, 
+      acceptCall, 
       declineCall, 
       endCall,
       refreshUsers: fetchUsers

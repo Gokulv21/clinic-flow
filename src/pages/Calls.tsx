@@ -3,7 +3,7 @@ import { useCommunication } from '@/lib/communication';
 import { useAuth } from '@/lib/auth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Phone, User, Search, RefreshCw, MessageSquare } from 'lucide-react';
+import { Phone, User, Search, RefreshCw, MessageSquare, Video } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -99,19 +99,36 @@ export default function Calls() {
                               )}
                             </div>
                           </div>
-                          <Button 
-                            onClick={() => makeCall(u.id, u.full_name)}
-                            disabled={callState !== 'idle' || !isOnline}
-                            size="icon" 
-                            className={cn(
-                                "w-12 h-12 rounded-xl shadow-lg transition-all active:scale-90 shrink-0",
-                                isOnline 
-                                  ? "bg-primary hover:bg-primary/90 text-white shadow-primary/30" 
-                                  : "bg-muted text-muted-foreground shadow-none opacity-40 grayscale"
-                            )}
-                          >
-                            <Phone className="w-5 h-5" />
-                          </Button>
+                          <div className="flex items-center gap-2">
+                              <Button 
+                                onClick={() => makeCall(u.id, u.full_name, 'video')}
+                                disabled={callState !== 'idle' || !isOnline}
+                                size="icon" 
+                                title="Video Call"
+                                className={cn(
+                                    "w-11 h-11 rounded-xl shadow-lg transition-all active:scale-90 shrink-0",
+                                    isOnline 
+                                      ? "bg-blue-500 hover:bg-blue-600 text-white shadow-blue-500/20" 
+                                      : "bg-muted text-muted-foreground shadow-none opacity-40 grayscale"
+                                )}
+                              >
+                                <Video className="w-4 h-4" />
+                              </Button>
+                              <Button 
+                                onClick={() => makeCall(u.id, u.full_name, 'audio')}
+                                disabled={callState !== 'idle' || !isOnline}
+                                size="icon" 
+                                title="Audio Call"
+                                className={cn(
+                                    "w-11 h-11 rounded-xl shadow-lg transition-all active:scale-90 shrink-0",
+                                    isOnline 
+                                      ? "bg-primary hover:bg-primary/90 text-white shadow-primary/20" 
+                                      : "bg-muted text-muted-foreground shadow-none opacity-40 grayscale"
+                                )}
+                              >
+                                <Phone className="w-4 h-4" />
+                              </Button>
+                          </div>
                         </div>
                         <div className="px-5 py-2.5 bg-muted/20 border-t border-border/40 flex items-center justify-between">
                            <span className="text-[9px] text-muted-foreground font-bold uppercase tracking-tighter">Extension</span>
