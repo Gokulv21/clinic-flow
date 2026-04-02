@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { useEffect, useRef } from 'react';
 
 export default function CallOverlay() {
-  const { callState, callMode, incomingCall, activeCall, acceptCall, declineCall, endCall } = useCommunication();
+  const { callState, callMode, incomingCall, activeCall, acceptCall, declineCall, endCall, peerReady } = useCommunication();
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -40,7 +40,7 @@ export default function CallOverlay() {
         <audio ref={remoteAudioRef} autoPlay />
 
         {/* Incoming Call UI */}
-        {(callState === 'ringing' || incomingCall) && (
+        {callState === 'ringing' && incomingCall && (
           <div className="flex flex-col items-center gap-6">
             <div className="relative">
               <div className="w-16 h-16 rounded-full bg-blue-500/10 flex items-center justify-center border-2 border-blue-500">
@@ -50,8 +50,8 @@ export default function CallOverlay() {
             </div>
             
             <div className="text-center">
-              <h3 className="text-lg font-bold">Incoming Consultation</h3>
-              <p className="text-sm text-muted-foreground font-medium">{incomingCall?.fromName || 'Someone'} is calling you</p>
+              <h3 className="text-lg font-bold text-foreground font-sans">Incoming Consultation</h3>
+              <p className="text-sm text-muted-foreground font-medium">{incomingCall.fromName} is calling you</p>
             </div>
 
             <div className="flex items-center gap-4 w-full">
@@ -64,9 +64,17 @@ export default function CallOverlay() {
               </Button>
               <Button 
                 onClick={acceptCall} 
-                className="flex-1 rounded-xl h-12 gap-2 bg-emerald-500 hover:bg-emerald-600 text-white"
+                disabled={!peerReady}
+                className={cn(
+                    "flex-1 rounded-xl h-12 gap-2 text-white transition-all",
+                    peerReady ? "bg-emerald-500 hover:bg-emerald-600" : "bg-muted text-muted-foreground cursor-wait"
+                )}
               >
-                <Phone className="w-4 h-4" /> Accept
+                {peerReady ? (
+                  <><Phone className="w-4 h-4" /> Accept</>
+                ) : (
+                  <><div className="w-4 h-4 rounded-full border-2 border-muted-foreground border-t-transparent animate-spin ring-1 ring-white/20" /> Initializing...</>
+                )}
               </Button>
             </div>
           </div>
@@ -83,7 +91,7 @@ export default function CallOverlay() {
             </div>
             
             <div className="text-center">
-              <h3 className="text-lg font-bold italic tracking-wider">Calling Staff...</h3>
+              <h3 className="text-lg font-bold italic tracking-wider text-foreground font-sans">Calling Staff...</h3>
               <p className="text-sm text-muted-foreground font-medium">Connecting to {activeCall?.partnerName}</p>
             </div>
 
@@ -97,8 +105,24 @@ export default function CallOverlay() {
           </div>
         )}
 
+        {/* Connecting Handshake UI */}
+        {callState === 'connecting' && (
+          <div className="flex flex-col items-center gap-6 py-4 animate-in fade-in duration-500">
+            <div className="relative">
+              <div className="w-20 h-20 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                 <Phone className="w-6 h-6 text-primary animate-pulse" />
+              </div>
+            </div>
+            <div className="text-center space-y-2">
+              <h3 className="font-bold text-xl text-foreground font-sans">Connecting...</h3>
+              <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold animate-pulse">Setting up secure media bridge</p>
+            </div>
+          </div>
+        )}
+
         {/* Active Call UI */}
-        {callState === 'connected' && (
+        {callState === 'connected' && activeCall && (
           <div className="flex flex-col items-center gap-4 relative">
              {callMode === 'video' ? (
                 <div className="w-full aspect-video rounded-xl bg-black border border-border overflow-hidden relative shadow-inner">
@@ -111,18 +135,18 @@ export default function CallOverlay() {
 
                     <div className="absolute top-2 left-2 px-2 py-1 bg-black/40 backdrop-blur-md rounded-md border border-white/10 flex items-center gap-2">
                         <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        <span className="text-[10px] text-white font-bold uppercase tracking-wider">{activeCall?.partnerName}</span>
+                        <span className="text-[10px] text-white font-bold uppercase tracking-wider">{activeCall.partnerName}</span>
                     </div>
                 </div>
              ) : (
-                <div className="flex items-center gap-4 w-full">
-                  <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center border-2 border-emerald-500">
-                    <User className="w-6 h-6 text-emerald-500" />
+                <div className="flex items-center gap-4 w-full p-2 bg-emerald-500/5 rounded-2xl border border-emerald-500/10">
+                  <div className="w-14 h-14 rounded-xl bg-emerald-500/10 flex items-center justify-center border-2 border-emerald-500">
+                    <User className="w-7 h-7 text-emerald-500" />
                   </div>
                   <div>
-                    <h3 className="font-bold">Consultation Active</h3>
+                    <h3 className="font-bold text-foreground">Consultation Active</h3>
                     <p className="text-xs text-emerald-500 font-bold flex items-center gap-1.5 uppercase tracking-widest">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Live Audio with {activeCall?.partnerName}
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Live Audio with {activeCall.partnerName}
                     </p>
                   </div>
                 </div>
@@ -132,7 +156,7 @@ export default function CallOverlay() {
               onClick={endCall} 
               variant="destructive" 
               className={cn(
-                "w-full rounded-xl h-12 gap-2 shadow-lg",
+                "w-full rounded-xl h-12 gap-2 shadow-lg shadow-destructive/20",
                 callMode === 'video' && "mt-2"
               )}
             >
@@ -143,11 +167,14 @@ export default function CallOverlay() {
 
         {/* Call Ended UI */}
         {callState === 'ended' && (
-          <div className="flex flex-col items-center gap-4 py-4">
-            <div className="w-12 h-12 rounded-xl bg-destructive/10 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-4 py-6 animate-in fade-in zoom-in duration-300">
+            <div className="w-14 h-14 rounded-2xl bg-destructive/10 flex items-center justify-center ring-2 ring-destructive/20">
               <PhoneOff className="w-6 h-6 text-destructive" />
             </div>
-            <p className="font-bold text-destructive italic">Consultation Ended</p>
+            <div className="text-center">
+              <p className="font-bold text-destructive text-lg font-sans">Consultation Ended</p>
+              <p className="text-xs text-muted-foreground font-medium">Session recorded for clinic audit</p>
+            </div>
           </div>
         )}
       </div>

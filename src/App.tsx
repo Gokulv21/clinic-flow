@@ -18,7 +18,7 @@ import Analytics from "@/pages/Analytics";
 import UserManagement from "@/pages/UserManagement";
 import DoctorProfile from "@/pages/DoctorProfile";
 import Help from "@/pages/Help";
-import Calls from "@/pages/Calls";
+import Calls from "@/pages/Calls.tsx";
 import PublicPrescription from "@/pages/PublicPrescription";
 import NotFound from "./pages/NotFound.tsx";
 import { ReactNode } from "react";
