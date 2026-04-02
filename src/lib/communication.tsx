@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, useRef, ReactNode } fro
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './auth';
 import type { Peer, MediaConnection } from 'peerjs';
+import { toast } from 'sonner';
 
 // We'll import Peer dynamically to avoid SSR issues if any, 
 // though this is a SPA.
@@ -41,10 +42,16 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
   const signalingChannelRef = useRef<any>(null);
   const waitingToAnswerRef = useRef(false);
   const incomingCallRef = useRef<any>(null);
+  const callStateRef = useRef<string>('idle');
+  const [sessionId] = useState(() => Math.random().toString(36).substring(7));
 
   useEffect(() => {
     incomingCallRef.current = incomingCall;
   }, [incomingCall]);
+
+  useEffect(() => {
+    callStateRef.current = callState;
+  }, [callState]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -109,15 +116,17 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!userId || !PeerClass) return;
 
-    console.log('[Peer] Initializing for user:', userId);
+    console.log('[Peer] Initializing for user:', userId, 'session:', sessionId);
     
-    // Initialize PeerJS with User ID
-    const newPeer = new PeerClass(`prescripto-${userId}`, {
+    // Initialize PeerJS with User ID + Session ID (Supports Multi-tab)
+    const newPeer = new PeerClass(`prescripto-${userId}-${sessionId}`, {
       debug: 1,
       config: {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' },
+          { urls: 'stun:stun3.l.google.com:19302' },
         ]
       }
     });
@@ -129,12 +138,12 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
     });
 
     newPeer.on('call', async (call: any) => {
-      console.log('[Peer] Incoming stream call from:', call.peer);
+      console.log('[Peer] Incoming media stream from caller:', call.peer);
       currentCallRef.current = call;
       
       // AUTO-ANSWER: If the user already clicked "Accept" in the UI, we should answer the media call immediately
       if (waitingToAnswerRef.current) {
-         console.log('[Peer] Auto-answering call as user already accepted UI');
+         console.log('[Peer] Handshake successful: Auto-answering media as user accepted UI');
          try {
             const constraints = {
                 audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
@@ -147,13 +156,17 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
             waitingToAnswerRef.current = false;
             
             call.on('stream', (remoteStream: MediaStream) => {
+                console.log('[Peer] Remote stream received and attached');
                 setActiveCall(prev => prev ? { ...prev, stream: remoteStream, localStream: stream } : null);
             });
             call.on('close', cleanupCall);
          } catch (err) {
-            console.error('[Peer] Failed to auto-answer:', err);
+            console.error('[Peer] Failed to acquire media for auto-answer:', err);
+            toast.error('Could not access microphone/camera. Call failed.');
             cleanupCall();
          }
+      } else {
+         console.log('[Peer] Waiting for user to click ACCEPT in UI...');
       }
     });
 
@@ -175,46 +188,33 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
 
     console.log('[Comm] Connecting signaling for user:', userId);
 
-    // Supabase Presence
-    const presenceChannel = supabase.channel('online-staff', {
-      config: { presence: { key: userId } }
+    // Unified Communication Channel (Presence & Signaling)
+    const commChannel = supabase.channel('clinic-communication', {
+      config: { presence: { key: `${userId}-${sessionId}` } }
     });
-
-    presenceChannel
+ 
+    commChannel
       .on('presence', { event: 'sync' }, () => {
-        const state = presenceChannel.presenceState();
-        console.log('[Comm] Presence Sync:', Object.keys(state));
+        const state = commChannel.presenceState();
+        console.log('[Comm] Presence Sync (Tabs):', state);
+        
+        // Group by userId for onlineUsers map
         const formatted: Record<string, any> = {};
         Object.keys(state).forEach(key => {
           const presence = state[key][0] as any;
-          formatted[key] = presence;
+          const uId = presence.id;
+          if (uId) formatted[uId] = presence;
         });
         setOnlineUsers(formatted);
       })
-      .subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-          console.log('[Comm] Presence Subscribed. Tracking user...');
-          await presenceChannel.track({
-            id: userId,
-            full_name: profileName || 'Staff Member',
-            role: rolesString.split(',')[0] || 'staff',
-            last_seen: new Date().toISOString()
-          });
-        }
-      });
-
-    presenceChannelRef.current = presenceChannel;
-
-    // Signaling Channel for Call Invites
-    const signaling = supabase.channel(`signal-${userId}`);
-    signaling
       .on('broadcast', { event: 'call-invite' }, ({ payload }) => {
-        console.log('[Signal] Call invite received from:', payload.fromName);
-        if (callState === 'idle') {
+        if (payload.toUserId !== userId) return; 
+        console.log('[Signal] Call invite received for ME from:', payload.fromName, payload);
+        if (callStateRef.current === 'idle') {
           setIncomingCall({ 
-            from: payload.fromId, 
+            from: payload.fromUserId, 
             fromName: payload.fromName, 
-            peerId: payload.peerId,
+            peerId: payload.peerId, // The ID of the specific tab calling us
             mode: payload.mode || 'audio'
           });
           setCallMode(payload.mode || 'audio');
@@ -222,27 +222,69 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
           ringtoneRef.current?.play().catch(e => console.warn('Autoplay blocked:', e));
         }
       })
-      .on('broadcast', { event: 'call-decline' }, () => {
+      .on('broadcast', { event: 'call-accept' }, async ({ payload }) => {
+        if (payload.toUserId !== userId) return; 
+        console.log('[Signal] Call accepted for MY call by:', payload.partnerName, payload);
+        
+        if (callStateRef.current === 'dialing' && peerRef.current) {
+          try {
+            const constraints = {
+              audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+              video: payload.mode === 'video' ? { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } : false
+            };
+            
+            console.log('[Peer] Acquiring media for call...');
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            localStreamRef.current = stream;
+            
+            console.log('[Peer] Calling remote tab:', payload.peerId);
+            const call = peerRef.current.call(payload.peerId, stream);
+            currentCallRef.current = call;
+            setCallState('connected');
+            
+            call.on('stream', (remoteStream) => {
+              console.log('[Peer] Caller received remote stream');
+              setActiveCall(prev => prev ? { ...prev, stream: remoteStream, localStream: stream } : null);
+            });
+            call.on('error', (e) => console.error('[Peer] Call Stream Error:', e));
+            call.on('close', cleanupCall);
+          } catch (err) {
+            console.error('[Signal] Failed to initiate PeerJS call:', err);
+            toast.error('Could not start media. Check camera/mic permissions.');
+            cleanupCall();
+          }
+        }
+      })
+      .on('broadcast', { event: 'call-decline' }, ({ payload }) => {
+        if (payload.toUserId !== userId) return;
         console.log('[Signal] Call declined');
         setCallState('ended');
         setTimeout(() => setCallState('idle'), 2000);
       })
-      .on('broadcast', { event: 'call-end' }, () => {
+      .on('broadcast', { event: 'call-end' }, ({ payload }) => {
+        if (payload.toUserId !== userId) return;
         console.log('[Signal] Call ended by partner');
         cleanupCall();
       })
-      .subscribe((status) => {
-         if (status === 'SUBSCRIBED') {
-             console.log('[Signal] Channel Subscribed for user:', userId);
-         }
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('[Comm] Handshake Subscribed. Tracking user (tab):', `${userId}-${sessionId}`);
+          await commChannel.track({
+            id: userId,
+            sessionId: sessionId,
+            full_name: profileName || 'Staff Member',
+            role: rolesString.split(',')[0] || 'staff',
+            last_seen: new Date().toISOString()
+          });
+        }
       });
-
-    signalingChannelRef.current = signaling;
+ 
+    signalingChannelRef.current = commChannel;
+    presenceChannelRef.current = commChannel;
 
     return () => {
-      console.log('[Comm] Disconnecting signaling for user:', userId);
-      presenceChannel.unsubscribe();
-      signaling.unsubscribe();
+      console.log('[Comm] Disconnecting comm channel for user:', userId);
+      commChannel.unsubscribe();
     };
   }, [userId, profileName, rolesString]);
 
@@ -254,22 +296,24 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
     setCallState('ended');
     setActiveCall(null);
     setIncomingCall(null);
+    waitingToAnswerRef.current = false;
     setTimeout(() => setCallState('idle'), 1000);
   };
 
   const makeCall = async (targetUserId: string, targetName: string, mode: 'audio' | 'video' = 'audio') => {
-    if (!peerRef.current || !user || !profile) return;
+    if (!peerRef.current || !user || !profile || !signalingChannelRef.current) return;
 
     setCallMode(mode);
     setCallState('dialing');
     setActiveCall({ partnerId: targetUserId, partnerName: targetName, stream: null, localStream: null });
 
-    // Send Invite via Supabase Broadcast to the target's signaling channel
-    await supabase.channel(`signal-${targetUserId}`).send({
+    // Send Invite via Global Signal Channel
+    await signalingChannelRef.current.send({
       type: 'broadcast',
       event: 'call-invite',
       payload: {
-        fromId: user.id,
+        toUserId: targetUserId,
+        fromUserId: user.id,
         fromName: profile.full_name,
         peerId: peerRef.current.id,
         mode: mode
@@ -278,46 +322,57 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
   };
 
   const acceptCall = async () => {
-    if (!incomingCallRef.current || !currentCallRef.current) return;
+    if (!incomingCallRef.current || !signalingChannelRef.current) {
+        console.error('[Signal] Cannot accept: No incoming call or signaling channel');
+        return;
+    }
 
+    console.log('[Signal] User clicked ACCEPT. Sending signal to caller...', incomingCallRef.current.from);
     ringtoneRef.current?.pause();
     if (ringtoneRef.current) ringtoneRef.current.currentTime = 0;
     
-    // Send accept signal to the dialer
-    await supabase.channel(`signal-${incomingCallRef.current.from}`).send({
+    // Set flag so that when the PeerJS call arrives, we answer it immediately
+    waitingToAnswerRef.current = true;
+
+    // Send accept signal to the dialer via Global Signaling
+    const payload = { 
+        toUserId: incomingCallRef.current.from,
+        peerId: peerRef.current?.id, // Our specific tab's Peer ID
+        partnerName: profile?.full_name || 'Staff',
+        mode: incomingCallRef.current.mode
+    };
+    
+    console.log('[Signal] Sending call-accept:', payload);
+
+    await signalingChannelRef.current.send({
         type: 'broadcast',
         event: 'call-accept',
-        payload: { 
-            peerId: peerRef.current?.id,
-            partnerName: profile?.full_name || 'Staff',
-            mode: incomingCallRef.current.mode
-        }
+        payload
     });
 
-    waitingToAnswerRef.current = true;
-    setCallState('ringing'); // Maintain UI state until PeerJS stream arrives via 'on call'
+    setCallState('ringing'); 
   };
 
   const declineCall = async () => {
-    if (!incomingCall) return;
+    if (!incomingCall || !signalingChannelRef.current) return;
     ringtoneRef.current?.pause();
     
-    await supabase.channel(`signal-${incomingCall.from}`).send({
+    await signalingChannelRef.current.send({
       type: 'broadcast',
       event: 'call-decline',
-      payload: { fromId: user?.id }
+      payload: { toUserId: incomingCall.from, fromUserId: user?.id }
     });
     
     cleanupCall();
   };
 
   const endCall = async () => {
-    if (!activeCall) return;
+    if (!activeCall || !signalingChannelRef.current) return;
     
-    await supabase.channel(`signal-${activeCall.partnerId}`).send({
+    await signalingChannelRef.current.send({
       type: 'broadcast',
       event: 'call-end',
-      payload: { fromId: user?.id }
+      payload: { toUserId: activeCall.partnerId, fromUserId: user?.id }
     });
     
     cleanupCall();
