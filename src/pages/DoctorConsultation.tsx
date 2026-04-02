@@ -75,6 +75,7 @@ export default function DoctorConsultation() {
   const [clinicalNotes, setClinicalNotes] = useState('');
   const [showVitalsEdit, setShowVitalsEdit] = useState(false);
   const [lastInputWay, setLastInputWay] = useState<'typing' | 'writing'>('typing');
+  const [saveError, setSaveError] = useState<{ step: 'prescription' | 'visit', message: string } | null>(null);
   const lastLoadedVisitId = useRef<string | null>(null);
 
   useEffect(() => {
@@ -147,6 +148,18 @@ export default function DoctorConsultation() {
   }, [selectedVisit?.id, diagnosis, clinicalNotes, medicines, advice, prescriptionImage, prescriptionPaths, isWritingMode, lastInputWay]);
 
   const selectVisit = async (visit: any, checkForDrafts = false) => {
+    if (saving) {
+      toast.warning('Please wait for the current save to complete');
+      return;
+    }
+    
+    if (saveError) {
+      toast.error('Previous save failed. Please retry or clear the error before switching patients.', {
+        description: `Error at step: ${saveError.step}. Click "Retry Save" to fix.`
+      });
+      return;
+    }
+
     setSelectedVisit(visit);
     setPatient(visit.patients);
     
@@ -367,10 +380,12 @@ export default function DoctorConsultation() {
     }
 
     setSaving(true);
+    setSaveError(null);
+
     try {
-      // Parallelize database operations for speed under high traffic
-      const [rxResult, visitResult] = await Promise.all([
-        supabase.from('prescriptions').insert({
+      // Step 1: Save Prescription (if not already saved in a previous failed attempt)
+      if (!saveError || saveError.step === 'prescription') {
+        const { error: rxError } = await supabase.from('prescriptions').insert({
           visit_id: selectedVisit.id,
           patient_id: patient.id,
           diagnosis: finalDiagnosis,
@@ -380,25 +395,37 @@ export default function DoctorConsultation() {
           raw_paths: finalPaths as any,
           is_writing_mode: isWritingMode,
           doctor_id: user?.id
-        }),
-        supabase.from('visits').update({ 
-          status: 'completed', 
-          diagnosis: finalDiagnosis
-        }).eq('id', selectedVisit.id)
-      ]);
+        });
 
-      if (rxResult.error) throw rxResult.error;
-      if (visitResult.error) throw visitResult.error;
+        if (rxError) {
+          // If it's a "duplicate key" error, it might mean it was actually saved but the response was lost
+          if (rxError.code === '23505') {
+             console.log("Prescription likely already exists, proceeding to status update.");
+          } else {
+            setSaveError({ step: 'prescription', message: rxError.message });
+            throw rxError;
+          }
+        }
+      }
 
+      // Step 2: Update Visit Status
+      const { error: visitError } = await supabase.from('visits').update({ 
+        status: 'completed', 
+        diagnosis: finalDiagnosis
+      }).eq('id', selectedVisit.id);
+
+      if (visitError) {
+        setSaveError({ step: 'visit', message: visitError.message });
+        throw visitError;
+      }
+
+      // SUCCESS: Clear everything
       toast.success('Prescription saved & sent to print queue');
       
-      // Clear persistence info
       localStorage.removeItem(`draft_${selectedVisit.id}`);
       localStorage.removeItem('active_consultation_id');
       
       setAdvice('');
-      
-      // OPTIMISTIC CLEAR: Clear selection and data immediately for snappier feel
       setSelectedVisit(null);
       setPatient(null);
       setPrescriptionImage(null);
@@ -406,10 +433,15 @@ export default function DoctorConsultation() {
       setDiagnosis('');
       setClinicalNotes('');
       setMedicines([{ type: 'Tab.', name: '', dosage: '', frequency: '', duration: '' }]);
+      setSaveError(null);
 
       queryClient.invalidateQueries({ queryKey: ['visitQueue'] });
     } catch (err: any) {
-      toast.error(err.message);
+      console.error("Save error:", err);
+      toast.error(`Save Failed: ${err.message || 'Unknown error'}`, {
+        description: "Please try again. Your data is still here.",
+        duration: 5000,
+      });
     } finally {
       setSaving(false);
     }
@@ -521,6 +553,14 @@ export default function DoctorConsultation() {
             <div className="md:hidden flex items-center justify-between mb-4 bg-background/80 backdrop-blur sticky top-[-1rem] z-20 py-2 -mx-4 px-4 border-b border-border shadow-sm">
               <div className="flex items-center gap-3">
                 <Button variant="ghost" size="icon" onClick={() => {
+                  if (saving) {
+                    toast.warning('Save in progress...');
+                    return;
+                  }
+                  if (saveError) {
+                    toast.error('Please retry the failed save first');
+                    return;
+                  }
                   localStorage.removeItem('active_consultation_id');
                   setSelectedVisit(null);
                 }} className="-ml-2">
@@ -1064,9 +1104,23 @@ export default function DoctorConsultation() {
                     <Eye className="w-4 h-4 mr-2" />
                     Preview
                   </Button>
-                  <Button onClick={savePrescription} disabled={saving} className="h-11 shadow-lg bg-primary hover:bg-primary/90">
-                    {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-                    Save & Complete
+                  <Button 
+                    onClick={savePrescription} 
+                    disabled={saving} 
+                    className={cn(
+                      "h-11 shadow-lg transition-all",
+                      saveError ? "bg-red-600 hover:bg-red-700 animate-pulse" : "bg-primary hover:bg-primary/90"
+                    )}
+                  >
+                    {saving ? (
+                      <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Saving...</>
+                    ) : (
+                      saveError ? (
+                        <><RefreshCw className="w-4 h-4 mr-2" /> Retry Save</>
+                      ) : (
+                        <><Save className="w-4 h-4 mr-2" /> Save & Complete</>
+                      )
+                    )}
                   </Button>
                 </div>
               </CardContent>
