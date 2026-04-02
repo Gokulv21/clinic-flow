@@ -18,9 +18,12 @@ import Analytics from "@/pages/Analytics";
 import UserManagement from "@/pages/UserManagement";
 import DoctorProfile from "@/pages/DoctorProfile";
 import Help from "@/pages/Help";
+import Calls from "@/pages/Calls";
 import PublicPrescription from "@/pages/PublicPrescription";
 import NotFound from "./pages/NotFound.tsx";
 import { ReactNode } from "react";
+import { CommunicationProvider } from "@/lib/communication";
+import CallOverlay from "@/components/CallOverlay";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -132,20 +135,24 @@ const App = () => (
         <Sonner />
         <BrowserRouter basename="/prescripto">
           <AuthProvider>
-            <Routes>
-              <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-              <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-              <Route path="/nurse" element={<ProtectedRoute allowedRoles={['staff', 'doctor']}><NurseEntry /></ProtectedRoute>} />
-              <Route path="/consultation" element={<ProtectedRoute allowedRoles={['doctor']}><DoctorConsultation /></ProtectedRoute>} />
-              <Route path="/print" element={<ProtectedRoute allowedRoles={['staff', 'doctor']}><PrintQueue /></ProtectedRoute>} />
-              <Route path="/patients" element={<ProtectedRoute allowedRoles={['staff', 'doctor']}><PatientList /></ProtectedRoute>} />
-              <Route path="/analytics" element={<ProtectedRoute allowedRoles={['doctor']}><Analytics /></ProtectedRoute>} />
-              <Route path="/profile" element={<ProtectedRoute allowedRoles={['doctor']}><DoctorProfile /></ProtectedRoute>} />
-              <Route path="/users" element={<ProtectedRoute allowedRoles={['doctor']}><UserManagement /></ProtectedRoute>} />
-              <Route path="/help" element={<ProtectedRoute><Help /></ProtectedRoute>} />
-              <Route path="/rx/:visitId" element={<PublicPrescription />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+            <CommunicationProvider>
+              <CallOverlay />
+              <Routes>
+                <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+                <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                <Route path="/nurse" element={<ProtectedRoute allowedRoles={['staff', 'doctor']}><NurseEntry /></ProtectedRoute>} />
+                <Route path="/consultation" element={<ProtectedRoute allowedRoles={['doctor']}><DoctorConsultation /></ProtectedRoute>} />
+                <Route path="/print" element={<ProtectedRoute allowedRoles={['staff', 'doctor']}><PrintQueue /></ProtectedRoute>} />
+                <Route path="/patients" element={<ProtectedRoute allowedRoles={['staff', 'doctor']}><PatientList /></ProtectedRoute>} />
+                <Route path="/analytics" element={<ProtectedRoute allowedRoles={['doctor']}><Analytics /></ProtectedRoute>} />
+                <Route path="/profile" element={<ProtectedRoute allowedRoles={['doctor']}><DoctorProfile /></ProtectedRoute>} />
+                <Route path="/users" element={<ProtectedRoute allowedRoles={['doctor']}><UserManagement /></ProtectedRoute>} />
+                <Route path="/help" element={<ProtectedRoute><Help /></ProtectedRoute>} />
+                <Route path="/calls" element={<ProtectedRoute><Calls /></ProtectedRoute>} />
+                <Route path="/rx/:visitId" element={<PublicPrescription />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </CommunicationProvider>
           </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>

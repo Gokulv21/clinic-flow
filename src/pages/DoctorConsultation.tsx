@@ -22,6 +22,8 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { printPrescription } from '@/lib/printPrescription';
 import PageBanner from '@/components/PageBanner';
 import consultationBanner from '@/assets/consultation_banner.png';
+import { useCommunication } from '@/lib/communication';
+import { PhoneCall } from 'lucide-react';
 
 interface Medicine {
   type: string;
@@ -42,6 +44,10 @@ const COMMON_FREQUENCIES = [
 export default function DoctorConsultation() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { makeCall, onlineUsers, callState } = useCommunication();
+  
+  // Find a staff member to call (simplified for now: calls the first available staff)
+  const firstAvailableStaff = Object.entries(onlineUsers).find(([_, u]) => u.role === 'staff');
 
   // 1. Fetch Queue via React Query
   const { data: queue = [], isLoading: isLoadingQueue, refetch: refetchQueue } = useQuery({
@@ -602,6 +608,19 @@ export default function DoctorConsultation() {
                     <Badge variant="outline" className="text-[10px] font-bold px-2 py-0.5 border-slate-200">
                       TOKEN #{selectedVisit.token_number}
                     </Badge>
+                    {firstAvailableStaff && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => makeCall(firstAvailableStaff[0], firstAvailableStaff[1].full_name)}
+                        disabled={callState !== 'idle'}
+                        className="h-8 px-2 bg-emerald-500 hover:bg-emerald-600 text-white gap-1 rounded-lg shadow-sm animate-in fade-in zoom-in duration-300"
+                        title="Quick Call Staff"
+                      >
+                        <PhoneCall className="w-3.5 h-3.5" />
+                        <span className="text-[11px] font-bold">Call Staff</span>
+                      </Button>
+                    )}
                   </div>
                 </CardTitle>
               </CardHeader>

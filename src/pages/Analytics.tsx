@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { startOfDay, endOfDay, isWithinInterval } from 'date-fns';
+import { startOfDay, endOfDay, isWithinInterval, startOfHour, endOfHour, setHours, format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell } from 'recharts';
@@ -111,7 +111,24 @@ export default function Analytics() {
 
     const resultData: any[] = [];
     
-    if (formatType === 'day') {
+    if (timeRange === 'today') {
+      for (let h = 0; h < 24; h++) {
+        const d = setHours(startOfDay(new Date()), h);
+        const hStart = startOfHour(d);
+        const hEnd = endOfHour(d);
+        
+        const countVal = visits?.filter(v => {
+          const vDate = new Date(v.created_at);
+          return isWithinInterval(vDate, { start: hStart, end: hEnd });
+        }).length || 0;
+
+        resultData.push({ 
+          name: format(d, 'ha'), 
+          patients: countVal,
+          color: '#3b82f6' // Unified blue for today's hourly breakdown
+        });
+      }
+    } else if (formatType === 'day') {
       for (let i = daysCount - 1; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
@@ -275,6 +292,7 @@ export default function Analytics() {
                       tickLine={false} 
                       tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10, fontWeight: 600 }}
                       dy={10}
+                      interval={timeRange === 'today' ? 1 : 0}
                     />
                     <YAxis 
                       axisLine={false} 
@@ -287,7 +305,7 @@ export default function Analytics() {
                       contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '12px', border: '1px solid hsl(var(--border))', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', padding: '12px' }}
                       labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 'bold' }}
                     />
-                    <Bar dataKey="patients" radius={[6, 6, 0, 0]} barSize={timeRange === 'year' ? 30 : 20}>
+                    <Bar dataKey="patients" radius={[6, 6, 0, 0]} barSize={timeRange === 'today' ? 12 : (timeRange === 'year' ? 30 : 20)}>
                       {volumeData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
