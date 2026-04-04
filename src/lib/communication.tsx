@@ -367,6 +367,7 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
       .on('broadcast', { event: 'call-video-state' }, ({ payload }) => {
         if (payload.toUserId !== userId) return;
         setActiveParticipants(prev => prev.map(p => p.id === payload.fromUserId ? { ...p, videoOff: payload.videoOff } : p));
+        if (!payload.videoOff) setCallMode('video');
       })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
@@ -612,13 +613,15 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
             }
         }
 
-        const newState = !videoTracks[0].enabled;
-        videoTracks.forEach(t => t.enabled = newState);
-        setIsVideoOff(!newState);
-        if (newState) setCallMode('video');
+        const newState = isVideoOff; // it was OFF, now we want it ON (if isVideoOff was true)
+        const trackEnabled = newState; 
+        
+        videoTracks.forEach(t => t.enabled = trackEnabled);
+        setIsVideoOff(!trackEnabled);
+        if (trackEnabled) setCallMode('video');
         
         // Force state update to refresh local UI
-        setActiveParticipants(prev => prev.map(p => p.isLocal ? { ...p, stream: localStreamRef.current, videoOff: !newState } : p));
+        setActiveParticipants(prev => prev.map(p => p.isLocal ? { ...p, stream: localStreamRef.current, videoOff: !trackEnabled } : p));
         setActiveCall(prev => prev ? { ...prev, localStream: localStreamRef.current } : null);
 
         // Signaling
@@ -628,7 +631,7 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
                 await signalingChannelRef.current.send({
                     type: 'broadcast',
                     event: 'call-video-state',
-                    payload: { toUserId: p.id, fromUserId: user?.id, videoOff: !newState }
+                    payload: { toUserId: p.id, fromUserId: user?.id, videoOff: !trackEnabled }
                 });
             });
         }

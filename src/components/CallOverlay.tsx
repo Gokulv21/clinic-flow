@@ -206,7 +206,7 @@ export default function CallOverlay() {
                 {/* Main Remote Video (if single) */}
                 {remoteParticipants.length === 1 && (
                     <div className="w-full h-full rounded-[2rem] overflow-hidden bg-zinc-900 border border-white/5 relative shadow-2xl">
-                        {callMode === 'video' && remoteParticipants[0].stream && !remoteParticipants[0].videoOff ? (
+                        {(callMode === 'video' || remoteParticipants.some(p => !p.videoOff)) && remoteParticipants[0].stream && !remoteParticipants[0].videoOff ? (
                             <VideoStream 
                                 stream={remoteParticipants[0].stream} 
                                 className={cn(
@@ -233,7 +233,7 @@ export default function CallOverlay() {
                 {/* Multiple Remote Videos */}
                 {remoteParticipants.length > 1 && remoteParticipants.map((p) => (
                     <div key={p.id} className="relative rounded-[1.5rem] overflow-hidden bg-zinc-900 border border-white/5 aspect-square md:aspect-auto shadow-xl">
-                         {callMode === 'video' && p.stream && !p.videoOff ? (
+                         {(callMode === 'video' || !p.videoOff) && p.stream && !p.videoOff ? (
                             <VideoStream stream={p.stream} className="w-full h-full object-cover" />
                         ) : (
                             <div className="w-full h-full flex items-center justify-center">
@@ -259,7 +259,7 @@ export default function CallOverlay() {
             </div>
 
             {/* Local Preview PIP */}
-            {localParticipant && callMode === 'video' && (
+            {localParticipant && (callMode === 'video' || !isVideoOff) && (
                 <motion.div 
                     drag 
                     dragConstraints={{ left: -300, right: 0, top: -500, bottom: 0 }}
