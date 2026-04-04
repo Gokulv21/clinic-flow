@@ -616,6 +616,10 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
         videoTracks.forEach(t => t.enabled = newState);
         setIsVideoOff(!newState);
         if (newState) setCallMode('video');
+        
+        // Force state update to refresh local UI
+        setActiveParticipants(prev => prev.map(p => p.isLocal ? { ...p, stream: localStreamRef.current, videoOff: !newState } : p));
+        setActiveCall(prev => prev ? { ...prev, localStream: localStreamRef.current } : null);
 
         // Signaling
         if (activeParticipants.length > 0) {

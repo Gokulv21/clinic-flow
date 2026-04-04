@@ -12,6 +12,41 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
+// Robust Video Stream Component
+function VideoStream({ stream, muted = false, className }: { stream: MediaStream | null, muted?: boolean, className?: string }) {
+    const videoRef = useRef<HTMLVideoElement>(null);
+
+    useEffect(() => {
+        if (videoRef.current && stream) {
+            console.log('[Video] Attaching stream to element');
+            videoRef.current.srcObject = stream;
+            
+            // Explicitly trigger play
+            const playVideo = async () => {
+                try {
+                    await videoRef.current?.play();
+                } catch (err) {
+                    console.warn('[Video] Autoplay prevented, retrying on metadata load...', err);
+                }
+            };
+            playVideo();
+        }
+    }, [stream]);
+
+    return (
+        <video 
+            ref={videoRef}
+            autoPlay 
+            playsInline 
+            muted={muted}
+            className={className}
+            onLoadedMetadata={(e) => {
+                (e.target as HTMLVideoElement).play().catch(console.warn);
+            }}
+        />
+    );
+}
+
 export default function CallOverlay() {
   const { 
     callState, callMode, incomingCall, activeCall, activeParticipants,
@@ -24,15 +59,6 @@ export default function CallOverlay() {
 
   const [showAddParticipant, setShowAddParticipant] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const localVideoRef = useRef<HTMLVideoElement>(null);
-
-  // Attach local stream to preview
-  useEffect(() => {
-    const local = activeParticipants.find(p => p.isLocal);
-    if (local?.stream && localVideoRef.current) {
-        localVideoRef.current.srcObject = local.stream;
-    }
-  }, [activeParticipants]);
 
   if (callState === 'idle') return null;
 
@@ -50,12 +76,10 @@ export default function CallOverlay() {
       <div className="absolute inset-0 z-0 opacity-30">
           <div className="absolute inset-0 bg-gradient-to-b from-blue-600/20 to-black" />
           {activeCall?.stream && callMode === 'video' && !isVideoOff && (
-              <video 
-                autoPlay 
-                playsInline 
+              <VideoStream 
+                stream={activeCall.stream} 
                 muted 
-                className="w-full h-full object-cover blur-2xl scale-110"
-                ref={el => { if (el) el.srcObject = activeCall.stream; }}
+                className="w-full h-full object-cover blur-2xl scale-110" 
               />
           )}
       </div>
@@ -183,14 +207,12 @@ export default function CallOverlay() {
                 {remoteParticipants.length === 1 && (
                     <div className="w-full h-full rounded-[2rem] overflow-hidden bg-zinc-900 border border-white/5 relative shadow-2xl">
                         {callMode === 'video' && remoteParticipants[0].stream && !remoteParticipants[0].videoOff ? (
-                            <video 
-                                autoPlay 
-                                playsInline 
+                            <VideoStream 
+                                stream={remoteParticipants[0].stream} 
                                 className={cn(
                                     "w-full h-full object-cover transition-all duration-700",
                                     isOnHold && "grayscale blur-lg opacity-40 scale-110"
                                 )}
-                                ref={el => { if (el) el.srcObject = remoteParticipants[0].stream; }}
                             />
                         ) : (
                             <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-zinc-800 to-zinc-950">
@@ -212,12 +234,7 @@ export default function CallOverlay() {
                 {remoteParticipants.length > 1 && remoteParticipants.map((p) => (
                     <div key={p.id} className="relative rounded-[1.5rem] overflow-hidden bg-zinc-900 border border-white/5 aspect-square md:aspect-auto shadow-xl">
                          {callMode === 'video' && p.stream && !p.videoOff ? (
-                            <video 
-                                autoPlay 
-                                playsInline 
-                                className="w-full h-full object-cover"
-                                ref={el => { if (el) el.srcObject = p.stream; }}
-                            />
+                            <VideoStream stream={p.stream} className="w-full h-full object-cover" />
                         ) : (
                             <div className="w-full h-full flex items-center justify-center">
                                 <Avatar className="w-20 h-20 border-2 border-white/10">
@@ -253,10 +270,8 @@ export default function CallOverlay() {
                     )}
                 >
                     {!isVideoOff ? (
-                        <video 
-                            ref={localVideoRef} 
-                            autoPlay 
-                            playsInline 
+                        <VideoStream 
+                            stream={localParticipant.stream} 
                             muted 
                             className="w-full h-full object-cover scale-x-[-1]" 
                         />
