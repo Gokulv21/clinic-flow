@@ -43,6 +43,7 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
   const [callState, setCallState] = useState<CallState>('idle');
   const [callMode, setCallMode] = useState<'audio' | 'video'>('audio');
   const [incomingCall, setIncomingCall] = useState<{ from: string, fromName: string, peerId: string, mode: 'audio' | 'video' } | null>(null);
+  const [activeCall, setActiveCall] = useState<{ partnerId: string, partnerName: string, stream: MediaStream | null, localStream: MediaStream | null } | null>(null);
   const [activeParticipants, setActiveParticipants] = useState<Array<{ id: string, name: string, stream: MediaStream | null, isLocal?: boolean }>>([]);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
