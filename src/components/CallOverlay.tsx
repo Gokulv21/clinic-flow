@@ -182,7 +182,7 @@ export default function CallOverlay() {
                 {/* Main Remote Video (if single) */}
                 {remoteParticipants.length === 1 && (
                     <div className="w-full h-full rounded-[2rem] overflow-hidden bg-zinc-900 border border-white/5 relative shadow-2xl">
-                        {callMode === 'video' && remoteParticipants[0].stream ? (
+                        {callMode === 'video' && remoteParticipants[0].stream && !remoteParticipants[0].videoOff ? (
                             <video 
                                 autoPlay 
                                 playsInline 
@@ -211,7 +211,7 @@ export default function CallOverlay() {
                 {/* Multiple Remote Videos */}
                 {remoteParticipants.length > 1 && remoteParticipants.map((p) => (
                     <div key={p.id} className="relative rounded-[1.5rem] overflow-hidden bg-zinc-900 border border-white/5 aspect-square md:aspect-auto shadow-xl">
-                         {callMode === 'video' && p.stream ? (
+                         {callMode === 'video' && p.stream && !p.videoOff ? (
                             <video 
                                 autoPlay 
                                 playsInline 

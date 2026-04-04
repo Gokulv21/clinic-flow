@@ -18,7 +18,7 @@ interface CommunicationContextType {
   callMode: 'audio' | 'video';
   incomingCall: { from: string, fromName: string, peerId: string, mode: 'audio' | 'video' } | null;
   activeCall: { partnerId: string, partnerName: string, stream: MediaStream | null, localStream: MediaStream | null } | null;
-  activeParticipants: Array<{ id: string, name: string, stream: MediaStream | null, isLocal?: boolean }>;
+  activeParticipants: Array<{ id: string, name: string, stream: MediaStream | null, isLocal?: boolean, videoOff?: boolean }>;
   isMuted: boolean;
   isVideoOff: boolean;
   isOnHold: boolean;
@@ -45,7 +45,7 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
   const [callMode, setCallMode] = useState<'audio' | 'video'>('audio');
   const [incomingCall, setIncomingCall] = useState<{ from: string, fromName: string, peerId: string, mode: 'audio' | 'video' } | null>(null);
   const [activeCall, setActiveCall] = useState<{ partnerId: string, partnerName: string, stream: MediaStream | null, localStream: MediaStream | null } | null>(null);
-  const [activeParticipants, setActiveParticipants] = useState<Array<{ id: string, name: string, stream: MediaStream | null, isLocal?: boolean }>>([]);
+  const [activeParticipants, setActiveParticipants] = useState<Array<{ id: string, name: string, stream: MediaStream | null, isLocal?: boolean, videoOff?: boolean }>>([]);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [isOnHold, setIsOnHold] = useState(false);
@@ -133,20 +133,25 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
 
   const getMediaStream = async (mode: 'audio' | 'video'): Promise<MediaStream> => {
     const constraints: any = [
-      mode === 'video' ? {
+      {
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
         video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }
-      } : null,
-      mode === 'video' ? {
+      },
+      {
         audio: { echoCancellation: true, noiseSuppression: true },
         video: true
-      } : null,
+      },
       { audio: true, video: false }
-    ].filter(Boolean);
+    ];
 
     for (const constraint of constraints) {
       try {
-        return await navigator.mediaDevices.getUserMedia(constraint);
+        const stream = await navigator.mediaDevices.getUserMedia(constraint);
+        // If we only wanted audio, disable video track but keep it in the stream
+        if (mode === 'audio') {
+            stream.getVideoTracks().forEach(t => t.enabled = false);
+        }
+        return stream;
       } catch (err) {
         console.warn('[Media] Constraint failed, trying next...');
       }
@@ -206,6 +211,7 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
                 waitingToAnswerRef.current = false;
                 
                 call.on('stream', (remoteStream: MediaStream) => {
+                    toast.dismiss('call-connecting');
                     const partnerName = allUsers.find(u => u.id === partnerUserId)?.full_name || 'Staff';
                     
                     setActiveParticipants(prev => {
@@ -357,6 +363,10 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
       .on('broadcast', { event: 'call-resume' }, ({ payload }) => {
         if (payload.toUserId !== userId) return;
         setIsPartnerOnHold(false);
+      })
+      .on('broadcast', { event: 'call-video-state' }, ({ payload }) => {
+        if (payload.toUserId !== userId) return;
+        setActiveParticipants(prev => prev.map(p => p.id === payload.fromUserId ? { ...p, videoOff: payload.videoOff } : p));
       })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
@@ -587,24 +597,36 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
 
   const toggleVideo = async () => {
     if (localStreamRef.current) {
-        const videoTracks = localStreamRef.current.getVideoTracks();
+        let videoTracks = localStreamRef.current.getVideoTracks();
+        
+        // If NO video track, try to get one (only happens if first getUserMedia failed)
         if (videoTracks.length === 0) {
             try {
-                const vidStream = await navigator.mediaDevices.getUserMedia({ video: true });
-                const newTrack = vidStream.getVideoTracks()[0];
-                localStreamRef.current.addTrack(newTrack);
-                setIsVideoOff(false);
-                setCallMode('video');
-                // Note: PeerJS doesn't automatically send newly added tracks.
-                // In a production app, we would re-negotiate or use a different library.
-                // For now, we update the local UI and the partner will see a blank container
-                // until re-connection or if we decide to re-call.
-            } catch (err) {
-                toast.error('Could not access camera');
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                const track = stream.getVideoTracks()[0];
+                localStreamRef.current.addTrack(track);
+                videoTracks = [track];
+            } catch (e) {
+                toast.error('Camera access denied');
+                return;
             }
-        } else {
-            videoTracks.forEach(track => track.enabled = !track.enabled);
-            setIsVideoOff(!videoTracks[0].enabled);
+        }
+
+        const newState = !videoTracks[0].enabled;
+        videoTracks.forEach(t => t.enabled = newState);
+        setIsVideoOff(!newState);
+        if (newState) setCallMode('video');
+
+        // Signaling
+        if (activeParticipants.length > 0) {
+            activeParticipants.forEach(async (p) => {
+                if (p.isLocal) return;
+                await signalingChannelRef.current.send({
+                    type: 'broadcast',
+                    event: 'call-video-state',
+                    payload: { toUserId: p.id, fromUserId: user?.id, videoOff: !newState }
+                });
+            });
         }
     }
   };
