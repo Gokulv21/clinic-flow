@@ -15,7 +15,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 export default function CallOverlay() {
   const { 
     callState, callMode, incomingCall, activeCall, activeParticipants,
-    isMuted, isVideoOff, isOnHold, 
+    isMuted, isVideoOff, isOnHold, isPartnerOnHold,
     acceptCall, declineCall, endCall, 
     toggleMute, toggleVideo, toggleHold,
     addParticipant, onlineUsers, allUsers,
@@ -141,7 +141,10 @@ export default function CallOverlay() {
                        `${remoteParticipants[0].name} + ${remoteParticipants.length - 1} others`}
                     </span>
                     {isOnHold && (
-                        <span className="ml-2 px-2 py-0.5 bg-amber-500 text-[10px] font-black uppercase rounded text-black">On Hold</span>
+                        <span className="ml-2 px-2 py-0.5 bg-amber-500 text-[10px] font-black uppercase rounded text-black">You're on Hold</span>
+                    )}
+                    {isPartnerOnHold && (
+                        <span className="ml-2 px-2 py-0.5 bg-blue-500 text-[10px] font-black uppercase rounded text-white">Partner on Hold</span>
                     )}
                 </div>
                 
@@ -155,6 +158,20 @@ export default function CallOverlay() {
                         <UserPlus className="w-5 h-5" />
                     </Button>
                 </div>
+
+                {isPartnerOnHold && (
+                    <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="absolute inset-x-0 top-32 flex justify-center pointer-events-none"
+                    >
+                        <div className="bg-amber-500/10 backdrop-blur-xl border border-amber-500/20 p-4 px-8 rounded-2xl flex flex-col items-center gap-2 shadow-2xl">
+                            <Pause className="w-12 h-12 text-amber-500 animate-pulse" />
+                            <p className="text-amber-500 font-black uppercase tracking-tighter">Staff put you on hold</p>
+                            <p className="text-[10px] text-amber-500/60 font-bold uppercase tracking-widest">They will be back shortly</p>
+                        </div>
+                    </motion.div>
+                )}
             </div>
 
             {/* Video Grid */}

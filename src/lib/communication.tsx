@@ -22,6 +22,7 @@ interface CommunicationContextType {
   isMuted: boolean;
   isVideoOff: boolean;
   isOnHold: boolean;
+  isPartnerOnHold: boolean;
   makeCall: (targetUserId: string, targetName: string, mode?: 'audio' | 'video') => Promise<void>;
   addParticipant: (targetUserId: string, targetName: string) => Promise<void>;
   acceptCall: () => void;
@@ -48,6 +49,7 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [isOnHold, setIsOnHold] = useState(false);
+  const [isPartnerOnHold, setIsPartnerOnHold] = useState(false);
   
   const peerRef = useRef<Peer | null>(null);
   const callsRef = useRef<Map<string, MediaConnection>>(new Map());
@@ -348,6 +350,14 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
         if (payload.toUserId !== userId) return;
         cleanupCall();
       })
+      .on('broadcast', { event: 'call-hold' }, ({ payload }) => {
+        if (payload.toUserId !== userId) return;
+        setIsPartnerOnHold(true);
+      })
+      .on('broadcast', { event: 'call-resume' }, ({ payload }) => {
+        if (payload.toUserId !== userId) return;
+        setIsPartnerOnHold(false);
+      })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
           await commChannel.track({
@@ -420,6 +430,7 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
     setIsMuted(false);
     setIsVideoOff(false);
     setIsOnHold(false);
+    setIsPartnerOnHold(false);
     waitingToAnswerRef.current = false;
     setTimeout(() => setCallState('idle'), 1000);
   };
@@ -574,21 +585,48 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const toggleVideo = () => {
+  const toggleVideo = async () => {
     if (localStreamRef.current) {
         const videoTracks = localStreamRef.current.getVideoTracks();
-        videoTracks.forEach(track => track.enabled = !track.enabled);
-        setIsVideoOff(!videoTracks[0].enabled);
+        if (videoTracks.length === 0) {
+            try {
+                const vidStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                const newTrack = vidStream.getVideoTracks()[0];
+                localStreamRef.current.addTrack(newTrack);
+                setIsVideoOff(false);
+                setCallMode('video');
+                // Note: PeerJS doesn't automatically send newly added tracks.
+                // In a production app, we would re-negotiate or use a different library.
+                // For now, we update the local UI and the partner will see a blank container
+                // until re-connection or if we decide to re-call.
+            } catch (err) {
+                toast.error('Could not access camera');
+            }
+        } else {
+            videoTracks.forEach(track => track.enabled = !track.enabled);
+            setIsVideoOff(!videoTracks[0].enabled);
+        }
     }
   };
 
   const toggleHold = () => {
-    setIsOnHold(prev => !prev);
-    // When on hold, we stop sending video/audio but keep the connection
+    const newState = !isOnHold;
+    setIsOnHold(newState);
+    
+    // Notify Partner
+    if (activeParticipants.length > 0) {
+        activeParticipants.forEach(async (p) => {
+            if (p.isLocal) return;
+            await signalingChannelRef.current.send({
+                type: 'broadcast',
+                event: newState ? 'call-hold' : 'call-resume',
+                payload: { toUserId: p.id, fromUserId: user?.id }
+            });
+        });
+    }
+
     if (localStreamRef.current) {
-        const tracks = localStreamRef.current.getTracks();
-        const newState = !isOnHold; // Toggle
-        tracks.forEach(track => track.enabled = !newState);
+        localStreamRef.current.getTracks().forEach(track => track.enabled = !newState);
     }
   };
 
@@ -604,6 +642,7 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
       isMuted,
       isVideoOff,
       isOnHold,
+      isPartnerOnHold,
       makeCall, 
       addParticipant,
       acceptCall, 
