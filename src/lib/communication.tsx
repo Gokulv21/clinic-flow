@@ -174,8 +174,19 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
               { urls: 'stun:stun1.l.google.com:19302' },
               { urls: 'stun:stun2.l.google.com:19302' },
               { urls: 'stun:stun3.l.google.com:19302' },
+              { urls: 'stun:stun4.l.google.com:19302' },
               { urls: 'stun:stun.nextcloud.com:443' },
-              { urls: 'stun:stun.voiparound.com:3478' }
+              { urls: 'stun:stun.voiparound.com:3478' },
+              { urls: 'stun:stun.ekiga.net' },
+              { urls: 'stun:stun.ideasip.com' },
+              { urls: 'stun:stun.iptel.org' },
+              { urls: 'stun:stun.rixtelecom.se' },
+              { urls: 'stun:stun.schlund.de' },
+              { urls: 'stun:stunserver.org' },
+              { urls: 'stun:stun.softjoys.com' },
+              { urls: 'stun:stun.voipbuster.com' },
+              { urls: 'stun:stun.voxgratia.org' },
+              { urls: 'stun:stun.stunprotocol.org:3478' }
             ]
           }
         });

@@ -47,6 +47,39 @@ function VideoStream({ stream, muted = false, className }: { stream: MediaStream
     );
 }
 
+// Robust Audio Stream Component
+function AudioStream({ stream }: { stream: MediaStream | null }) {
+    const audioRef = useRef<HTMLAudioElement>(null);
+
+    useEffect(() => {
+        if (audioRef.current && stream) {
+            console.log('[Audio] Attaching stream to element');
+            audioRef.current.srcObject = stream;
+            
+            // Explicitly trigger play
+            const playAudio = async () => {
+                try {
+                    await audioRef.current?.play();
+                } catch (err) {
+                    console.warn('[Audio] Autoplay prevented, retrying on metadata load...', err);
+                }
+            };
+            playAudio();
+        }
+    }, [stream]);
+
+    return (
+        <audio 
+            ref={audioRef}
+            autoPlay 
+            className="hidden"
+            onLoadedMetadata={(e) => {
+                (e.target as HTMLAudioElement).play().catch(console.warn);
+            }}
+        />
+    );
+}
+
 export default function CallOverlay() {
   const { 
     callState, callMode, incomingCall, activeCall, activeParticipants,
@@ -222,7 +255,7 @@ export default function CallOverlay() {
                             </div>
                         )}
                         {/* Audio track */}
-                        <audio autoPlay ref={el => { if (el) el.srcObject = remoteParticipants[0].stream; }} />
+                        <AudioStream stream={remoteParticipants[0].stream} />
                         
                         <div className="absolute bottom-6 left-6 p-2 px-4 bg-black/40 backdrop-blur-md rounded-xl border border-white/10 flex items-center gap-2">
                             <span className="text-xs font-bold">{remoteParticipants[0].name}</span>
@@ -242,7 +275,7 @@ export default function CallOverlay() {
                                 </Avatar>
                             </div>
                         )}
-                        <audio autoPlay ref={el => { if (el) el.srcObject = p.stream; }} />
+                        <AudioStream stream={p.stream} />
                         <div className="absolute bottom-4 left-4 p-1 px-3 bg-black/40 backdrop-blur-md rounded-lg border border-white/10">
                             <span className="text-[10px] font-bold">{p.name}</span>
                         </div>
