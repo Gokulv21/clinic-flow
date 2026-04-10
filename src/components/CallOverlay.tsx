@@ -1,8 +1,7 @@
 import { useCommunication } from '@/lib/communication';
 import { Button } from '@/components/ui/button';
 import { 
-  Phone, PhoneOff, User, X, Mic, MicOff, Video, VideoOff, 
-  Pause, Play, UserPlus, Volume2, Grid, Maximize2 
+  Pause, Play, UserPlus, Volume2, Grid, Maximize2, VolumeX, Volume1 
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEffect, useRef, useState } from 'react';
@@ -47,21 +46,82 @@ function VideoStream({ stream, muted = false, className }: { stream: MediaStream
     );
 }
 
+// Visualizer Component
+function AudioVisualizer({ stream }: { stream: MediaStream | null }) {
+    const [level, setLevel] = useState(0);
+    const audioContextRef = useRef<AudioContext | null>(null);
+    const analyserRef = useRef<AnalyserNode | null>(null);
+    const animationRef = useRef<number | null>(null);
+
+    useEffect(() => {
+        if (!stream || stream.getAudioTracks().length === 0) return;
+
+        const init = () => {
+            const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+            const ctx = new AudioContextClass();
+            const analyser = ctx.createAnalyser();
+            const source = ctx.createMediaStreamSource(stream);
+            source.connect(analyser);
+            analyser.fftSize = 256;
+            
+            audioContextRef.current = ctx;
+            analyserRef.current = analyser;
+
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+
+            const update = () => {
+                analyser.getByteFrequencyData(dataArray);
+                let sum = 0;
+                for (let i = 0; i < bufferLength; i++) {
+                    sum += dataArray[i];
+                }
+                const average = sum / bufferLength;
+                setLevel(average);
+                animationRef.current = requestAnimationFrame(update);
+            };
+            update();
+        };
+
+        init();
+
+        return () => {
+            if (animationRef.current) cancelAnimationFrame(animationRef.current);
+            if (audioContextRef.current) audioContextRef.current.close();
+        };
+    }, [stream]);
+
+    return (
+        <div className="flex items-end gap-0.5 h-3">
+            {[...Array(4)].map((_, i) => (
+                <motion.div 
+                    key={i}
+                    animate={{ height: level > 10 ? [2, 12, 4, 8, 2][(i + Math.floor(level/20)) % 5] : 2 }}
+                    transition={{ repeat: Infinity, duration: 0.5 }}
+                    className="w-1 bg-emerald-500 rounded-full"
+                />
+            ))}
+        </div>
+    );
+}
+
 // Robust Audio Stream Component
 function AudioStream({ stream }: { stream: MediaStream | null }) {
     const audioRef = useRef<HTMLAudioElement>(null);
+    const [blocked, setBlocked] = useState(false);
 
     useEffect(() => {
         if (audioRef.current && stream) {
             console.log('[Audio] Attaching stream to element');
             audioRef.current.srcObject = stream;
             
-            // Explicitly trigger play
             const playAudio = async () => {
                 try {
                     await audioRef.current?.play();
+                    setBlocked(false);
                 } catch (err) {
-                    console.warn('[Audio] Autoplay prevented, retrying on metadata load...', err);
+                    console.warn('[Audio] Autoplay prevented', err);
+                    setBlocked(true);
                 }
             };
             playAudio();
@@ -69,23 +129,38 @@ function AudioStream({ stream }: { stream: MediaStream | null }) {
     }, [stream]);
 
     return (
-        <audio 
-            ref={audioRef}
-            autoPlay 
-            className="hidden"
-            onLoadedMetadata={(e) => {
-                (e.target as HTMLAudioElement).play().catch(console.warn);
-            }}
-        />
+        <div className="absolute top-4 right-4 z-50">
+            <audio 
+                ref={audioRef}
+                autoPlay 
+                className="hidden"
+                onLoadedMetadata={(e) => {
+                    (e.target as HTMLAudioElement).play().catch(() => setBlocked(true));
+                }}
+            />
+            {blocked && (
+                <Button 
+                    size="sm" 
+                    variant="destructive" 
+                    className="animate-bounce text-[10px] h-6 px-2 rounded-full"
+                    onClick={() => {
+                        audioRef.current?.play();
+                        setBlocked(false);
+                    }}
+                >
+                    Enable Sound
+                </Button>
+            )}
+        </div>
     );
 }
 
 export default function CallOverlay() {
   const { 
     callState, callMode, incomingCall, activeCall, activeParticipants,
-    isMuted, isVideoOff, isOnHold, isPartnerOnHold,
+    isMuted, isVideoOff, isOnHold, isPartnerOnHold, isSpeakerOn,
     acceptCall, declineCall, endCall, 
-    toggleMute, toggleVideo, toggleHold,
+    toggleMute, toggleVideo, toggleHold, toggleSpeaker,
     addParticipant, onlineUsers, allUsers,
     peerReady 
   } = useCommunication();
@@ -257,7 +332,8 @@ export default function CallOverlay() {
                         {/* Audio track */}
                         <AudioStream stream={remoteParticipants[0].stream} />
                         
-                        <div className="absolute bottom-6 left-6 p-2 px-4 bg-black/40 backdrop-blur-md rounded-xl border border-white/10 flex items-center gap-2">
+                        <div className="absolute bottom-6 left-6 p-2 px-4 bg-black/40 backdrop-blur-md rounded-xl border border-white/10 flex items-center gap-3">
+                            <AudioVisualizer stream={remoteParticipants[0].stream} />
                             <span className="text-xs font-bold">{remoteParticipants[0].name}</span>
                         </div>
                     </div>
@@ -276,7 +352,8 @@ export default function CallOverlay() {
                             </div>
                         )}
                         <AudioStream stream={p.stream} />
-                        <div className="absolute bottom-4 left-4 p-1 px-3 bg-black/40 backdrop-blur-md rounded-lg border border-white/10">
+                        <div className="absolute bottom-4 left-4 p-1 px-3 bg-black/40 backdrop-blur-md rounded-lg border border-white/10 flex items-center gap-2">
+                            <AudioVisualizer stream={p.stream} />
                             <span className="text-[10px] font-bold">{p.name}</span>
                         </div>
                     </div>
@@ -353,6 +430,18 @@ export default function CallOverlay() {
                         )}
                     >
                         {isOnHold ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
+                    </Button>
+
+                    <Button 
+                        onClick={toggleSpeaker}
+                        variant="ghost" 
+                        size="icon"
+                        className={cn(
+                            "w-12 h-12 rounded-full transition-all duration-300",
+                            isSpeakerOn ? "bg-blue-500 text-white hover:bg-blue-600" : "bg-white/10 hover:bg-white/20 text-white"
+                        )}
+                    >
+                        {isSpeakerOn ? <Volume2 className="w-5 h-5" /> : <Volume1 className="w-5 h-5" />}
                     </Button>
 
                     <div className="w-px h-8 bg-white/10 mx-2" />

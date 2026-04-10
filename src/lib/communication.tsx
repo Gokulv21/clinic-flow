@@ -31,6 +31,8 @@ interface CommunicationContextType {
   toggleMute: () => void;
   toggleVideo: () => void;
   toggleHold: () => void;
+  toggleSpeaker: () => void;
+  isSpeakerOn: boolean;
   refreshUsers: () => Promise<void>;
 }
 
@@ -56,6 +58,8 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
   const currentCallRef = useRef<MediaConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const ringtoneRef = useRef<HTMLAudioElement | null>(null);
+  const dialingToneRef = useRef<HTMLAudioElement | null>(null);
+  const [isSpeakerOn, setIsSpeakerOn] = useState(false);
   const presenceChannelRef = useRef<any>(null);
   const signalingChannelRef = useRef<any>(null);
   const waitingToAnswerRef = useRef(false);
@@ -78,13 +82,19 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
       });
     }
 
+    // Preload dialing tone
+    const dialing = new Audio('https://assets.mixkit.co/active_storage/sfx/1547/1547-preview.mp3');
+    dialing.loop = true;
+    dialingToneRef.current = dialing;
+
     // Preload ringtone
-    const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
+    const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3');
     audio.loop = true;
     ringtoneRef.current = audio;
 
     return () => {
       audio.pause();
+      dialing.pause();
       if (peerRef.current) peerRef.current.destroy();
     };
   }, []);
@@ -486,6 +496,13 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
     setIsOnHold(false);
     setIsPartnerOnHold(false);
     waitingToAnswerRef.current = false;
+    
+    // Stop sounds
+    ringtoneRef.current?.pause();
+    if (ringtoneRef.current) ringtoneRef.current.currentTime = 0;
+    dialingToneRef.current?.pause();
+    if (dialingToneRef.current) dialingToneRef.current.currentTime = 0;
+
     setTimeout(() => setCallState('idle'), 1000);
   };
 
@@ -502,6 +519,9 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
     setActiveParticipants([
         { id: user.id, name: profile.full_name, stream: localStream, isLocal: true }
     ]);
+
+    // Play Dialing Tone
+    dialingToneRef.current?.play().catch(e => console.warn('Dialing tone blocked:', e));
 
     // Send Invite via Global Signal Channel
     await signalingChannelRef.current.send({
@@ -702,6 +722,41 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const toggleSpeaker = async () => {
+    const newState = !isSpeakerOn;
+    setIsSpeakerOn(newState);
+    
+    // On browsers that support setSinkId, we try to find the speaker
+    // Note: This is mostly Chromium only.
+    if ('setSinkId' in HTMLAudioElement.prototype) {
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const audioOutputs = devices.filter(device => device.kind === 'audiooutput');
+            
+            // Try to find something that looks like a speaker
+            const speaker = audioOutputs.find(d => 
+                d.label.toLowerCase().includes('speaker') || 
+                d.label.toLowerCase().includes('loudspeaker')
+            ) || audioOutputs[0];
+
+            if (speaker) {
+                // Apply to all active audio elements in the DOM
+                const audios = document.querySelectorAll('audio, video');
+                audios.forEach((el: any) => {
+                    if (el.setSinkId) {
+                        el.setSinkId(newState ? speaker.deviceId : '').catch(console.error);
+                    }
+                });
+                toast.info(newState ? 'Speakerphone On' : 'Speakerphone Off');
+            }
+        } catch (err) {
+            console.warn('Failed to switch audio output:', err);
+        }
+    } else {
+        toast.info('Speaker toggle not supported on this browser. Use system settings.');
+    }
+  };
+
   return (
     <CommunicationContext.Provider value={{ 
       allUsers,
@@ -715,6 +770,7 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
       isVideoOff,
       isOnHold,
       isPartnerOnHold,
+      isSpeakerOn,
       makeCall, 
       addParticipant,
       acceptCall, 
@@ -723,6 +779,7 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
       toggleMute,
       toggleVideo,
       toggleHold,
+      toggleSpeaker,
       refreshUsers: fetchUsers,
       peerReady
     }}>
