@@ -167,7 +167,7 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
       try {
         const { Peer } = await import('peerjs');
         const newPeer = new Peer(`prescripto-${userId}-${sessionId}`, {
-          debug: 1,
+          debug: 2,
           config: {
             iceServers: [
               { urls: 'stun:stun.l.google.com:19302' },
@@ -175,6 +175,17 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
               { urls: 'stun:stun2.l.google.com:19302' },
               { urls: 'stun:stun3.l.google.com:19302' },
               { urls: 'stun:stun4.l.google.com:19302' },
+              // Metered Open Relay - Free TURN service for testing/community
+              {
+                urls: [
+                  "turn:openrelay.metered.ca:80",
+                  "turn:openrelay.metered.ca:443",
+                  "turn:openrelay.metered.ca:443?transport=tcp"
+                ],
+                username: "openrelayproject",
+                credential: "openrelayproject",
+              },
+              { urls: 'stun:openrelay.metered.ca:80' },
               { urls: 'stun:stun.nextcloud.com:443' },
               { urls: 'stun:stun.voiparound.com:3478' },
               { urls: 'stun:stun.ekiga.net' },
@@ -187,7 +198,8 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
               { urls: 'stun:stun.voipbuster.com' },
               { urls: 'stun:stun.voxgratia.org' },
               { urls: 'stun:stun.stunprotocol.org:3478' }
-            ]
+            ],
+            iceCandidatePoolSize: 10,
           }
         });
 
@@ -223,6 +235,18 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
                 
                 call.on('stream', (remoteStream: MediaStream) => {
                     toast.dismiss('call-connecting');
+                    console.log('[Peer] Remote stream received from:', partnerUserId);
+                    
+                    // Monitor ICE connection state
+                    if (call.peerConnection) {
+                        call.peerConnection.oniceconnectionstatechange = () => {
+                            console.log(`[ICE] Connection state with ${partnerUserId}:`, call.peerConnection.iceConnectionState);
+                            if (call.peerConnection.iceConnectionState === 'failed') {
+                                toast.error('Connection failed. High restrictive firewall detected.');
+                            }
+                        };
+                    }
+
                     const partnerName = allUsers.find(u => u.id === partnerUserId)?.full_name || 'Staff';
                     
                     setActiveParticipants(prev => {
@@ -332,7 +356,15 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
             call.on('stream', (remoteStream) => {
               toast.dismiss('call-connecting');
               setCallState('connected');
-              
+              console.log('[Peer] Outgoing call connected to:', payload.fromUserId || payload.peerId.split('-')[1]);
+
+              // Monitor ICE connection state
+              if (call.peerConnection) {
+                  call.peerConnection.oniceconnectionstatechange = () => {
+                      console.log('[ICE] Outgoing connection state:', call.peerConnection.iceConnectionState);
+                  };
+              }
+
               const partnerId = payload.fromUserId || payload.peerId.split('-')[1];
               const partnerName = payload.partnerName || 'Staff';
 

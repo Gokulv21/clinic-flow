@@ -93,13 +93,18 @@ function ProtectedRoute({ children, allowedRoles }: { children: ReactNode; allow
             <ShieldAlert className="w-8 h-8" />
           </div>
           <div className="space-y-2">
-            <h1 className="text-xl font-bold">Access Pending</h1>
-            <p className="text-muted-foreground text-sm">Your account is created, but no role has been assigned yet. Please contact the clinic administrator to activate your access.</p>
+            <h1 className="text-xl font-bold">Access Verification</h1>
+            <p className="text-muted-foreground text-sm">We're verifying your account roles. If this takes longer than expected, it might be a temporary connection issue.</p>
           </div>
-          <Button variant="outline" className="w-full font-bold" onClick={async () => {
-            await signOut();
-            navigate('/login');
-          }}>Back to Login</Button>
+          <div className="flex flex-col gap-2">
+            <Button onClick={refresh} className="w-full gap-2 font-bold">
+              <RefreshCw className="w-4 h-4" /> Retry Verification
+            </Button>
+            <Button variant="outline" className="w-full text-xs" onClick={async () => {
+              await signOut();
+              navigate('/login');
+            }}>Back to Login</Button>
+          </div>
         </div>
       </div>
     );

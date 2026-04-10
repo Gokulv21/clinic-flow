@@ -44,7 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     
-    console.log('[Auth] Fetching user data for:', userId);
+    console.log(`[Auth] Fetching user data for: ${userId} (Force: ${force})`);
     isFetching.current = true;
     setLoading(true);
     setError(null);
@@ -54,10 +54,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         supabase.from('profiles').select('full_name').eq('user_id', userId).maybeSingle(),
       ]);
 
-      if (rolesRes.error) throw rolesRes.error;
-      if (profileRes.error) throw profileRes.error;
+      if (rolesRes.error) {
+        console.error('[Auth] Roles Fetch Error:', rolesRes.error);
+        throw rolesRes.error;
+      }
+      if (profileRes.error) {
+        console.error('[Auth] Profile Fetch Error:', profileRes.error);
+        throw profileRes.error;
+      }
 
       const newRoles = (rolesRes.data || []).map(r => r.role as AppRole);
+      console.log('[Auth] Roles loaded:', newRoles);
+      
       setRoles(newRoles);
       setProfile(profileRes.data || null);
       
@@ -66,12 +74,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sessionStorage.setItem('user_profile', JSON.stringify(profileRes.data));
       
       lastFetchedId.current = userId;
-      setError(null); // Clear errors if we successfully fetched
+      setError(null);
     } catch (err: any) {
-      console.error('[Auth] Error fetching user data (might be offline):', err);
+      console.error('[Auth] Error fetching user data:', err);
       // If we have cached roles, don't set a global error that blocks the whole app
       if (roles.length === 0) {
-        setError(err.message || 'Failed to connect to security service');
+        const isNetworkError = err.message?.includes('fetch') || err.message?.includes('Network') || !navigator.onLine;
+        setError(isNetworkError ? 'Network Connection Issue (Database Blocked?)' : err.message || 'Failed to connect to security service');
       }
     } finally {
       isFetching.current = false;
@@ -90,35 +99,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let mounted = true;
 
     const initAuth = async () => {
-      // Safety timeout: ensure loading screen clears within 5 seconds regardless of network
+      console.log('[Auth] Initializing Auth module...');
+      
       const timeoutId = setTimeout(() => {
         if (mounted) {
-          console.warn('[Auth] Hydration timeout reached. Forcing loading false.');
+          console.warn('[Auth] Hydration timeout! Forcing loading false for usability.');
           setLoading(false);
         }
-      }, 5000);
+      }, 8000); // 8 second safety net for slow machine/network
 
       try {
-        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        const { data: { session: initialSession }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error('[Auth] Session retrieval error:', sessionError);
+        }
+
         if (!mounted) return;
 
         if (initialSession) {
+          console.log('[Auth] Found existing session for:', initialSession.user.id);
           setSession(initialSession);
           setUser(initialSession.user);
           
           // OFFLINE-FIRST: Unblock the UI immediately if we have cached roles
           if (roles.length > 0) {
+            console.log('[Auth] Immediate UI unblock with cached roles');
             setLoading(false);
           }
           
           await fetchUserData(initialSession.user.id);
         } else {
+          console.log('[Auth] No session found.');
           setLoading(false);
         }
       } catch (err) {
-        console.error('[Auth] Init error:', err);
-        // Even if session lookup fails (e.g. offline), let the app mount
-        // ProtectedRoute will handle !user by redirecting to login later
+        console.error('[Auth] Initialization crash:', err);
         setLoading(false);
       } finally {
         if (mounted) clearTimeout(timeoutId);
@@ -126,19 +142,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
         if (!mounted) return;
-        console.log('[Auth] State change:', event);
+        console.log('[Auth] Supabase Event:', event);
         
         setSession(currentSession);
         const currentUser = currentSession?.user ?? null;
         setUser(currentUser);
         
         if (currentUser) {
-          fetchUserData(currentUser.id);
+          if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+            fetchUserData(currentUser.id);
+          }
         } else {
-          setRoles([]);
-          setProfile(null);
-          setError(null);
-          lastFetchedId.current = null;
+          // If explicitly signed out, clear everything
+          if (event === 'SIGNED_OUT') {
+            setRoles([]);
+            setProfile(null);
+            setError(null);
+            lastFetchedId.current = null;
+          }
           setLoading(false);
         }
       });

@@ -47,7 +47,12 @@ export default function PatientList() {
         query = query.or(`name.ilike.%${search}%,phone.ilike.%${search}%,registration_id.ilike.%${search}%`);
       }
     }
-    const { data, count } = await query;
+    const { data, count, error } = await query;
+    if (error) {
+      console.error('[PatientDirectory] Fetch Error:', error);
+      toast.error('Failed to load patient directory. Check your connection.');
+      return;
+    }
     setPatients(data || []);
     setTotalCount(count || 0);
   };
