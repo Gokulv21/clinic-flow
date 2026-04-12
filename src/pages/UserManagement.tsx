@@ -50,14 +50,14 @@ export default function UserManagement() {
       // Base the list on profiles to show everyone, even if they lack a role
       const merged = (profilesData || []).map(p => {
         const r = rolesData?.find(role => role.user_id === p.user_id);
-        
-        const displayName = (p?.full_name && p.full_name !== 'Staff Member') 
-          ? p.full_name 
+
+        const displayName = (p?.full_name && p.full_name !== 'Staff Member')
+          ? p.full_name
           : (p?.email || 'Staff Member');
 
         return {
           id: p.user_id,
-          registration_id: r?.id || 'NO-ROLE', 
+          registration_id: r?.id || 'NO-ROLE',
           full_name: displayName,
           email: p?.email || 'No email synced',
           role: r?.role || null // Null means pending role assignment
@@ -108,8 +108,8 @@ export default function UserManagement() {
         id: data.user.id
       });
       if (profileError) {
-          console.error("Profile Error:", profileError);
-          // Don't throw yet, verify if role assigned
+        console.error("Profile Error:", profileError);
+        // Don't throw yet, verify if role assigned
       }
 
       toast.success(`User ${fullName} created with role: ${role}`);
@@ -118,12 +118,12 @@ export default function UserManagement() {
       setFullName('');
       fetchUsers();
     } catch (err: any) {
-        if (err.message?.includes('already registered')) {
-            toast.warning("This user already exists in Auth. Check the list below to 'Activate' them if they are missing a role.");
-            fetchUsers();
-        } else {
-            toast.error(err.message);
-        }
+      if (err.message?.includes('already registered')) {
+        toast.warning("This user already exists in Auth. Check the list below to 'Activate' them if they are missing a role.");
+        fetchUsers();
+      } else {
+        toast.error(err.message);
+      }
     } finally {
       setCreating(false);
     }
@@ -233,13 +233,13 @@ export default function UserManagement() {
                   {u.role ? (
                     <Badge variant="outline" className={roleBadgeClass(u.role)}>{u.role}</Badge>
                   ) : (
-                    <Button 
-                        size="sm" 
-                        variant="destructive" 
-                        className="animate-pulse font-bold h-8"
-                        onClick={() => assignMissingRole(u.id, u.full_name)}
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="animate-pulse font-bold h-8"
+                      onClick={() => assignMissingRole(u.id, u.full_name)}
                     >
-                        Activate Account
+                      Activate Account
                     </Button>
                   )}
                 </div>
