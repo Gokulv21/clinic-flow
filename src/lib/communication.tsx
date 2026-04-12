@@ -1,22 +1,29 @@
 import { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './auth';
-import type { Peer, MediaConnection } from 'peerjs';
+import { 
+  Room, 
+  RoomEvent, 
+  VideoPresets, 
+  Track, 
+  RemoteParticipant, 
+  RemoteTrack, 
+  RemoteTrackPublication,
+  LocalVideoTrack,
+  LocalAudioTrack,
+  ConnectionState
+} from 'livekit-client';
 import { toast } from 'sonner';
-
-// We'll import Peer dynamically to avoid SSR issues if any, 
-// though this is a SPA.
-let PeerClass: any;
 
 type CallState = 'idle' | 'dialing' | 'ringing' | 'connecting' | 'connected' | 'ended';
 
 interface CommunicationContextType {
   allUsers: Array<{ id: string, full_name: string, role: string }>;
-  peerReady: boolean;
+  roomReady: boolean;
   onlineUsers: Record<string, { full_name: string, role: string, last_seen: string }>;
   callState: CallState;
   callMode: 'audio' | 'video';
-  incomingCall: { from: string, fromName: string, peerId: string, mode: 'audio' | 'video' } | null;
+  incomingCall: { from: string, fromName: string, roomName: string, mode: 'audio' | 'video' } | null;
   activeCall: { partnerId: string, partnerName: string, stream: MediaStream | null, localStream: MediaStream | null } | null;
   activeParticipants: Array<{ id: string, name: string, stream: MediaStream | null, isLocal?: boolean, videoOff?: boolean }>;
   isMuted: boolean;
@@ -40,75 +47,53 @@ const CommunicationContext = createContext<CommunicationContextType | undefined>
 
 export function CommunicationProvider({ children }: { children: ReactNode }) {
   const { user, profile, roles } = useAuth();
-  const [peer, setPeer] = useState<Peer | null>(null);
+  const [room, setRoom] = useState<Room | null>(null);
   const [allUsers, setAllUsers] = useState<Array<{ id: string, full_name: string, role: string }>>([]);
   const [onlineUsers, setOnlineUsers] = useState<Record<string, any>>({});
   const [callState, setCallState] = useState<CallState>('idle');
   const [callMode, setCallMode] = useState<'audio' | 'video'>('audio');
-  const [incomingCall, setIncomingCall] = useState<{ from: string, fromName: string, peerId: string, mode: 'audio' | 'video' } | null>(null);
+  const [incomingCall, setIncomingCall] = useState<{ from: string, fromName: string, roomName: string, mode: 'audio' | 'video' } | null>(null);
   const [activeCall, setActiveCall] = useState<{ partnerId: string, partnerName: string, stream: MediaStream | null, localStream: MediaStream | null } | null>(null);
   const [activeParticipants, setActiveParticipants] = useState<Array<{ id: string, name: string, stream: MediaStream | null, isLocal?: boolean, videoOff?: boolean }>>([]);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [isOnHold, setIsOnHold] = useState(false);
   const [isPartnerOnHold, setIsPartnerOnHold] = useState(false);
-  
-  const peerRef = useRef<Peer | null>(null);
-  const callsRef = useRef<Map<string, MediaConnection>>(new Map());
-  const currentCallRef = useRef<MediaConnection | null>(null);
-  const localStreamRef = useRef<MediaStream | null>(null);
+  const [isSpeakerOn, setIsSpeakerOn] = useState(false);
+
+  const roomRef = useRef<Room | null>(null);
+  const currentRoomNameRef = useRef<string | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const ringtoneRef = useRef<HTMLAudioElement | null>(null);
   const dialingToneRef = useRef<HTMLAudioElement | null>(null);
-  const [isSpeakerOn, setIsSpeakerOn] = useState(false);
   const presenceChannelRef = useRef<any>(null);
-  const signalingChannelRef = useRef<any>(null);
-  const waitingToAnswerRef = useRef(false);
-  const incomingCallRef = useRef<any>(null);
-  const callStateRef = useRef<string>('idle');
   const [sessionId] = useState(() => Math.random().toString(36).substring(7));
 
+  // Initialize Audio Assets
   useEffect(() => {
-    incomingCallRef.current = incomingCall;
-  }, [incomingCall]);
-
-  useEffect(() => {
-    callStateRef.current = callState;
-  }, [callState]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      import('peerjs').then(({ Peer }) => {
-        PeerClass = Peer;
-      });
-    }
-
-    // Preload dialing tone
     const dialing = new Audio('https://assets.mixkit.co/active_storage/sfx/1547/1547-preview.mp3');
     dialing.loop = true;
     dialingToneRef.current = dialing;
 
-    // Preload ringtone
-    const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3');
-    audio.loop = true;
-    ringtoneRef.current = audio;
+    const ringing = new Audio('https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3');
+    ringing.loop = true;
+    ringtoneRef.current = ringing;
 
     return () => {
-      audio.pause();
       dialing.pause();
-      if (peerRef.current) peerRef.current.destroy();
+      ringing.pause();
+      if (roomRef.current) roomRef.current.disconnect();
     };
   }, []);
 
+  // Fetch Users for Directory
   const fetchUsers = async () => {
     if (!user) return;
     try {
-      const [{ data: profData, error: profError }, { data: rolesData, error: rolesError }] = await Promise.all([
+      const [{ data: profData }, { data: rolesData }] = await Promise.all([
         supabase.from('profiles').select('*'),
         supabase.from('user_roles').select('*')
       ]);
-      
-      if (profError) throw profError;
-      if (rolesError) throw rolesError;
       
       if (profData) {
         setAllUsers(profData.map((p: any) => {
@@ -121,372 +106,165 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
         }));
       }
     } catch (err) {
-      console.error('[Comm] Error fetching staff directory:', err);
+      console.error('[LiveKit] Error fetching staff directory:', err);
     }
   };
 
-  // --- User Profiles Fetching ---
-  useEffect(() => {
-    fetchUsers();
-  }, [user?.id]);
+  useEffect(() => { fetchUsers(); }, [user?.id]);
 
-  const userId = user?.id;
-  const profileName = profile?.full_name;
-  const rolesString = roles.join(',');
-
-  const profileRef = useRef(profileName);
-  const rolesRef = useRef(rolesString);
-  useEffect(() => { profileRef.current = profileName; }, [profileName]);
-  useEffect(() => { rolesRef.current = rolesString; }, [rolesString]);
-
-  const [peerReady, setPeerReady] = useState(false);
-
-  const getMediaStream = async (mode: 'audio' | 'video'): Promise<MediaStream> => {
-    const constraints: any = [
-      {
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }
+  // --- LiveKit Room Handlers ---
+  const setupRoom = (mode: 'audio' | 'video') => {
+    const newRoom = new Room({
+      adaptiveStream: true,
+      dynacast: true,
+      videoCaptureDefaults: {
+        resolution: VideoPresets.h720.resolution,
       },
-      {
-        audio: { echoCancellation: true, noiseSuppression: true },
-        video: true
-      },
-      { audio: true, video: false }
-    ];
-
-    for (const constraint of constraints) {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia(constraint);
-        // If we only wanted audio, disable video track but keep it in the stream
-        if (mode === 'audio') {
-            stream.getVideoTracks().forEach(t => t.enabled = false);
-        }
-        return stream;
-      } catch (err) {
-        console.warn('[Media] Constraint failed, trying next...');
+      publishDefaults: {
+        simulcast: true, // Crucial for low bandwidth networks (India 4G)
       }
-    }
-    throw new Error('No media devices available');
-  };
-
-  // --- PeerJS Effect ---
-  useEffect(() => {
-    if (!userId) return;
-
-    const initPeer = async () => {
-      try {
-        const { Peer } = await import('peerjs');
-        const newPeer = new Peer(`prescripto-${userId}-${sessionId}`, {
-          debug: 2,
-          config: {
-            iceServers: [
-              { urls: 'stun:stun.l.google.com:19302' },
-              { urls: 'stun:stun1.l.google.com:19302' },
-              { urls: 'stun:stun2.l.google.com:19302' },
-              { urls: 'stun:stun3.l.google.com:19302' },
-              { urls: 'stun:stun4.l.google.com:19302' },
-              // Metered Open Relay - Free TURN service for testing/community
-              {
-                urls: [
-                  "turn:openrelay.metered.ca:80",
-                  "turn:openrelay.metered.ca:443",
-                  "turn:openrelay.metered.ca:443?transport=tcp"
-                ],
-                username: "openrelayproject",
-                credential: "openrelayproject",
-              },
-              { urls: 'stun:openrelay.metered.ca:80' },
-              { urls: 'stun:stun.nextcloud.com:443' },
-              { urls: 'stun:stun.voiparound.com:3478' },
-              { urls: 'stun:stun.ekiga.net' },
-              { urls: 'stun:stun.ideasip.com' },
-              { urls: 'stun:stun.iptel.org' },
-              { urls: 'stun:stun.rixtelecom.se' },
-              { urls: 'stun:stun.schlund.de' },
-              { urls: 'stun:stunserver.org' },
-              { urls: 'stun:stun.softjoys.com' },
-              { urls: 'stun:stun.voipbuster.com' },
-              { urls: 'stun:stun.voxgratia.org' },
-              { urls: 'stun:stun.stunprotocol.org:3478' }
-            ],
-            iceCandidatePoolSize: 10,
-          }
-        });
-
-        newPeer.on('open', (id: string) => {
-          setPeer(newPeer);
-          peerRef.current = newPeer;
-          setPeerReady(true);
-        });
-
-        newPeer.on('disconnected', () => {
-          newPeer.reconnect();
-        });
-
-        newPeer.on('call', async (call: any) => {
-          const partnerUserId = call.peer.split('-')[1]; // prescripto-userId-sessionId
-          callsRef.current.set(partnerUserId, call);
-          
-          if (waitingToAnswerRef.current || callStateRef.current === 'connected') {
-             try {
-                let stream = localStreamRef.current;
-                if (!stream) {
-                    const constraints = {
-                        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-                        video: (incomingCallRef.current?.mode === 'video' || callMode === 'video') ? { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } : false
-                    };
-                    stream = await navigator.mediaDevices.getUserMedia(constraints);
-                    localStreamRef.current = stream;
-                }
-                
-                call.answer(stream);
-                setCallState('connected');
-                waitingToAnswerRef.current = false;
-                
-                call.on('stream', (remoteStream: MediaStream) => {
-                    toast.dismiss('call-connecting');
-                    console.log('[Peer] Remote stream received from:', partnerUserId);
-                    
-                    // Monitor ICE connection state
-                    if (call.peerConnection) {
-                        call.peerConnection.oniceconnectionstatechange = () => {
-                            console.log(`[ICE] Connection state with ${partnerUserId}:`, call.peerConnection.iceConnectionState);
-                            if (call.peerConnection.iceConnectionState === 'failed') {
-                                toast.error('Connection failed. High restrictive firewall detected.');
-                            }
-                        };
-                    }
-
-                    const partnerName = allUsers.find(u => u.id === partnerUserId)?.full_name || 'Staff';
-                    
-                    setActiveParticipants(prev => {
-                        const exists = prev.find(p => p.id === partnerUserId);
-                        if (exists) return prev.map(p => p.id === partnerUserId ? { ...p, stream: remoteStream } : p);
-                        return [...prev, { id: partnerUserId, name: partnerName, stream: remoteStream }];
-                    });
-
-                    setActiveCall(prev => {
-                        if (!prev || prev.partnerId === partnerUserId) {
-                            return { partnerId: partnerUserId, partnerName, stream: remoteStream, localStream: stream };
-                        }
-                        return prev;
-                    });
-                });
-
-                call.on('close', () => {
-                   handleParticipantLeave(partnerUserId);
-                });
-                
-                call.on('error', (e: any) => {
-                    console.error('[Peer] Call error for:', partnerUserId, e);
-                    handleParticipantLeave(partnerUserId);
-                });
-             } catch (err) {
-                toast.error('Media access failed.');
-                cleanupCall();
-             }
-          }
-        });
-
-        newPeer.on('error', (err: any) => {
-          console.error('[Peer] Global Error:', err.type, err);
-        });
-
-      } catch (err) {
-        console.error('[Peer] Failed to load PeerJS:', err);
-      }
-    };
-
-    initPeer();
-
-    return () => {
-      if (peerRef.current) {
-        peerRef.current.destroy();
-        peerRef.current = null;
-        setPeerReady(false);
-      }
-    };
-  }, [userId]);
-
-  // --- Supabase Realtime (Presence & Signaling) Effect ---
-  useEffect(() => {
-    if (!userId) return;
-
-    // Use a Unified global channel until clinic isolation is supported in DB schema
-    const channelName = `clinic-communication`;
-    console.log('[Comm] Connecting to Unified Signaling:', channelName);
-
-    const commChannel = supabase.channel(channelName, {
-      config: { presence: { key: `${userId}-${sessionId}` } }
     });
- 
-    commChannel
+
+    newRoom.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, publication: RemoteTrackPublication, participant: RemoteParticipant) => {
+        console.log('[LiveKit] Track Subscribed:', track.kind, participant.identity);
+        updateParticipantsFromRoom(newRoom);
+    });
+
+    newRoom.on(RoomEvent.TrackUnsubscribed, () => updateParticipantsFromRoom(newRoom));
+    newRoom.on(RoomEvent.ParticipantConnected, () => updateParticipantsFromRoom(newRoom));
+    newRoom.on(RoomEvent.ParticipantDisconnected, (participant) => {
+        handleParticipantLeave(participant.identity);
+    });
+
+    newRoom.on(RoomEvent.ConnectionStateChanged, (state) => {
+        console.log('[LiveKit] Connection State:', state);
+        if (state === ConnectionState.Disconnected) {
+            cleanupCall();
+        } else if (state === ConnectionState.Connected) {
+            setCallState('connected');
+            dialingToneRef.current?.pause();
+            toast.dismiss('call-connecting');
+        } else if (state === ConnectionState.Reconnecting) {
+            toast.loading('Reconnecting to call...', { id: 'call-reconnecting' });
+        }
+    });
+
+    newRoom.on(RoomEvent.TrackMuted, () => updateParticipantsFromRoom(newRoom));
+    newRoom.on(RoomEvent.TrackUnmuted, () => updateParticipantsFromRoom(newRoom));
+
+    roomRef.current = newRoom;
+    setRoom(newRoom);
+    return newRoom;
+  };
+
+  const updateParticipantsFromRoom = (r: Room) => {
+    const participants: any[] = [];
+    
+    // Add Local
+    if (r.localParticipant) {
+        const stream = new MediaStream();
+        r.localParticipant.getTrackPublications().forEach(pub => {
+            if (pub.track && pub.track.mediaStreamTrack) stream.addTrack(pub.track.mediaStreamTrack);
+        });
+        participants.push({
+            id: r.localParticipant.identity,
+            name: r.localParticipant.name || 'Me',
+            stream: stream,
+            isLocal: true,
+            videoOff: !r.localParticipant.isCameraEnabled
+        });
+    }
+
+    // Add Remotes
+    r.remoteParticipants.forEach(p => {
+        const stream = new MediaStream();
+        p.getTrackPublications().forEach(pub => {
+            if (pub.track && pub.track.mediaStreamTrack) {
+                stream.addTrack(pub.track.mediaStreamTrack);
+            }
+        });
+
+        participants.push({
+            id: p.identity,
+            name: p.name || 'Remote',
+            stream: stream,
+            videoOff: !p.isCameraEnabled
+        });
+    });
+
+    setActiveParticipants(participants);
+    if (participants.length > 1) {
+        const remote = participants.find(p => !p.isLocal);
+        setActiveCall({
+            partnerId: remote.id,
+            partnerName: remote.name,
+            stream: remote.stream,
+            localStream: participants.find(p => p.isLocal)?.stream || null
+        });
+    }
+  };
+
+  // --- Realtime Coordination (Supabase for Ringing only) ---
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase.channel('clinic-communication', {
+      config: { presence: { key: `${user.id}-${sessionId}` } }
+    });
+
+    channel
       .on('presence', { event: 'sync' }, () => {
-        const state = commChannel.presenceState();
+        const state = channel.presenceState();
         const formatted: Record<string, any> = {};
         Object.keys(state).forEach(key => {
-          const presenceList = state[key] as any[];
-          if (presenceList.length > 0) {
-              const p = presenceList[0];
-              if (p.id) formatted[p.id] = p;
-          }
+          const p = (state[key] as any[])[0];
+          if (p?.id) formatted[p.id] = p;
         });
         setOnlineUsers(formatted);
       })
       .on('broadcast', { event: 'call-invite' }, ({ payload }) => {
-        if (payload.toUserId !== userId) return; 
-        if (callStateRef.current === 'idle') {
+        if (payload.toUserId !== user.id) return;
+        if (callState === 'idle') {
           setIncomingCall({ 
             from: payload.fromUserId, 
             fromName: payload.fromName, 
-            peerId: payload.peerId,
+            roomName: payload.roomName,
             mode: payload.mode || 'audio'
           });
           setCallMode(payload.mode || 'audio');
           setCallState('ringing');
-          ringtoneRef.current?.play().catch(e => console.warn('Autoplay blocked:', e));
-        }
-      })
-      .on('broadcast', { event: 'call-accept' }, async ({ payload }) => {
-        if (payload.toUserId !== userId) return; 
-        
-        if ((callStateRef.current === 'dialing' || callStateRef.current === 'connected') && peerRef.current) {
-          try {
-            let stream = localStreamRef.current;
-            if (!stream) {
-                stream = await getMediaStream(payload.mode || 'video');
-                localStreamRef.current = stream;
-            }
-            
-            const call = peerRef.current.call(payload.peerId, stream);
-            callsRef.current.set(payload.fromUserId || payload.peerId.split('-')[1], call);
-            
-            if (callStateRef.current === 'dialing') setCallState('connecting');
-            
-            call.on('stream', (remoteStream) => {
-              toast.dismiss('call-connecting');
-              setCallState('connected');
-              console.log('[Peer] Outgoing call connected to:', payload.fromUserId || payload.peerId.split('-')[1]);
-
-              // Monitor ICE connection state
-              if (call.peerConnection) {
-                  call.peerConnection.oniceconnectionstatechange = () => {
-                      console.log('[ICE] Outgoing connection state:', call.peerConnection.iceConnectionState);
-                  };
-              }
-
-              const partnerId = payload.fromUserId || payload.peerId.split('-')[1];
-              const partnerName = payload.partnerName || 'Staff';
-
-              setActiveParticipants(prev => {
-                  const exists = prev.find(p => p.id === partnerId);
-                  if (exists) return prev.map(p => p.id === partnerId ? { ...p, stream: remoteStream } : p);
-                  return [...prev, { id: partnerId, name: partnerName, stream: remoteStream }];
-              });
-
-              setActiveCall(prev => {
-                  if (!prev || prev.partnerId === partnerId) {
-                      return { partnerId: partnerId, partnerName, stream: remoteStream, localStream: stream };
-                  }
-                  return prev;
-              });
-            });
-            call.on('error', (e) => console.error('[Peer] Call Stream Error:', e));
-            call.on('close', () => handleParticipantLeave(payload.fromUserId || payload.peerId.split('-')[1]));
-          } catch (err) {
-            toast.error('Could not start media.');
-            toast.dismiss('call-connecting');
-            cleanupCall();
-          }
+          ringtoneRef.current?.play().catch(console.warn);
         }
       })
       .on('broadcast', { event: 'call-decline' }, ({ payload }) => {
-        if (payload.toUserId !== userId) return;
-        setCallState('ended');
-        setTimeout(() => setCallState('idle'), 2000);
-      })
-      .on('broadcast', { event: 'call-end' }, ({ payload }) => {
-        if (payload.toUserId !== userId) return;
+        if (payload.toUserId !== user.id) return;
         cleanupCall();
       })
-      .on('broadcast', { event: 'call-hold' }, ({ payload }) => {
-        if (payload.toUserId !== userId) return;
-        setIsPartnerOnHold(true);
-      })
-      .on('broadcast', { event: 'call-resume' }, ({ payload }) => {
-        if (payload.toUserId !== userId) return;
-        setIsPartnerOnHold(false);
-      })
-      .on('broadcast', { event: 'call-video-state' }, ({ payload }) => {
-        if (payload.toUserId !== userId) return;
-        setActiveParticipants(prev => prev.map(p => p.id === payload.fromUserId ? { ...p, videoOff: payload.videoOff } : p));
-        if (!payload.videoOff) setCallMode('video');
+      .on('broadcast', { event: 'call-end' }, ({ payload }) => {
+        if (payload.toUserId !== user.id) return;
+        cleanupCall();
       })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
-          await commChannel.track({
-            id: userId,
-            sessionId: sessionId,
-            full_name: profileRef.current || 'Staff Member',
-            role: rolesRef.current?.split(',')[0] || 'staff',
+          await channel.track({
+            id: user.id,
+            full_name: profile?.full_name || 'Staff Member',
+            role: roles[0] || 'staff',
             last_seen: new Date().toISOString()
           });
         }
       });
- 
-    signalingChannelRef.current = commChannel;
-    presenceChannelRef.current = commChannel;
 
-    const heartbeat = setInterval(() => {
-      if (commChannel.state === 'joined') {
-        commChannel.send({
-          type: 'broadcast',
-          event: 'heartbeat',
-          payload: { userId, timestamp: new Date().toISOString() }
-        });
-      } else if (commChannel.state === 'closed' || commChannel.state === 'errored') {
-        commChannel.subscribe();
-      }
-    }, 45000);
-
-    return () => {
-      console.log('[Comm] Disconnecting comm channel for user:', userId);
-      clearInterval(heartbeat);
-      commChannel.unsubscribe();
-    };
-  }, [userId]);
-
-  const handleParticipantLeave = (pId: string) => {
-    callsRef.current.delete(pId);
-    setActiveParticipants(prev => prev.filter(p => p.id !== pId));
-    if (activeCall?.partnerId === pId) {
-        // If the main partner left, end the whole thing for now, or pick next
-        if (activeParticipants.length <= 2) { // Just local and leaving partner
-            cleanupCall();
-        } else {
-            setActiveParticipants(prev => {
-                const remaining = prev.filter(p => p.id !== pId && !p.isLocal);
-                if (remaining.length > 0) {
-                    setActiveCall({
-                        partnerId: remaining[0].id,
-                        partnerName: remaining[0].name,
-                        stream: remaining[0].stream,
-                        localStream: localStreamRef.current
-                    });
-                }
-                return prev.filter(p => p.id !== pId);
-            });
-        }
-    }
-  };
+    presenceChannelRef.current = channel;
+    return () => { channel.unsubscribe(); };
+  }, [user?.id, callState]);
 
   const cleanupCall = () => {
-    callsRef.current.forEach(call => call.close());
-    callsRef.current.clear();
-    localStreamRef.current?.getTracks().forEach(track => track.stop());
-    localStreamRef.current = null;
-    ringtoneRef.current?.pause();
-    if (ringtoneRef.current) ringtoneRef.current.currentTime = 0;
+    if (roomRef.current) {
+        roomRef.current.disconnect();
+        roomRef.current = null;
+    }
+    setRoom(null);
     setCallState('ended');
     setActiveCall(null);
     setActiveParticipants([]);
@@ -495,293 +273,201 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
     setIsVideoOff(false);
     setIsOnHold(false);
     setIsPartnerOnHold(false);
-    waitingToAnswerRef.current = false;
-    
-    // Stop sounds
     ringtoneRef.current?.pause();
-    if (ringtoneRef.current) ringtoneRef.current.currentTime = 0;
     dialingToneRef.current?.pause();
-    if (dialingToneRef.current) dialingToneRef.current.currentTime = 0;
-
-    setTimeout(() => setCallState('idle'), 1000);
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    setTimeout(() => setCallState('idle'), 1500);
   };
+
+  const handleParticipantLeave = (id: string) => {
+    setActiveParticipants(prev => prev.filter(p => p.id !== id));
+    if (activeParticipants.length <= 2) cleanupCall();
+  };
+
+  // --- Token Fetching from Edge Function ---
+  const getLiveKitToken = async (roomName: string, identity: string, name: string) => {
+    const { data, error } = await supabase.functions.invoke('get-livekit-token', {
+      body: { roomName, identity, name }
+    });
+    if (error) throw error;
+    return data.token;
+  };
+
+  // --- Public API ---
 
   const makeCall = async (targetUserId: string, targetName: string, mode: 'audio' | 'video' = 'audio') => {
-    if (!peerRef.current || !user || !profile || !signalingChannelRef.current) return;
-
+    if (!user || !profile) return;
+    
     setCallMode(mode);
     setCallState('dialing');
-    
-    const localStream = await getMediaStream(mode);
-    localStreamRef.current = localStream;
-    
-    setActiveCall({ partnerId: targetUserId, partnerName: targetName, stream: null, localStream });
-    setActiveParticipants([
-        { id: user.id, name: profile.full_name, stream: localStream, isLocal: true }
-    ]);
+    dialingToneRef.current?.play().catch(console.warn);
 
-    // Play Dialing Tone
-    dialingToneRef.current?.play().catch(e => console.warn('Dialing tone blocked:', e));
+    const roomName = `room-${user.id}-${targetUserId}-${Date.now()}`;
+    currentRoomNameRef.current = roomName;
 
-    // Send Invite via Global Signal Channel
-    await signalingChannelRef.current.send({
+    // Set auto-timeout (30s)
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+        if (callState === 'dialing' || callState === 'ringing') {
+            console.log('[LiveKit] Call timed out - no response');
+            toast.error('No response from recipient');
+            cleanupCall();
+        }
+    }, 30000);
+    
+    // Broadcast invite
+    await presenceChannelRef.current.send({
       type: 'broadcast',
       event: 'call-invite',
-      payload: {
-        toUserId: targetUserId,
-        fromUserId: user.id,
-        fromName: profile.full_name,
-        peerId: peerRef.current.id,
-        mode: mode
-      }
-    });
-  };
-
-  const addParticipant = async (targetUserId: string, targetName: string) => {
-    if (!peerRef.current || !user || !profile || !signalingChannelRef.current || !localStreamRef.current) return;
-
-    toast.info(`Inviting ${targetName} to conference...`);
-
-    // Send Invite to the new person
-    await signalingChannelRef.current.send({
-      type: 'broadcast',
-      event: 'call-invite',
-      payload: {
-        toUserId: targetUserId,
-        fromUserId: user.id,
-        fromName: profile.full_name,
-        peerId: peerRef.current.id,
-        mode: callMode,
-        isConference: true
-      }
+      payload: { toUserId: targetUserId, fromUserId: user.id, fromName: profile.full_name, roomName, mode }
     });
 
-    // Also tell existing participants that a new person is joining?
-    // In Mesh, everyone needs to call everyone. But for now, we'll simplify: 
-    // The "host" (person who adds) acts as the bridge if needed, but PeerJS Mesh is better.
-    // To keep it simple: the new person will receive invites from the host.
+    // Connect to SFU
+    try {
+        const token = await getLiveKitToken(roomName, user.id, profile.full_name);
+        const r = setupRoom(mode);
+        // LiveKit URL (Server hosted via Docker)
+        // In local testing, use ws://localhost:7880
+        // In production, use wss://livekit.yourdomain.com
+        const liveKitUrl = import.meta.env.VITE_LIVEKIT_URL || 'ws://localhost:7880';
+        await r.connect(liveKitUrl, token);
+        
+        // Publish Tracks
+        await r.localParticipant.enableCameraAndMicrophone();
+        if (mode === 'audio') await r.localParticipant.setCameraEnabled(false);
+        
+        updateParticipantsFromRoom(r);
+    } catch (err) {
+        console.error('[LiveKit] Connection failed:', err);
+        toast.error('Failed to establish media link');
+        cleanupCall();
+    }
   };
 
   const acceptCall = async () => {
-    if (!incomingCallRef.current || !signalingChannelRef.current) {
-        console.error('[Signal] Cannot accept: No incoming call or signaling channel');
-        return;
-    }
+    if (!incomingCall || !user || !profile) return;
 
-    console.log('[Signal] User clicked ACCEPT. Initiating media bridge...');
-    toast.loading('Connecting secure media...', { id: 'call-connecting' });
-    
     ringtoneRef.current?.pause();
-    if (ringtoneRef.current) ringtoneRef.current.currentTime = 0;
-    
-    // Set flag so that when the PeerJS call arrives, we answer it immediately
-    waitingToAnswerRef.current = true;
-    
-    // Initialize activeCall for the receiver so the UI can transition
-    setActiveCall({
-        partnerId: incomingCallRef.current.from,
-        partnerName: incomingCallRef.current.fromName,
-        stream: null,
-        localStream: null
-    });
-    
-    setActiveParticipants([
-        { id: userId!, name: profile?.full_name || 'Me', stream: null, isLocal: true },
-        { id: incomingCallRef.current.from, name: incomingCallRef.current.fromName, stream: null }
-    ]);
+    setCallState('connecting');
+    toast.loading('Connecting secure consultation...', { id: 'call-connecting' });
 
-    // Send accept signal to the dialer via Global Signaling (Triple-Send for reliability)
-    const payload = { 
-        toUserId: incomingCallRef.current.from,
-        fromUserId: userId,
-        peerId: peerRef.current?.id, // Our specific tab's Peer ID
-        partnerName: profile?.full_name || 'Staff',
-        mode: incomingCallRef.current.mode
-    };
-    
-    console.log('[Signal] Initiating Triple-Send Handshake for:', payload.toUserId);
-
-    const sendSignal = () => signalingChannelRef.current.send({
-        type: 'broadcast',
-        event: 'call-accept',
-        payload
-    });
-
-    sendSignal(); // Instant
-    setTimeout(sendSignal, 300); // 300ms delay
-    setTimeout(sendSignal, 800); // 800ms delay
-
-    setCallState('connecting'); 
-
-    // HANDSHAKE TIMEOUT supervisor
-    setTimeout(() => {
-        if (callStateRef.current === 'connecting' && !activeCall?.stream) {
-           console.warn('[Signal] Handshake threshold reached. Resetting...');
-           toast.error('Connection timed out. Partner may have disconnected.', { id: 'call-connecting' });
-           cleanupCall();
-        }
-    }, 15000);
+    try {
+        currentRoomNameRef.current = incomingCall.roomName;
+        const token = await getLiveKitToken(incomingCall.roomName, user.id, profile.full_name);
+        const r = setupRoom(incomingCall.mode);
+        const liveKitUrl = import.meta.env.VITE_LIVEKIT_URL || 'ws://localhost:7880';
+        await r.connect(liveKitUrl, token);
+        
+        await r.localParticipant.enableCameraAndMicrophone();
+        if (incomingCall.mode === 'audio') await r.localParticipant.setCameraEnabled(false);
+        
+        updateParticipantsFromRoom(r);
+    } catch (err) {
+        toast.error('Media connection failed');
+        cleanupCall();
+    }
   };
 
   const declineCall = async () => {
-    if (!incomingCall || !signalingChannelRef.current) return;
-    ringtoneRef.current?.pause();
-    
-    await signalingChannelRef.current.send({
-      type: 'broadcast',
-      event: 'call-decline',
-      payload: { toUserId: incomingCall.from, fromUserId: user?.id }
+    if (!incomingCall) return;
+    await presenceChannelRef.current.send({
+        type: 'broadcast',
+        event: 'call-decline',
+        payload: { toUserId: incomingCall.from, fromUserId: user?.id }
     });
-    
     cleanupCall();
   };
 
   const endCall = async () => {
-    cleanupCall();
-    
     if (activeParticipants.length > 0) {
         activeParticipants.forEach(async (p) => {
             if (p.isLocal) return;
-            await signalingChannelRef.current.send({
+            await presenceChannelRef.current.send({
                 type: 'broadcast',
                 event: 'call-end',
                 payload: { toUserId: p.id, fromUserId: user?.id }
             });
         });
     }
+    cleanupCall();
   };
 
   const toggleMute = () => {
-    if (localStreamRef.current) {
-        const audioTracks = localStreamRef.current.getAudioTracks();
-        audioTracks.forEach(track => track.enabled = !track.enabled);
-        setIsMuted(!audioTracks[0].enabled);
-    }
+    const enabled = room?.localParticipant.isMicrophoneEnabled;
+    room?.localParticipant.setMicrophoneEnabled(!enabled);
+    setIsMuted(!!enabled);
   };
 
-  const toggleVideo = async () => {
-    if (localStreamRef.current) {
-        let videoTracks = localStreamRef.current.getVideoTracks();
-        
-        // If NO video track, try to get one (only happens if first getUserMedia failed)
-        if (videoTracks.length === 0) {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                const track = stream.getVideoTracks()[0];
-                localStreamRef.current.addTrack(track);
-                videoTracks = [track];
-            } catch (e) {
-                toast.error('Camera access denied');
-                return;
-            }
-        }
-
-        const newState = isVideoOff; // it was OFF, now we want it ON (if isVideoOff was true)
-        const trackEnabled = newState; 
-        
-        videoTracks.forEach(t => t.enabled = trackEnabled);
-        setIsVideoOff(!trackEnabled);
-        if (trackEnabled) setCallMode('video');
-        
-        // Force state update to refresh local UI
-        setActiveParticipants(prev => prev.map(p => p.isLocal ? { ...p, stream: localStreamRef.current, videoOff: !trackEnabled } : p));
-        setActiveCall(prev => prev ? { ...prev, localStream: localStreamRef.current } : null);
-
-        // Signaling
-        if (activeParticipants.length > 0) {
-            activeParticipants.forEach(async (p) => {
-                if (p.isLocal) return;
-                await signalingChannelRef.current.send({
-                    type: 'broadcast',
-                    event: 'call-video-state',
-                    payload: { toUserId: p.id, fromUserId: user?.id, videoOff: !trackEnabled }
-                });
-            });
-        }
-    }
+  const toggleVideo = () => {
+    const enabled = room?.localParticipant.isCameraEnabled;
+    room?.localParticipant.setCameraEnabled(!enabled);
+    setIsVideoOff(!!enabled);
+    if (!enabled) setCallMode('video');
   };
 
   const toggleHold = () => {
     const newState = !isOnHold;
     setIsOnHold(newState);
-    
-    // Notify Partner
-    if (activeParticipants.length > 0) {
-        activeParticipants.forEach(async (p) => {
-            if (p.isLocal) return;
-            await signalingChannelRef.current.send({
-                type: 'broadcast',
-                event: newState ? 'call-hold' : 'call-resume',
-                payload: { toUserId: p.id, fromUserId: user?.id }
-            });
-        });
-    }
-
-    if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach(track => track.enabled = !newState);
-    }
+    room?.localParticipant.setMicrophoneEnabled(!newState);
+    room?.localParticipant.setCameraEnabled(!newState);
   };
 
   const toggleSpeaker = async () => {
-    const newState = !isSpeakerOn;
-    setIsSpeakerOn(newState);
-    
-    // On browsers that support setSinkId, we try to find the speaker
-    // Note: This is mostly Chromium only.
-    if ('setSinkId' in HTMLAudioElement.prototype) {
-        try {
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            const audioOutputs = devices.filter(device => device.kind === 'audiooutput');
-            
-            // Try to find something that looks like a speaker
-            const speaker = audioOutputs.find(d => 
-                d.label.toLowerCase().includes('speaker') || 
-                d.label.toLowerCase().includes('loudspeaker')
-            ) || audioOutputs[0];
+    try {
+      const newState = !isSpeakerOn;
+      setIsSpeakerOn(newState);
+      
+      if (room) {
+        const devices = await Room.getLocalDevices('audiooutput');
+        // On many browsers, we can't distinguish "earpiece" vs "speaker" 
+        // without specifically tagged device labels.
+        // We'll look for keywords like 'speaker', 'loudspeaker', 'audio out'.
+        const speakerDevice = devices.find(d => 
+          d.label.toLowerCase().includes('speaker') || 
+          d.label.toLowerCase().includes('loudspeaker') ||
+          d.label.toLowerCase().includes('external')
+        );
 
-            if (speaker) {
-                // Apply to all active audio elements in the DOM
-                const audios = document.querySelectorAll('audio, video');
-                audios.forEach((el: any) => {
-                    if (el.setSinkId) {
-                        el.setSinkId(newState ? speaker.deviceId : '').catch(console.error);
-                    }
-                });
-                toast.info(newState ? 'Speakerphone On' : 'Speakerphone Off');
-            }
-        } catch (err) {
-            console.warn('Failed to switch audio output:', err);
+        if (speakerDevice && newState) {
+          await room.switchActiveDevice('audiooutput', speakerDevice.deviceId);
+          toast.success('Switched to speaker');
+        } else if (devices[0] && !newState) {
+          await room.switchActiveDevice('audiooutput', devices[0].deviceId);
+          toast.success('Switched to default output');
         }
-    } else {
-        toast.info('Speaker toggle not supported on this browser. Use system settings.');
+      }
+    } catch (err) {
+      console.error('[LiveKit] Failed to switch audio output:', err);
+      // Fallback: just toggle the state for UI
+      setIsSpeakerOn(prev => !prev);
     }
   };
 
   return (
     <CommunicationContext.Provider value={{ 
-      allUsers,
-      onlineUsers, 
-      callState, 
-      callMode,
-      incomingCall, 
-      activeCall, 
-      activeParticipants,
-      isMuted,
-      isVideoOff,
-      isOnHold,
-      isPartnerOnHold,
-      isSpeakerOn,
-      makeCall, 
-      addParticipant,
-      acceptCall, 
-      declineCall, 
-      endCall,
-      toggleMute,
-      toggleVideo,
-      toggleHold,
-      toggleSpeaker,
+      allUsers, onlineUsers, callState, callMode, incomingCall, activeCall, 
+      activeParticipants, isMuted, isVideoOff, isOnHold, isPartnerOnHold, 
+      isSpeakerOn, makeCall, 
+      addParticipant: async (targetUserId: string, targetName: string) => {
+        if (!user || !profile || !currentRoomNameRef.current) return;
+        
+        toast.info(`Inviting ${targetName} to consultation...`);
+        
+        await presenceChannelRef.current.send({
+          type: 'broadcast',
+          event: 'call-invite',
+          payload: { 
+            toUserId: targetUserId, 
+            fromUserId: user.id, 
+            fromName: profile.full_name, 
+            roomName: currentRoomNameRef.current, 
+            mode: callMode 
+          }
+        });
+      },
+      acceptCall, declineCall, endCall, toggleMute, toggleVideo, toggleHold, toggleSpeaker,
       refreshUsers: fetchUsers,
-      peerReady
+      roomReady: !!room
     }}>
       {children}
     </CommunicationContext.Provider>
@@ -790,8 +476,6 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
 
 export function useCommunication() {
   const context = useContext(CommunicationContext);
-  if (context === undefined) {
-    throw new Error('useCommunication must be used within a CommunicationProvider');
-  }
+  if (context === undefined) throw new Error('useCommunication must be used within a CommunicationProvider');
   return context;
 }

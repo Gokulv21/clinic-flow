@@ -1,7 +1,8 @@
 import { useCommunication } from '@/lib/communication';
 import { Button } from '@/components/ui/button';
 import { 
-  Pause, Play, UserPlus, Volume2, Grid, Maximize2, VolumeX, Volume1 
+  Pause, Play, UserPlus, Volume2, Grid, Maximize2, VolumeX, Volume1,
+  Mic, MicOff, Video, VideoOff, Phone, PhoneOff, User
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEffect, useRef, useState } from 'react';
@@ -135,7 +136,8 @@ function AudioStream({ stream }: { stream: MediaStream | null }) {
                 autoPlay 
                 className="hidden"
                 onLoadedMetadata={(e) => {
-                    (e.target as HTMLAudioElement).play().catch(() => setBlocked(true));
+                    const audio = e.target as HTMLAudioElement;
+                    audio.play().catch(() => setBlocked(true));
                 }}
             />
             {blocked && (
@@ -162,7 +164,7 @@ export default function CallOverlay() {
     acceptCall, declineCall, endCall, 
     toggleMute, toggleVideo, toggleHold, toggleSpeaker,
     addParticipant, onlineUsers, allUsers,
-    peerReady 
+    roomReady 
   } = useCommunication();
 
   const [showAddParticipant, setShowAddParticipant] = useState(false);
@@ -219,9 +221,21 @@ export default function CallOverlay() {
                 <h1 className="text-3xl font-black tracking-tight">
                   {callState === 'ringing' ? (incomingCall?.fromName || 'Someone') : (activeCall?.partnerName || 'Connecting...')}
                 </h1>
-                <p className="text-blue-400 font-bold uppercase tracking-[0.2em] text-xs">
-                  {callState === 'ringing' ? 'Incoming Consultation' : 'Dialing Staff...'}
-                </p>
+                <div className="flex flex-col items-center gap-2">
+                    <p className="text-blue-400 font-bold uppercase tracking-[0.2em] text-xs">
+                    {callState === 'ringing' ? 'Incoming Consultation' : 'Dialing Staff...'}
+                    </p>
+                    {callState === 'dialing' && (
+                        <motion.div 
+                            initial={{ width: 0 }}
+                            animate={{ width: "100%" }}
+                            transition={{ duration: 30, ease: "linear" }}
+                            className="h-1 bg-blue-500/30 rounded-full w-48 overflow-hidden"
+                        >
+                            <div className="h-full bg-blue-500 w-full" />
+                        </motion.div>
+                    )}
+                </div>
               </div>
             </div>
 
@@ -237,8 +251,8 @@ export default function CallOverlay() {
                   </Button>
                   <Button 
                     onClick={acceptCall}
-                    disabled={!peerReady}
-                    className="w-16 h-16 rounded-full p-0 bg-emerald-500 hover:bg-emerald-600 shadow-lg shadow-emerald-500/20 hover:scale-110 transition-transform"
+                    disabled={!roomReady && callState === 'connecting'}
+                    className="w-16 h-16 rounded-full p-0 bg-emerald-500 hover:bg-emerald-600 shadow-lg shadow-emerald-500/20 hover:scale-110 transition-transform disabled:opacity-50"
                   >
                     <Phone className="w-8 h-8" />
                   </Button>
@@ -309,11 +323,14 @@ export default function CallOverlay() {
             {/* Video Grid */}
             <div className={cn(
                 "flex-1 p-4 pt-24 pb-32 transition-all duration-500",
-                remoteParticipants.length > 1 ? "grid grid-cols-1 md:grid-cols-2 gap-4" : "relative"
+                remoteParticipants.length === 1 ? "relative" : 
+                remoteParticipants.length === 2 ? "grid grid-cols-1 md:grid-cols-2 gap-6" :
+                remoteParticipants.length <= 4 ? "grid grid-cols-2 gap-4" :
+                "grid grid-cols-2 md:grid-cols-3 gap-3"
             )}>
                 {/* Main Remote Video (if single) */}
                 {remoteParticipants.length === 1 && (
-                    <div className="w-full h-full rounded-[2rem] overflow-hidden bg-zinc-900 border border-white/5 relative shadow-2xl">
+                    <div className="w-full h-full max-w-5xl mx-auto rounded-[2rem] overflow-hidden bg-zinc-900 border border-white/5 relative shadow-2xl">
                         {(callMode === 'video' || remoteParticipants.some(p => !p.videoOff)) && remoteParticipants[0].stream && !remoteParticipants[0].videoOff ? (
                             <VideoStream 
                                 stream={remoteParticipants[0].stream} 
