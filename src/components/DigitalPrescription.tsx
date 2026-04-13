@@ -197,10 +197,11 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
     }, [animate]);
 
     useEffect(() => {
+        if (!mounted) return;
         fitCanvas();
         redrawStatic(pages[currentPageIndex] || []);
         redrawPage();
-    }, [currentPageIndex, isEnlarged, fitCanvas, redrawStatic, redrawPage]);
+    }, [mounted, currentPageIndex, isEnlarged, fitCanvas, redrawStatic, redrawPage]);
 
     // ── Gesture State
     const [canvasTransform, setCanvasTransform] = useState({ x: 0, y: 0, scale: 1 });

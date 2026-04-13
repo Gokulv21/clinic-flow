@@ -345,7 +345,7 @@ export default function DoctorConsultation() {
         throw visitError;
       }
 
-      toast.success('Prescription saved & sent to print queue');
+      toast.success('Prescription saved & sent to print queue', { position: 'top-center' });
       localStorage.removeItem(`draft_${selectedVisit.id}`);
       localStorage.removeItem('active_consultation_id');
       setAdvice('');
@@ -359,7 +359,7 @@ export default function DoctorConsultation() {
       setSaveError(null);
       queryClient.invalidateQueries({ queryKey: ['visitQueue'] });
     } catch (err: any) {
-      toast.error(`Save Failed: ${err.message || 'Unknown error'}`);
+      toast.error(`Save Failed: ${err.message || 'Unknown error'}`, { position: 'top-center' });
     } finally {
       setSaving(false);
     }
@@ -1035,12 +1035,12 @@ export default function DoctorConsultation() {
                     )}
                   >
                     {saving ? (
-                      <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Saving...</>
+                      <span key="saving" className="flex items-center"><Loader2 className="w-4 h-4 animate-spin mr-2" /> Saving...</span>
                     ) : (
                       saveError ? (
-                        <><RefreshCw className="w-4 h-4 mr-2" /> Retry Save</>
+                        <span key="error" className="flex items-center"><RefreshCw className="w-4 h-4 mr-2" /> Retry Save</span>
                       ) : (
-                        <><Save className="w-4 h-4 mr-2" /> Save & Complete</>
+                        <span key="idle" className="flex items-center"><Save className="w-4 h-4 mr-2" /> Save & Complete</span>
                       )
                     )}
                   </Button>
