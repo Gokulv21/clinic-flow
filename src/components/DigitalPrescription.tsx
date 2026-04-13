@@ -31,6 +31,11 @@ interface DigitalPrescriptionProps {
 }
 
 export default function DigitalPrescription({ patient, visit, initialPaths = [], initialPages, onSave, onClose }: DigitalPrescriptionProps) {
+    const [mounted, setMounted] = React.useState(false);
+    React.useEffect(() => {
+        setMounted(true);
+    }, []);
+
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const staticCanvasRef = useRef<HTMLCanvasElement | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -440,11 +445,13 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
         }
     };
 
+    if (!mounted || typeof document === 'undefined') return null;
+
     return createPortal(
         <div
             style={{
                 position: 'fixed', inset: 0, zIndex: 1000, // Very high z-index to stay on top
-                background: '#ffffff',
+                background: '#f1f5f9',
                 display: 'flex', flexDirection: 'column',
                 padding: 0,
             }}
@@ -579,7 +586,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                     flex: 1,
                     overflowY: 'auto',
                     overflowX: 'hidden',
-                    background: '#ffffff',
+                    background: '#f1f5f9',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',

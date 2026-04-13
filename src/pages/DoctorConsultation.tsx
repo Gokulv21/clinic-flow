@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import { cn, formatAge } from '@/lib/utils';
 import { 
   Plus, History, Clock, Search, ChevronRight, Stethoscope, 
-  User, CheckCircle2, AlertCircle, Trash2, Printer, 
+  User, Users, CheckCircle2, AlertCircle, Trash2, Printer, 
   ExternalLink, Phone, PhoneCall, Video, UserPlus, Info, 
   MapPin, Loader2, Save, X, MoreVertical, LayoutGrid, List,
   Activity, ClipboardList, Scale, Heart, Wind, Thermometer, 
@@ -428,7 +428,43 @@ export default function DoctorConsultation() {
 
   return (
     <div className="flex flex-col md:flex-row h-[calc(100vh-64px)] md:h-[calc(100vh-0px)] overflow-hidden">
-      <div className={cn("w-full md:w-80 border-r border-border shrink-0 h-full", selectedVisit ? "hidden xl:block" : "block")}>
+      {/* ── Token Switcher Rail (Shows when patient selected) ── */}
+      {selectedVisit && (
+        <div className="hidden md:flex w-16 border-r border-border flex-col items-center py-4 gap-4 bg-muted/20 shrink-0">
+          <div className="w-10 h-10 rounded-full bg-blue-600/10 flex items-center justify-center mb-2">
+            <Users className="w-5 h-5 text-blue-600" />
+          </div>
+          <div className="flex-1 flex flex-col gap-3 overflow-y-auto no-scrollbar pb-20">
+            {queue.map(visit => (
+              <Button
+                key={visit.id}
+                variant={selectedVisit.id === visit.id ? "default" : "ghost"}
+                size="icon"
+                onClick={() => selectVisit(visit, true)}
+                className={cn(
+                  "w-10 h-10 rounded-full font-black text-xs transition-all",
+                  selectedVisit.id === visit.id 
+                    ? "bg-blue-600 text-white shadow-lg scale-110" 
+                    : "text-muted-foreground hover:bg-white hover:text-blue-600 border border-transparent hover:border-blue-200"
+                )}
+              >
+                {visit.token_number}
+              </Button>
+            ))}
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setSelectedVisit(null)}
+            className="w-10 h-10 rounded-full text-muted-foreground hover:text-red-500 hover:bg-red-50"
+            title="Exit Consultation"
+          >
+            <X className="w-5 h-5" />
+          </Button>
+        </div>
+      )}
+
+      <div className={cn("w-full md:w-80 border-r border-border shrink-0 h-full", selectedVisit ? "hidden" : "block")}>
         {queuePanel}
       </div>
 

@@ -209,7 +209,7 @@ Follow the instructions carefully.
                         background: '#ffffff',
                         backgroundColor: '#ffffff',
                         boxSizing: 'border-box',
-                        boxShadow: 'none',
+                        boxShadow: isPrint ? 'none' : '0 10px 40px rgba(0,0,0,0.12)',
                         flexShrink: 0,
                         pageBreakAfter: (isPrint && idx < pagesToShow.length - 1) ? 'always' : undefined,
                     }}
