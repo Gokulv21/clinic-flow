@@ -11,6 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Wifi, WifiLow, SignalHigh, SignalLow, Activity } from 'lucide-react';
 
 // Robust Video Stream Component
 function VideoStream({ stream, muted = false, className }: { stream: MediaStream | null, muted?: boolean, className?: string }) {
@@ -97,11 +98,24 @@ function AudioVisualizer({ stream }: { stream: MediaStream | null }) {
             {[...Array(4)].map((_, i) => (
                 <motion.div 
                     key={i}
-                    animate={{ height: level > 10 ? [2, 12, 4, 8, 2][(i + Math.floor(level/20)) % 5] : 2 }}
-                    transition={{ repeat: Infinity, duration: 0.5 }}
-                    className="w-1 bg-emerald-500 rounded-full"
+                    animate={{ height: level > 5 ? [2, 12, 4, 8, 2][(i + Math.floor(level/15)) % 5] : 2 }}
+                    transition={{ repeat: Infinity, duration: 0.4 }}
+                    className={cn(
+                        "w-1 rounded-full",
+                        level > 5 ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-zinc-600"
+                    )}
                 />
             ))}
+        </div>
+    );
+}
+
+// Connection Quality Component
+function ConnectionQualityIndicator() {
+    return (
+        <div className="flex items-center gap-1 px-2 py-0.5 bg-zinc-800/10 backdrop-blur-md rounded-md border border-white/5">
+            <SignalHigh className="w-3 h-3 text-emerald-500" />
+            <span className="text-[8px] font-black uppercase text-emerald-500 tracking-tighter">Secure & Stable</span>
         </div>
     );
 }
@@ -279,7 +293,7 @@ export default function CallOverlay() {
           >
             {/* Header info */}
             <div className="absolute top-8 left-0 right-0 px-6 flex items-center justify-between pointer-events-none">
-                <div className="flex items-center gap-3 bg-black/40 backdrop-blur-xl p-2 pr-4 rounded-full border border-white/10 pointer-events-auto">
+                <div className="flex items-center gap-3 glass-ios p-2 pr-4 rounded-full border border-white/20 pointer-events-auto shadow-2xl">
                     <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                     <span className="text-sm font-bold tracking-tight">
                       {remoteParticipants.length === 0 ? 'Connecting...' : 
@@ -295,6 +309,7 @@ export default function CallOverlay() {
                 </div>
                 
                 <div className="pointer-events-auto flex items-center gap-2">
+                    <ConnectionQualityIndicator />
                     <Button 
                         variant="ghost" 
                         size="icon" 
@@ -349,9 +364,9 @@ export default function CallOverlay() {
                         {/* Audio track */}
                         <AudioStream stream={remoteParticipants[0].stream} />
                         
-                        <div className="absolute bottom-6 left-6 p-2 px-4 bg-black/40 backdrop-blur-md rounded-xl border border-white/10 flex items-center gap-3">
+                        <div className="absolute bottom-6 left-6 p-2 px-4 glass-ios rounded-xl border border-white/20 flex items-center gap-3 shadow-lg">
                             <AudioVisualizer stream={remoteParticipants[0].stream} />
-                            <span className="text-xs font-bold">{remoteParticipants[0].name}</span>
+                            <span className="text-xs font-black tracking-tight">{remoteParticipants[0].name}</span>
                         </div>
                     </div>
                 )}
@@ -412,7 +427,7 @@ export default function CallOverlay() {
 
             {/* Floating Control Bar */}
             <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-30">
-                <div className="flex items-center gap-4 p-3 px-6 bg-zinc-900/40 backdrop-blur-3xl rounded-full border border-white/10 shadow-[0_20px_60px_rgba(0,0,0,0.8)]">
+                <div className="flex items-center gap-4 p-3 px-6 glass-ios rounded-full border border-white/20 shadow-[0_20px_60px_rgba(0,0,0,0.8)]">
                     <Button 
                         onClick={toggleMute}
                         variant="ghost" 

@@ -111,6 +111,12 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => { fetchUsers(); }, [user?.id]);
+  
+  // Create a memoized list of STUN servers for NAT traversal
+  const iceServers = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+  ];
 
   // --- LiveKit Room Handlers ---
   const setupRoom = (mode: 'audio' | 'video') => {
@@ -122,7 +128,8 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
       },
       publishDefaults: {
         simulcast: true, // Crucial for low bandwidth networks (India 4G)
-      }
+      },
+      iceServers: iceServers,
     });
 
     newRoom.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, publication: RemoteTrackPublication, participant: RemoteParticipant) => {
@@ -375,10 +382,18 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
     try {
         const token = await getLiveKitToken(roomName, user.id, profile.full_name);
         const r = setupRoom(mode);
-        // LiveKit URL (Server hosted via Docker)
-        // In local testing, use ws://localhost:7880
-        // In production, use wss://livekit.yourdomain.com
-        const liveKitUrl = import.meta.env.VITE_LIVEKIT_URL || 'ws://localhost:7880';
+        
+        // Production-Grade Global Connectivity:
+        // By default, LiveKit Cloud or VPS deployments use wss:// (Secure WebSockets).
+        const rawUrl = import.meta.env.VITE_LIVEKIT_URL || 'ws://localhost:7880';
+        let liveKitUrl = rawUrl;
+        
+        // Auto-detect and force secure protocol for non-local environments
+        if (!liveKitUrl.includes('localhost') && !liveKitUrl.startsWith('ws')) {
+            liveKitUrl = `wss://${liveKitUrl}`;
+        }
+
+        console.log('[LiveKit] Connecting to Global Instance:', liveKitUrl);
         await r.connect(liveKitUrl, token);
         
         // Publish Tracks
@@ -404,7 +419,13 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
         currentRoomNameRef.current = incomingCall.roomName;
         const token = await getLiveKitToken(incomingCall.roomName, user.id, profile.full_name);
         const r = setupRoom(incomingCall.mode);
-        const liveKitUrl = import.meta.env.VITE_LIVEKIT_URL || 'ws://localhost:7880';
+        
+        const rawUrl = import.meta.env.VITE_LIVEKIT_URL || 'ws://localhost:7880';
+        let liveKitUrl = rawUrl;
+        if (!liveKitUrl.includes('localhost') && !liveKitUrl.startsWith('ws')) {
+            liveKitUrl = `wss://${liveKitUrl}`;
+        }
+
         await r.connect(liveKitUrl, token);
         
         await r.localParticipant.enableCameraAndMicrophone();

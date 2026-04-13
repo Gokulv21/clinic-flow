@@ -11,6 +11,7 @@ import PageBanner from '@/components/PageBanner';
 import userMgmtBanner from '@/assets/user_mgmt_banner.png';
 import Lottie from "lottie-react";
 import communicationAnimation from "@/assets/animations/analytics.json"; // Reusing an animation for now or replace later
+import { motion } from 'framer-motion';
 
 export default function Calls() {
   const { user } = useAuth();
@@ -60,10 +61,16 @@ export default function Calls() {
               <Button 
                 variant="outline" 
                 size="icon" 
-                className="shrink-0 rounded-xl"
+                className="shrink-0 rounded-xl btn-liquid-pop overflow-hidden"
                 onClick={() => refreshUsers()}
+                asChild
               >
-                <RefreshCw className="w-4 h-4" />
+                <motion.button
+                  whileTap={{ scale: 0.8 }}
+                  transition={{ type: "spring", stiffness: 600, damping: 30 }}
+                >
+                  <RefreshCw className="w-4 h-4" />
+                </motion.button>
               </Button>
             </div>
 

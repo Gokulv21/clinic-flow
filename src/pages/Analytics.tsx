@@ -3,7 +3,9 @@ import { startOfDay, endOfDay, isWithinInterval, startOfHour, endOfHour, setHour
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell } from 'recharts';
-import { Users, CalendarDays, Activity, Pill, Filter } from 'lucide-react';
+import { Users, CalendarDays, Activity, Pill, Filter, Lightbulb, Sparkles, TrendingUp, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import PageBanner from '@/components/PageBanner';
@@ -21,6 +23,8 @@ export default function Analytics() {
   const [diagnosisData, setDiagnosisData] = useState<any[]>([]);
   const [seasonalityData, setSeasonalityData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [smartInsight, setSmartInsight] = useState<string | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   useEffect(() => {
     fetchGeneralStats();
@@ -211,6 +215,30 @@ export default function Analytics() {
     setLoading(false);
   };
 
+  const generateInsight = () => {
+    setIsAnalyzing(true);
+    // Simulate thinking/calculating
+    setTimeout(() => {
+        let insight = "";
+        
+        // Find busiest time/day
+        const maxVolume = [...volumeData].sort((a,b) => b.patients - a.patients)[0];
+        const topDiag = diagnosisData[0]?.name || "general conditions";
+
+        if (timeRange === 'today') {
+            insight = `Peak traffic detected today at ${maxVolume?.name}. Ensure staff coverage.`;
+        } else {
+            insight = `Trend Alert: ${topDiag} represents your highest patient volume this ${timeRange}.`;
+        }
+
+        setSmartInsight(insight);
+        setIsAnalyzing(false);
+        fetchGeneralStats();
+        fetchVolumeData();
+        fetchSeasonalityData();
+    }, 1200);
+  };
+
   const COLORS = ['hsl(199,89%,38%)', 'hsl(158,64%,42%)', 'hsl(38,92%,50%)', 'hsl(262,60%,55%)', 'hsl(0,72%,51%)', 'hsl(199,89%,60%)'];
 
   return (
@@ -225,20 +253,53 @@ export default function Analytics() {
         </div>
       </PageBanner>
 
-      <div className="px-4 md:px-8 flex flex-col gap-10">
-        <div className="bg-card p-1 rounded-xl shadow-sm border border-border hidden md:flex w-fit ml-auto">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="rounded-lg text-xs font-bold gap-2"
-            onClick={() => {
-                fetchGeneralStats();
-                fetchVolumeData();
-                fetchSeasonalityData();
-            }}
-          >
-            <Filter className="w-3.5 h-3.5" /> Filter Data
-          </Button>
+        <div className="px-4 md:px-8 flex flex-col gap-6">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <AnimatePresence mode="wait">
+                {smartInsight ? (
+                    <motion.div 
+                        initial={{ opacity: 0, x: -20, scale: 0.95 }}
+                        animate={{ opacity: 1, x: 0, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.9 }}
+                        className="glass-droplet px-6 py-4 rounded-[1.5rem] border-blue-500/30 flex items-center gap-4 shadow-xl max-w-2xl"
+                    >
+                        <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0">
+                            <Sparkles className="w-5 h-5 text-blue-500 animate-pulse" />
+                        </div>
+                        <p className="text-sm font-bold text-foreground leading-snug">{smartInsight}</p>
+                        <button onClick={() => setSmartInsight(null)} className="ml-2 p-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full transition-colors">
+                            <X className="w-4 h-4 text-muted-foreground" />
+                        </button>
+                    </motion.div>
+                ) : (
+                    <div />
+                )}
+            </AnimatePresence>
+
+            <div className="bg-card p-1.5 rounded-2xl shadow-sm border border-border flex items-center gap-2">
+            <Button 
+                variant="ghost" 
+                size="sm" 
+                className={cn("rounded-xl text-xs font-black uppercase tracking-widest gap-2 bg-blue-500/5 text-blue-600 hover:bg-blue-500/10 transition-all btn-liquid-pop overflow-hidden", isAnalyzing && "opacity-50")}
+                onClick={generateInsight}
+                disabled={isAnalyzing}
+                asChild
+            >
+                <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    transition={{ type: "spring", stiffness: 600, damping: 30 }}
+                >
+                    {isAnalyzing ? (
+                        <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }}>
+                            <TrendingUp className="w-4 h-4" />
+                        </motion.div>
+                    ) : (
+                        <Lightbulb className="w-4 h-4" />
+                    )}
+                    {isAnalyzing ? "Analyzing Trends..." : "Generate Smart Insight"}
+                </motion.button>
+            </Button>
+            </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

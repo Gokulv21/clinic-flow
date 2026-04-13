@@ -470,7 +470,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                 />
             )}
             {/* ── Toolbar (Hidden on Mobile) */}
-            <div className="hidden md:flex bg-background dark:bg-slate-900 border-b border-border px-4 py-3 items-center justify-between gap-y-2 shrink-0 shadow-lg sticky top-0 z-50 rounded-t-xl">
+            <div className="hidden md:flex glass-ios border-b border-white/10 px-4 py-3 items-center justify-between gap-y-2 shrink-0 shadow-2xl sticky top-0 z-50 rounded-t-xl">
                 <div className="flex items-center gap-1 md:gap-2 min-w-0 flex-wrap">
                     <Button variant="ghost" size="icon" onClick={onClose} className="shrink-0 h-8 w-8 md:h-10 md:w-10 text-foreground hover:bg-muted"><X className="w-5 h-5" /></Button>
 

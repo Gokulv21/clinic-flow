@@ -19,6 +19,7 @@ import {
   Droplet, Pencil, Calendar, RefreshCw, UserX, ChevronDown,
   Eye, PenTool, CheckCircle, ArrowLeft
 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { Textarea } from '@/components/ui/textarea';
 import DigitalPrescription from '@/components/DigitalPrescription';
 import PrescriptionTemplate from '@/components/PrescriptionTemplate';
@@ -384,8 +385,18 @@ export default function DoctorConsultation() {
             <p className="text-xs text-muted-foreground/60 uppercase tracking-widest font-bold">Queue is Empty</p>
           )}
         </div>
-        <Button variant="ghost" size="icon" onClick={() => refetchQueue()} disabled={isLoadingQueue} className="h-8 w-8">
-          {isLoadingQueue ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+        <Button variant="ghost" size="icon" onClick={() => refetchQueue()} disabled={isLoadingQueue} className="h-8 w-8 btn-liquid-pop overflow-hidden" asChild>
+          <motion.button
+            whileTap={{ scale: 0.7 }}
+            transition={{ type: "spring", stiffness: 600, damping: 25 }}
+          >
+            <motion.div
+                animate={isLoadingQueue ? { rotate: 360 } : { rotate: 0 }}
+                transition={isLoadingQueue ? { repeat: Infinity, duration: 1, ease: "linear" } : { type: "spring", stiffness: 500, damping: 30 }}
+            >
+                {isLoadingQueue ? <Loader2 className="w-4 h-4 animate-spin-liquid" /> : <RefreshCw className="w-4 h-4" />}
+            </motion.div>
+          </motion.button>
         </Button>
       </div>
       <div className="flex-1 overflow-auto">

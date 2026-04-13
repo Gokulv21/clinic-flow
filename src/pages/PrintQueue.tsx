@@ -9,6 +9,8 @@ import PageBanner from '@/components/PageBanner';
 import printQueueBanner from '@/assets/print_queue_banner.png';
 import { Printer, CheckCircle, Clock, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+import { motion } from 'framer-motion';
 import PrescriptionTemplate from '@/components/PrescriptionTemplate';
 import { printPrescription as renderAndPrintPrescription } from '@/lib/printPrescription';
 
@@ -128,9 +130,22 @@ export default function PrintQueue() {
             size="sm" 
             onClick={() => refetchPrescriptions()}
             disabled={isLoading}
-            className="gap-2 h-9 border-border hover:bg-muted"
+            className="gap-2 h-9 border-border hover:bg-muted btn-liquid-pop overflow-hidden"
+            asChild
           >
-            {isLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Manual Refresh
+            <motion.button
+              whileTap={{ scale: 0.92 }}
+              transition={{ type: "spring", stiffness: 600, damping: 30 }}
+            >
+              <motion.div
+                animate={isLoading ? { rotate: 360 } : { rotate: 0 }}
+                transition={isLoading ? { repeat: Infinity, duration: 1, ease: "linear" } : { type: "spring", stiffness: 500, damping: 30 }}
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className="w-4 h-4" />
+              </motion.div>
+              <span>Manual Refresh</span>
+            </motion.button>
           </Button>
         </div>
 

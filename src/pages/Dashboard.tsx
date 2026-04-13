@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { startOfDay, endOfDay } from 'date-fns';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { motion } from 'framer-motion';
 
 export default function Dashboard() {
   const { profile, roles, hasRole } = useAuth();
@@ -74,9 +75,9 @@ export default function Dashboard() {
             {roles.map(r => r.charAt(0).toUpperCase() + r.slice(1)).join(' & ')} Overview
           </p>
         </div>
-        <div className="flex items-center gap-2 bg-card px-4 py-2 rounded-full shadow-sm border border-border">
-          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Clinic Live</span>
+        <div className="flex items-center gap-3 glass-thick px-5 py-2.5 rounded-full shadow-2xl border border-white/20">
+          <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_12px_rgba(16,185,129,0.8)]" />
+          <span className="text-[10px] font-black text-slate-800 dark:text-white uppercase tracking-[0.2em]">Clinic Live</span>
         </div>
       </div>
 
@@ -86,18 +87,25 @@ export default function Dashboard() {
           { label: "Today's Visits", val: stats.today, icon: CalendarDays, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-500/10' },
           { label: "Completed", val: stats.completed, icon: UserCheck, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-500/10' },
           { label: "Total Patients", val: stats.total, icon: Activity, color: 'text-purple-600', bg: 'bg-purple-50 dark:bg-purple-500/10' }
-        ].map(s => (
-          <Card key={s.label} className="border-none shadow-sm overflow-hidden group bg-card">
-            <CardContent className="p-6 flex items-center justify-between">
-              <div>
-                <p className="text-[11px] font-black text-muted-foreground uppercase tracking-widest mb-1">{s.label}</p>
-                <p className="text-3xl font-black text-foreground group-hover:scale-110 transition-transform origin-left">{s.val}</p>
-              </div>
-              <div className={cn("p-3 rounded-2xl transition-all group-hover:rotate-12", s.bg)}>
-                <s.icon className={cn("w-6 h-6", s.color)} />
-              </div>
-            </CardContent>
-          </Card>
+        ].map((s, i) => (
+          <motion.div
+            key={s.label}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.1 }}
+          >
+            <Card className="border-none shadow-2xl overflow-hidden group glass-regular rounded-[2.5rem] border border-white/10">
+              <CardContent className="p-7 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">{s.label}</p>
+                  <p className="text-4xl font-black text-slate-900 dark:text-white group-hover:scale-110 transition-all duration-500 origin-left drop-shadow-sm">{s.val}</p>
+                </div>
+                <div className={cn("p-4 rounded-3xl transition-all duration-500 group-hover:rotate-12 shadow-inner", s.bg)}>
+                  <s.icon className={cn("w-7 h-7", s.color)} />
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
         ))}
       </div>
 
@@ -108,23 +116,28 @@ export default function Dashboard() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {visibleModules.map(m => (
-            <button
+          {visibleModules.map((m, i) => (
+            <motion.button
               key={m.path}
+              whileHover={{ y: -10, scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.3 + i * 0.1 }}
               onClick={() => navigate(m.path)}
-              className="group relative flex flex-col p-6 bg-card rounded-[2rem] border border-border hover:border-blue-500/50 transition-all text-left shadow-sm hover:shadow-xl hover:-translate-y-2 overflow-hidden"
+              className="group relative flex flex-col p-8 glass-thick rounded-[3rem] border border-white/20 transition-all duration-500 text-left shadow-2xl overflow-hidden active:scale-90"
             >
-              <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center mb-6 bg-gradient-to-br shadow-lg group-hover:scale-110 transition-transform", m.color)}>
-                <div className="text-white">{m.icon}</div>
+              <div className={cn("w-16 h-16 rounded-[1.5rem] flex items-center justify-center mb-8 bg-gradient-to-br shadow-2xl group-hover:rotate-6 transition-all duration-500", m.color)}>
+                <div className="text-white drop-shadow-md">{m.icon}</div>
               </div>
-              <div className="space-y-1">
-                <h3 className="font-heading font-black text-lg text-foreground group-hover:text-blue-600 transition-colors">{m.label}</h3>
-                <p className="text-xs font-medium text-muted-foreground line-clamp-2">{m.desc}</p>
+              <div className="space-y-2">
+                <h3 className="font-black text-xl text-slate-900 dark:text-white group-hover:text-blue-500 transition-colors tracking-tight">{m.label}</h3>
+                <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 leading-relaxed">{m.desc}</p>
               </div>
-              <div className="absolute top-4 right-4 text-muted-foreground/10 dark:text-muted-foreground/10 group-hover:text-blue-500/20 transition-colors">
-                 <Activity className="w-12 h-12" />
+              <div className="absolute top-6 right-6 text-blue-500/5 group-hover:text-blue-500/10 transition-all duration-700">
+                 <Activity className="w-16 h-16" />
               </div>
-            </button>
+            </motion.button>
           ))}
         </div>
       </div>
