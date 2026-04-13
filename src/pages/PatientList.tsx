@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Search, User, History, Edit, Printer, Eye } from 'lucide-react';
+import { Search, User, History, Edit, Printer, Eye, X } from 'lucide-react';
 import { toast } from 'sonner';
 import PrescriptionTemplate from '@/components/PrescriptionTemplate';
 import { printPrescription } from '@/lib/printPrescription';
@@ -27,7 +27,7 @@ export default function PatientList() {
   const [selectedPatient, setSelectedPatient] = useState<any>(null);
   const [visits, setVisits] = useState<any[]>([]);
   const [editing, setEditing] = useState(false);
-  const [editForm, setEditForm] = useState({ title: '', name: '', age: '', ageUnit: 'years', phone: '', address: '' });
+  const [editForm, setEditForm] = useState({ title: '', name: '', age: '', ageUnit: 'years', sex: 'Male', phone: '', address: '' });
   const [viewingRx, setViewingRx] = useState<any>(null);
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
@@ -76,6 +76,7 @@ export default function PatientList() {
       name: p.name, 
       age: String(p.age), 
       ageUnit: 'years', // Default to years when viewing existing
+      sex: p.sex || 'Male',
       phone: p.phone, 
       address: p.address || '' 
     });
@@ -97,6 +98,7 @@ export default function PatientList() {
       title: editForm.title,
       name: editForm.name,
       age: ageInYears,
+      sex: editForm.sex,
       phone: editForm.phone,
       address: editForm.address || null,
     }).eq('id', selectedPatient.id);
@@ -198,6 +200,7 @@ export default function PatientList() {
                       <SelectTrigger className="border-border bg-card focus:ring-primary/10"><SelectValue placeholder="Title" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="Mr.">Mr.</SelectItem>
+                        <SelectItem value="Mast.">Mast.</SelectItem>
                         <SelectItem value="Miss">Miss</SelectItem>
                         <SelectItem value="Mrs.">Mrs.</SelectItem>
                         <SelectItem value="Baby">Baby</SelectItem>
@@ -209,40 +212,53 @@ export default function PatientList() {
                     <Input className="border-border bg-card focus:ring-primary/10" value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
                   </div>
                 </div>
-                <div>
-                  <Label>Age</Label>
-                  <div className="flex gap-2">
-                    <Input 
-                      type="number" 
-                      step="0.1"
-                      value={editForm.age} 
-                      onChange={e => {
-                        const val = parseFloat(e.target.value);
-                        if (val > 1000) return;
-                        setEditForm(f => ({ ...f, age: e.target.value }));
-                      }} 
-                      className="flex-1"
-                    />
-                    <Select value={editForm.ageUnit} onValueChange={v => setEditForm(f => ({ ...f, ageUnit: v }))}>
-                      <SelectTrigger className="w-[100px]"><SelectValue /></SelectTrigger>
+                <div className="col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <Label>Age</Label>
+                    <div className="flex gap-2">
+                      <Input 
+                        type="number" 
+                        step="0.1"
+                        value={editForm.age} 
+                        onChange={e => {
+                          const val = parseFloat(e.target.value);
+                          if (val > 1000) return;
+                          setEditForm(f => ({ ...f, age: e.target.value }));
+                        }} 
+                        className="flex-1"
+                      />
+                      <Select value={editForm.ageUnit} onValueChange={v => setEditForm(f => ({ ...f, ageUnit: v }))}>
+                        <SelectTrigger className="w-[80px]"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="years">Yrs</SelectItem>
+                          <SelectItem value="months">Mnt</SelectItem>
+                          <SelectItem value="days">Day</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Gender</Label>
+                    <Select value={editForm.sex} onValueChange={v => setEditForm(f => ({ ...f, sex: v }))}>
+                      <SelectTrigger className="border-border bg-card"><SelectValue placeholder="Gender" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="years">Yrs</SelectItem>
-                        <SelectItem value="months">Mnt</SelectItem>
-                        <SelectItem value="days">Day</SelectItem>
+                        <SelectItem value="Male">Male</SelectItem>
+                        <SelectItem value="Female">Female</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Phone</Label>
-                  <Input 
-                    className="border-border bg-card focus:ring-primary/10"
-                    value={editForm.phone} 
-                    onChange={e => {
-                      const val = e.target.value.replace(/\D/g, '').slice(0, 10);
-                      setEditForm(f => ({ ...f, phone: val }));
-                    }} 
-                  />
+                  <div>
+                    <Label className="text-muted-foreground">Phone</Label>
+                    <Input 
+                      className="border-border bg-card focus:ring-primary/10"
+                      value={editForm.phone} 
+                      onChange={e => {
+                        const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                        setEditForm(f => ({ ...f, phone: val }));
+                      }} 
+                    />
+                  </div>
                 </div>
                 <div className="col-span-2">
                   <Label className="text-muted-foreground">Address</Label>
@@ -306,11 +322,16 @@ export default function PatientList() {
       {/* Prescription Preview Dialog */}
       <Dialog open={!!viewingRx} onOpenChange={open => !open && setViewingRx(null)}>
         <DialogContent className="max-w-[800px] p-0 overflow-hidden bg-muted">
-          <div className="bg-card p-4 border-b border-border flex items-center justify-between sticky top-0 z-10">
+          <div className="bg-card p-4 border-b border-border flex items-center justify-between sticky top-0 z-20">
             <h3 className="font-bold text-foreground">Prescription History</h3>
-            <Button size="sm" onClick={() => printPrescription('.print-container')} className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
-              <Printer className="w-4 h-4" /> Print
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button size="sm" onClick={() => printPrescription('.print-container')} className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
+                <Printer className="w-4 h-4" /> <span className="hidden sm:inline">Print</span>
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setViewingRx(null)} className="gap-1 border-muted-foreground/20 text-muted-foreground hover:bg-red-50 hover:text-red-600 hover:border-red-200">
+                <X className="w-4 h-4" /> <span className="hidden sm:inline">Close</span>
+              </Button>
+            </div>
           </div>
           <div className="p-4 md:p-8 overflow-y-auto max-h-[85vh] scrollbar-thin scrollbar-thumb-muted-foreground/20 min-h-[500px]">
             {viewingRx && (() => {
