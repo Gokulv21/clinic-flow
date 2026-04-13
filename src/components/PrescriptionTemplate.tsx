@@ -198,7 +198,7 @@ Follow the instructions carefully.
                     className="single-page-prescription"
                     style={{
                         width: isPrint ? '210mm' : '100%',
-                        maxWidth: isPrint ? undefined : '800px',
+                        maxWidth: isPrint ? undefined : '100%',
                         height: isPrint ? '296mm' : undefined,
                         minHeight: isPrint ? undefined : '500px',
                         margin: '0 auto',
@@ -209,7 +209,7 @@ Follow the instructions carefully.
                         background: '#ffffff',
                         backgroundColor: '#ffffff',
                         boxSizing: 'border-box',
-                        boxShadow: isPrint ? 'none' : '0 10px 40px rgba(0,0,0,0.12)',
+                        boxShadow: 'none',
                         flexShrink: 0,
                         pageBreakAfter: (isPrint && idx < pagesToShow.length - 1) ? 'always' : undefined,
                     }}

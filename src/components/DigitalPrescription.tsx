@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { 
     Maximize2, Minimize2, Trash2, Save, Undo, Redo, X, 
@@ -439,14 +440,13 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
         }
     };
 
-    return (
+    return createPortal(
         <div
             style={{
-                position: 'fixed', inset: 0, zIndex: 60, // Increased to cover Sidebar (z-50)
-                background: 'rgba(0,0,0,0.85)',
-                backdropFilter: 'blur(12px)',
+                position: 'fixed', inset: 0, zIndex: 1000, // Very high z-index to stay on top
+                background: '#ffffff',
                 display: 'flex', flexDirection: 'column',
-                padding: isEnlarged ? 0 : '12px',
+                padding: 0,
             }}
             onWheel={handleWheel}
         >
@@ -470,7 +470,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                 />
             )}
             {/* ── Toolbar (Hidden on Mobile) */}
-            <div className="hidden md:flex glass-ios border-b border-white/10 px-4 py-3 items-center justify-between gap-y-2 shrink-0 shadow-2xl sticky top-0 z-50 rounded-t-xl">
+            <div className="hidden md:flex bg-white border-b border-border px-4 py-3 items-center justify-between gap-y-2 shrink-0 shadow-sm sticky top-0 z-50 rounded-t-xl">
                 <div className="flex items-center gap-1 md:gap-2 min-w-0 flex-wrap">
                     <Button variant="ghost" size="icon" onClick={onClose} className="shrink-0 h-8 w-8 md:h-10 md:w-10 text-foreground hover:bg-muted"><X className="w-5 h-5" /></Button>
 
@@ -579,11 +579,11 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                     flex: 1,
                     overflowY: 'auto',
                     overflowX: 'hidden',
-                    background: '#0f172a',
+                    background: '#ffffff',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
-                    padding: '2rem 0', // More padding for better feel
+                    padding: '0', 
                     touchAction: 'pan-y pinch-zoom', // Allow native-like scroll and zoom
                     WebkitUserSelect: 'none',
                     userSelect: 'none',
@@ -593,12 +593,12 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                 <div
                     ref={containerRef}
                     style={{
-                        width: 'min(95vw, 800px)', // Robust width
+                        width: '100vw',
                         minHeight: '1130px', // Force A4 height to ensure scrolling
                         aspectRatio: '1 / 1.414',
                         position: 'relative',
                         flexShrink: 0,
-                        boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+                        boxShadow: 'none',
                         transform: `translate3d(${canvasTransform.x}px, ${canvasTransform.y}px, 0) scale(${canvasTransform.scale})`,
                         transformOrigin: 'top center',
                         touchAction: 'none', // Drawing area still needs touchAction: none
@@ -727,7 +727,8 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                     <Plus className="w-4 h-4" /> Add Page
                 </Button>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }
 

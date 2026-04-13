@@ -428,7 +428,7 @@ export default function DoctorConsultation() {
 
   return (
     <div className="flex flex-col md:flex-row h-[calc(100vh-64px)] md:h-[calc(100vh-0px)] overflow-hidden">
-      <div className={cn("w-full md:w-80 border-r border-border shrink-0 h-full", selectedVisit ? "hidden md:block" : "block")}>
+      <div className={cn("w-full md:w-80 border-r border-border shrink-0 h-full", selectedVisit ? "hidden xl:block" : "block")}>
         {queuePanel}
       </div>
 
@@ -444,8 +444,16 @@ export default function DoctorConsultation() {
           <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-6 animate-slide-in pb-[40vh] font-jakarta-sans">
             <Card className="border-none shadow-sm bg-card">
               <CardHeader className="pb-3 px-6">
-                <CardTitle className="flex items-center justify-between">
+                <CardTitle className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => setSelectedVisit(null)} 
+                      className="xl:hidden h-8 w-8 rounded-full"
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                    </Button>
                     <div className="p-2 bg-blue-50 dark:bg-blue-500/10 rounded-lg">
                       <User className="w-5 h-5 text-blue-600" />
                     </div>
@@ -515,7 +523,7 @@ export default function DoctorConsultation() {
                       <span className="text-[11px] font-bold">Edit</span>
                     </Button>
                   </div>
-                  <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
+                  <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                     {[
                       { label: 'Weight', value: selectedVisit.weight, unit: 'kg', icon: Scale, color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-500/10' },
                       { label: 'BP', value: selectedVisit.blood_pressure, unit: 'mmHg', icon: Heart, color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-500/10' },

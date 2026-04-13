@@ -261,7 +261,7 @@ export default function Analytics() {
                         initial={{ opacity: 0, x: -20, scale: 0.95 }}
                         animate={{ opacity: 1, x: 0, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.9 }}
-                        className="glass-droplet px-6 py-4 rounded-[1.5rem] border-blue-500/30 flex items-center gap-4 shadow-xl max-w-2xl"
+                        className="glass-droplet px-6 py-4 rounded-[1.5rem] border-blue-500/30 flex items-center gap-4 shadow-xl w-full md:max-w-xl"
                     >
                         <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0">
                             <Sparkles className="w-5 h-5 text-blue-500 animate-pulse" />
@@ -302,7 +302,7 @@ export default function Analytics() {
             </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {[
             { label: "Today's Patients", value: stats.todayPatients, icon: <CalendarDays className="w-5 h-5" />, color: 'bg-blue-500/10 text-blue-500', trend: trends.today },
             { label: 'Monthly Volume', value: stats.monthPatients, icon: <Activity className="w-5 h-5" />, color: 'bg-emerald-500/10 text-emerald-500', trend: trends.month },
