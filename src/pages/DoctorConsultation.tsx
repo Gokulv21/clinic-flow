@@ -101,7 +101,7 @@ export default function DoctorConsultation() {
           if (!document.hidden) {
             queryClient.invalidateQueries({ queryKey: ['visitQueue'] });
           }
-        }, 2000); 
+        }, 5000); 
       })
       .subscribe();
 
@@ -125,7 +125,10 @@ export default function DoctorConsultation() {
     };
     restoreState();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => { 
+      clearTimeout(debounceTimer);
+      supabase.removeChannel(channel); 
+    };
   }, []);
 
   useEffect(() => {

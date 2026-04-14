@@ -114,64 +114,83 @@ export default function Analytics() {
       .gte('created_at', startDate.toISOString());
 
     const resultData: any[] = [];
+    const bins: Record<string, any> = {};
 
     if (timeRange === 'today') {
       for (let h = 0; h < 24; h++) {
         const d = setHours(startOfDay(new Date()), h);
-        const hStart = startOfHour(d);
-        const hEnd = endOfHour(d);
-
-        const countVal = visits?.filter(v => {
-          const vDate = new Date(v.created_at);
-          return isWithinInterval(vDate, { start: hStart, end: hEnd });
-        }).length || 0;
-
-        resultData.push({
-          name: format(d, 'ha'),
-          patients: countVal,
-          color: '#3b82f6' // Unified blue for today's hourly breakdown
-        });
+        const name = format(d, 'ha');
+        bins[name] = { count: 0, _order: h };
       }
+
+      visits?.forEach(v => {
+        const d = new Date(v.created_at);
+        if (isWithinInterval(d, { start: startOfDay(new Date()), end: endOfDay(new Date()) })) {
+            const name = format(d, 'ha');
+            if (bins[name]) bins[name].count++;
+        }
+      });
+
+      const sortedKeys = Object.keys(bins).sort((a, b) => bins[a]._order - bins[b]._order);
+      sortedKeys.forEach(key => {
+        resultData.push({
+          name: key,
+          patients: bins[key].count,
+          color: '#3b82f6'
+        });
+      });
     } else if (formatType === 'day') {
       for (let i = daysCount - 1; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
-        const dayStart = startOfDay(d);
-        const dayEnd = endOfDay(d);
-
-        const countVal = visits?.filter(v => {
-          const vDate = new Date(v.created_at);
-          return isWithinInterval(vDate, { start: dayStart, end: dayEnd });
-        }).length || 0;
-
-        const prevCount = resultData.length > 0 ? resultData[resultData.length - 1].patients : 0;
-
-        resultData.push({
-          name: d.toLocaleDateString('en', { weekday: i < 7 ? 'short' : undefined, day: 'numeric', month: 'short' }),
-          patients: countVal,
-          color: countVal >= prevCount ? '#22c55e' : '#ef4444' // Green for up, red for down
-        });
+        const name = d.toLocaleDateString('en', { weekday: i < 7 ? 'short' : undefined, day: 'numeric', month: 'short' });
+        const key = format(d, 'yyyy-MM-dd');
+        bins[key] = { name, count: 0, _order: i };
       }
+
+      visits?.forEach(v => {
+        const d = new Date(v.created_at);
+        const key = format(d, 'yyyy-MM-dd');
+        if (bins[key]) bins[key].count++;
+      });
+
+      const sortedKeys = Object.keys(bins).sort((a, b) => bins[b]._order - bins[a]._order);
+      let prevCount = 0;
+      sortedKeys.forEach(key => {
+        const countVal = bins[key].count;
+        resultData.push({
+          name: bins[key].name,
+          patients: countVal,
+          color: countVal >= prevCount ? '#22c55e' : '#ef4444'
+        });
+        prevCount = countVal;
+      });
     } else {
       for (let i = 11; i >= 0; i--) {
         const d = new Date();
         d.setMonth(d.getMonth() - i, 1);
-        const mStart = startOfDay(new Date(d.getFullYear(), d.getMonth(), 1));
-        const mEnd = endOfDay(new Date(d.getFullYear(), d.getMonth() + 1, 0));
+        const name = d.toLocaleDateString('en', { month: 'short' });
+        const key = format(d, 'yyyy-MM');
+        bins[key] = { name, count: 0, _order: i };
+      }
 
-        const countVal = visits?.filter(v => {
-          const vDate = new Date(v.created_at);
-          return isWithinInterval(vDate, { start: mStart, end: mEnd });
-        }).length || 0;
+      visits?.forEach(v => {
+        const d = new Date(v.created_at);
+        const key = format(d, 'yyyy-MM');
+        if (bins[key]) bins[key].count++;
+      });
 
-        const prevCount = resultData.length > 0 ? resultData[resultData.length - 1].patients : 0;
-
+      const sortedKeys = Object.keys(bins).sort((a, b) => bins[b]._order - bins[a]._order);
+      let prevCount = 0;
+      sortedKeys.forEach(key => {
+        const countVal = bins[key].count;
         resultData.push({
-          name: d.toLocaleDateString('en', { month: 'short' }),
+          name: bins[key].name,
           patients: countVal,
           color: countVal >= prevCount ? '#22c55e' : '#ef4444'
         });
-      }
+        prevCount = countVal;
+      });
     }
     setVolumeData(resultData);
   };
@@ -184,10 +203,14 @@ export default function Analytics() {
 
   const fetchSeasonalityData = async () => {
     // Fetch last 6 months of prescriptions to see trends
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
     const { data: rxData } = await supabase
       .from('prescriptions')
       .select('diagnosis, created_at')
       .not('diagnosis', 'is', null)
+      .gte('created_at', sixMonthsAgo.toISOString())
       .order('created_at', { ascending: true });
 
     if (!rxData) return;
@@ -205,12 +228,20 @@ export default function Analytics() {
       return entry;
     });
 
+    // Instead of findIndex inside the loop, we create a lookup
+    const monthIndexLookup: Record<string, number> = {};
+    trendData.forEach((t, index) => {
+       monthIndexLookup[t.month] = index;
+    });
+
     rxData.forEach(rx => {
       const monthStr = new Date(rx.created_at).toLocaleDateString('en', { month: 'short' });
-      const trendIndex = trendData.findIndex(t => t.month === monthStr);
-      if (trendIndex > -1) {
+      const trendIndex = monthIndexLookup[monthStr];
+      if (trendIndex !== undefined) {
+        // Pre-lowercase the diagnosis to avoid multiple lowerCase calls per diagnosis
+        const rxDiag = rx.diagnosis?.toLowerCase() || '';
         topDiagnoses.forEach(d => {
-          if (rx.diagnosis?.toLowerCase().includes(d.toLowerCase())) {
+          if (rxDiag.includes(d.toLowerCase())) {
             trendData[trendIndex][d]++;
           }
         });
