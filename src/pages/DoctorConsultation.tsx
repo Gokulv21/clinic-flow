@@ -32,7 +32,7 @@ import { printPrescription } from '@/lib/printPrescription';
 import PageBanner from '@/components/PageBanner';
 import consultationBanner from '@/assets/consultation_banner.png';
 import { useCommunication } from '@/lib/communication';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
 
 interface Medicine {
   type: string;
@@ -52,23 +52,29 @@ const COMMON_FREQUENCIES = [
 
 export default function DoctorConsultation() {
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
   const { user } = useAuth();
+  const { slug } = useParams();
+  const navigate = useNavigate();
   const { makeCall, onlineUsers, callState, allUsers } = useCommunication();
   
+  const { clinic } = useOutletContext<{ clinic: any }>();
+
   // 1. Fetch Queue via React Query
   const { data: queue = [], isLoading: isLoadingQueue, refetch: refetchQueue } = useQuery({
-    queryKey: ['visitQueue'],
+    queryKey: ['visitQueue', clinic?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('visits')
         .select('*, patients(*), prescriptions(*)')
+        .eq('clinic_id', clinic?.id)
         .in('status', ['waiting', 'in_consultation'])
+        .or(`assigned_doctor_id.is.null,assigned_doctor_id.eq.${user?.id}`)
         .order('token_number', { ascending: true });
       if (error) throw error;
       return (data || []).filter(v => v.patients);
     },
-    staleTime: 30000,
+    enabled: !!clinic?.id,
+    staleTime: 5000, // Reduced from 30s
     refetchOnWindowFocus: true,
   });
 
@@ -92,16 +98,22 @@ export default function DoctorConsultation() {
   const lastLoadedVisitId = useRef<string | null>(null);
 
   useEffect(() => {
+    if (!clinic?.id) return;
+
     let debounceTimer: any;
     const channel = supabase
-      .channel('visits-realtime-doctor')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'visits' }, () => {
+      .channel(`visits-realtime-doctor-${clinic.id}`)
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'visits'
+      }, () => {
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
           if (!document.hidden) {
-            queryClient.invalidateQueries({ queryKey: ['visitQueue'] });
+            queryClient.invalidateQueries({ queryKey: ['visitQueue', clinic.id] });
           }
-        }, 5000); 
+        }, 800); // Fast sync for queue
       })
       .subscribe();
 
@@ -129,7 +141,7 @@ export default function DoctorConsultation() {
       clearTimeout(debounceTimer);
       supabase.removeChannel(channel); 
     };
-  }, []);
+  }, [queryClient, clinic?.id]);
 
   useEffect(() => {
     if (selectedVisit?.id && selectedVisit.id === lastLoadedVisitId.current) {
@@ -330,7 +342,8 @@ export default function DoctorConsultation() {
           advice_image: finalAdviceImage,
           raw_paths: finalPaths as any,
           is_writing_mode: isWritingMode,
-          doctor_id: user?.id
+          doctor_id: user?.id,
+          clinic_id: clinic?.id
         });
         if (rxError && rxError.code !== '23505') {
           setSaveError({ step: 'prescription', message: rxError.message });
@@ -433,11 +446,11 @@ export default function DoctorConsultation() {
     <div className="flex flex-col md:flex-row h-[calc(100vh-64px)] md:h-[calc(100vh-0px)] overflow-hidden">
       {/* ── Token Switcher Rail (Shows when patient selected) ── */}
       {selectedVisit && (
-        <div className="hidden md:flex w-16 border-r border-border flex-col items-center py-4 gap-4 bg-muted/20 shrink-0">
-          <div className="w-10 h-10 rounded-full bg-blue-600/10 flex items-center justify-center mb-2">
-            <Users className="w-5 h-5 text-blue-600" />
+        <div className="hidden md:flex w-20 border-r border-border flex-col items-center py-6 gap-6 bg-muted/20 shrink-0">
+          <div className="w-12 h-12 rounded-2xl bg-blue-600/10 flex items-center justify-center mb-2 shadow-inner border border-blue-600/5">
+            <Users className="w-6 h-6 text-blue-600" />
           </div>
-          <div className="flex-1 flex flex-col gap-3 overflow-y-auto no-scrollbar pb-20">
+          <div className="flex-1 flex flex-col gap-4 overflow-y-auto no-scrollbar pb-24 px-2">
             {queue.map(visit => (
               <Button
                 key={visit.id}
@@ -445,7 +458,7 @@ export default function DoctorConsultation() {
                 size="icon"
                 onClick={() => selectVisit(visit, true)}
                 className={cn(
-                  "w-10 h-10 rounded-full font-black text-xs transition-all",
+                  "w-12 h-12 rounded-2xl font-black text-sm transition-all",
                   selectedVisit.id === visit.id 
                     ? "bg-blue-600 text-white shadow-lg scale-110" 
                     : "text-muted-foreground hover:bg-white hover:text-blue-600 border border-transparent hover:border-blue-200"
@@ -459,7 +472,7 @@ export default function DoctorConsultation() {
             variant="ghost"
             size="icon"
             onClick={() => setSelectedVisit(null)}
-            className="w-10 h-10 rounded-full text-muted-foreground hover:text-red-500 hover:bg-red-50"
+            className="w-12 h-12 rounded-2xl text-muted-foreground hover:text-red-500 hover:bg-red-50 border border-transparent hover:border-red-100"
             title="Exit Consultation"
           >
             <X className="w-5 h-5" />
@@ -480,7 +493,7 @@ export default function DoctorConsultation() {
             </div>
           </div>
         ) : (
-          <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-6 animate-slide-in pb-[40vh] font-jakarta-sans">
+          <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-6 animate-slide-in pb-80 font-jakarta-sans">
             <Card className="border-none shadow-sm bg-card">
               <CardHeader className="pb-3 px-6">
                 <CardTitle className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -537,7 +550,7 @@ export default function DoctorConsultation() {
                         onClick={() => {
                           const firstStaff = allUsers.find(u => u.role === 'staff' && !!onlineUsers[u.id]);
                           if (firstStaff) makeCall(firstStaff.id, firstStaff.full_name, 'video');
-                          else navigate('/calls');
+                          else navigate(slug ? `/${slug}/calls` : '/calls');
                         }}
                         title="Video Consult Staff"
                       >
@@ -550,7 +563,7 @@ export default function DoctorConsultation() {
                         onClick={() => {
                           const firstStaff = allUsers.find(u => u.role === 'staff' && !!onlineUsers[u.id]);
                           if (firstStaff) makeCall(firstStaff.id, firstStaff.full_name, 'audio');
-                          else navigate('/calls');
+                          else navigate(slug ? `/${slug}/calls` : '/calls');
                         }}
                         title="Audio Call Staff"
                       >

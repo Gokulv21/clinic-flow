@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { startOfDay, endOfDay, isWithinInterval, startOfHour, endOfHour, setHours, format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,6 +17,7 @@ import analyticsAnimation from "@/assets/animations/analytics.json";
 type TimeRange = 'today' | 'week' | 'month' | 'year';
 
 export default function Analytics() {
+  const { clinic } = useOutletContext<{ clinic: any }>();
   const [stats, setStats] = useState({ todayPatients: 0, monthPatients: 0, totalPatients: 0 });
   const [timeRange, setTimeRange] = useState<TimeRange>('week');
   const [volumeData, setVolumeData] = useState<any[]>([]);
@@ -27,13 +29,17 @@ export default function Analytics() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   useEffect(() => {
-    fetchGeneralStats();
-    fetchSeasonalityData();
-  }, []);
+    if (clinic?.id) {
+      fetchGeneralStats();
+      fetchSeasonalityData();
+    }
+  }, [clinic?.id]);
 
   useEffect(() => {
-    fetchVolumeData();
-  }, [timeRange]);
+    if (clinic?.id) {
+      fetchVolumeData();
+    }
+  }, [timeRange, clinic?.id]);
 
   const fetchGeneralStats = async () => {
     const today = new Date();
@@ -46,11 +52,11 @@ export default function Analytics() {
     const lastMonthEnd = new Date(new Date().getFullYear(), new Date().getMonth(), 0);
 
     const [todayRes, yesterdayRes, monthRes, lastMonthRes, totalRes] = await Promise.all([
-      supabase.from('visits').select('id', { count: 'exact', head: true }).gte('created_at', today.toISOString()),
-      supabase.from('visits').select('id', { count: 'exact', head: true }).gte('created_at', yesterday.toISOString()).lt('created_at', today.toISOString()),
-      supabase.from('visits').select('id', { count: 'exact', head: true }).gte('created_at', monthStart.toISOString()),
-      supabase.from('visits').select('id', { count: 'exact', head: true }).gte('created_at', lastMonthStart.toISOString()).lte('created_at', lastMonthEnd.toISOString()),
-      supabase.from('patients').select('id', { count: 'exact', head: true }),
+      supabase.from('visits').select('id', { count: 'exact', head: true }).eq('clinic_id', clinic?.id).gte('created_at', today.toISOString()),
+      supabase.from('visits').select('id', { count: 'exact', head: true }).eq('clinic_id', clinic?.id).gte('created_at', yesterday.toISOString()).lt('created_at', today.toISOString()),
+      supabase.from('visits').select('id', { count: 'exact', head: true }).eq('clinic_id', clinic?.id).gte('created_at', monthStart.toISOString()),
+      supabase.from('visits').select('id', { count: 'exact', head: true }).eq('clinic_id', clinic?.id).gte('created_at', lastMonthStart.toISOString()).lte('created_at', lastMonthEnd.toISOString()),
+      supabase.from('patients').select('id', { count: 'exact', head: true }).eq('clinic_id', clinic?.id),
     ]);
 
     const todayCount = todayRes.count || 0;
@@ -82,7 +88,7 @@ export default function Analytics() {
     setTrends({ today: todayTrend, month: monthTrend });
 
     // Diagnosis distribution
-    const { data: rxData } = await supabase.from('prescriptions').select('diagnosis').not('diagnosis', 'is', null).limit(200);
+    const { data: rxData } = await supabase.from('prescriptions').select('diagnosis').eq('clinic_id', clinic?.id).not('diagnosis', 'is', null).limit(200);
     const counts: Record<string, number> = {};
     rxData?.forEach(r => { if (r.diagnosis) counts[r.diagnosis] = (counts[r.diagnosis] || 0) + 1; });
     setDiagnosisData(Object.entries(counts).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value).slice(0, 6));
@@ -111,6 +117,7 @@ export default function Analytics() {
     const { data: visits } = await supabase
       .from('visits')
       .select('created_at')
+      .eq('clinic_id', clinic?.id)
       .gte('created_at', startDate.toISOString());
 
     const resultData: any[] = [];
@@ -209,6 +216,7 @@ export default function Analytics() {
     const { data: rxData } = await supabase
       .from('prescriptions')
       .select('diagnosis, created_at')
+      .eq('clinic_id', clinic?.id)
       .not('diagnosis', 'is', null)
       .gte('created_at', sixMonthsAgo.toISOString())
       .order('created_at', { ascending: true });

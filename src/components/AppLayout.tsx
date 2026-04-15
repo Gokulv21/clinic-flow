@@ -1,6 +1,6 @@
 import { ReactNode, useState, useRef, useEffect } from 'react';
 import { useAuth, AppRole } from '@/lib/auth';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import {
   Stethoscope, ClipboardPlus, Printer, BarChart3, Users, LogOut, Home, Menu, HelpCircle, Sun, Moon, Monitor, ChevronUp, Phone
@@ -16,6 +16,7 @@ import {
 import { useTheme } from '@/components/ThemeProvider';
 import logo from '@/assets/logo.png';
 import { motion, AnimatePresence, useScroll, useMotionValueEvent } from 'framer-motion';
+import UpdateCarousel from './UpdateCarousel';
 
 interface NavItem {
   label: string;
@@ -25,16 +26,16 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { label: 'Dashboard', path: '/', icon: <Home className="w-5 h-5" />, roles: ['doctor'] },
-  { label: 'Consult Staff', path: '/calls', icon: <Phone className="w-5 h-5" />, roles: ['staff', 'doctor'] },
-  { label: 'Patient Entry', path: '/nurse', icon: <ClipboardPlus className="w-5 h-5" />, roles: ['staff', 'doctor'] },
-  { label: 'Consultation', path: '/consultation', icon: <Stethoscope className="w-5 h-5" />, roles: ['doctor'] },
-  { label: 'Print Queue', path: '/print', icon: <Printer className="w-5 h-5" />, roles: ['staff', 'doctor'] },
-  { label: 'Patients', path: '/patients', icon: <Users className="w-5 h-5" />, roles: ['doctor', 'staff'] },
-  { label: 'Analytics', path: '/analytics', icon: <BarChart3 className="w-5 h-5" />, roles: ['doctor'] },
-  { label: 'Profile', path: '/profile', icon: <Users className="w-5 h-5" />, roles: ['doctor'] },
-  { label: 'User Mgmt', path: '/users', icon: <Users className="w-5 h-5" />, roles: ['doctor'] },
-  { label: 'Help', path: '/help', icon: <HelpCircle className="w-5 h-5" />, roles: ['staff', 'doctor'] },
+  { label: 'Dashboard', path: '/', icon: <Home className="w-5 h-5" />, roles: ['doctor', 'superadmin'] },
+  { label: 'Consult Staff', path: '/calls', icon: <Phone className="w-5 h-5" />, roles: ['staff', 'doctor', 'superadmin'] },
+  { label: 'Patient Entry', path: '/nurse', icon: <ClipboardPlus className="w-5 h-5" />, roles: ['staff', 'doctor', 'superadmin'] },
+  { label: 'Consultation', path: '/consultation', icon: <Stethoscope className="w-5 h-5" />, roles: ['doctor', 'superadmin'] },
+  { label: 'Print Queue', path: '/print', icon: <Printer className="w-5 h-5" />, roles: ['staff', 'doctor', 'superadmin'] },
+  { label: 'Patients', path: '/patients', icon: <Users className="w-5 h-5" />, roles: ['doctor', 'staff', 'superadmin'] },
+  { label: 'Analytics', path: '/analytics', icon: <BarChart3 className="w-5 h-5" />, roles: ['doctor', 'superadmin'] },
+  { label: 'Profile', path: '/profile', icon: <Users className="w-5 h-5" />, roles: ['doctor', 'superadmin'] },
+  { label: 'User Mgmt', path: '/users', icon: <Users className="w-5 h-5" />, roles: ['doctor', 'superadmin'] },
+  { label: 'Help', path: '/help', icon: <HelpCircle className="w-5 h-5" />, roles: ['staff', 'doctor', 'superadmin'] },
 ];
 
 export default function AppLayout({ children }: { children: ReactNode }) {
@@ -65,15 +66,26 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     }
   }, [location.pathname]);
 
+  const { slug } = useParams();
+  
   const handleMobileNav = (path: string) => {
-    navigate(path);
+    const isGlobal = path === '/help';
+    const fullPath = (slug && !isGlobal) ? `/${slug}${path === '/' ? '/dashboard' : path}` : path;
+    navigate(fullPath);
     setIsMobileMenuOpen(false);
   };
 
   const visibleItems = navItems.filter(item => item.roles.some(r => roles.includes(r)));
+  
+  const getFullPath = (itemPath: string) => {
+    if (!slug || itemPath === '/help') return itemPath;
+    if (itemPath === '/') return `/${slug}/dashboard`;
+    return `/${slug}${itemPath}`;
+  };
 
   return (
     <div className="min-h-screen flex bg-slate-50 dark:bg-[#000000] font-jakarta-sans relative overflow-hidden">
+      <UpdateCarousel />
       {/* Decorative Background Elements for Glass effect */}
       <div className="fixed inset-0 pointer-events-none opacity-20 dark:opacity-40">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/30 blur-[120px] rounded-full" />
@@ -117,15 +129,18 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           </motion.div>
         </div>
 
-        <nav className="flex-1 px-4 space-y-2 relative">
-          {visibleItems.map(item => {
-            const isActive = location.pathname === item.path;
+        {/* Sidebar Nav - Scrollable section */}
+        <nav className="flex-1 px-4 space-y-1 overflow-y-auto no-scrollbar py-2">
+          {visibleItems.map((item) => {
+            const fullPath = getFullPath(item.path);
+            const isActive = location.pathname === fullPath || (item.path === '/' && location.pathname.endsWith('/dashboard'));
+            
             return (
               <button
                 key={item.path}
                 onMouseEnter={() => setHoveredItem(item.path)}
                 onMouseLeave={() => setHoveredItem(null)}
-                onClick={() => navigate(item.path)}
+                onClick={() => navigate(fullPath)}
                 className={cn(
                   "w-full flex items-center gap-4 px-3 py-3 rounded-2xl text-sm transition-all duration-300 relative z-10",
                   isActive ? "text-white" : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
@@ -148,18 +163,26 @@ export default function AppLayout({ children }: { children: ReactNode }) {
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: -10 }}
-                      className="whitespace-nowrap font-bold"
+                      className="font-bold tracking-tight"
                     >
                       {item.label}
                     </motion.span>
                   )}
                 </AnimatePresence>
+
+                {hoveredItem === item.path && !isActive && (
+                  <motion.div
+                    layoutId="sidebar-hover"
+                    className="absolute inset-0 bg-slate-100 dark:bg-white/5 rounded-2xl -z-20"
+                    transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+                  />
+                )}
               </button>
             );
           })}
         </nav>
 
-        <div className="p-4 mt-auto border-t border-white/10 space-y-4">
+        <div className="p-4 mt-auto border-t border-white/10 space-y-4 shrink-0">
           {/* Theme Toggle Capsule */}
           <div className="flex items-center gap-1 bg-white/5 p-1 rounded-2xl relative">
             <button
@@ -207,11 +230,12 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         className="fixed bottom-6 left-1/2 z-[100] glass-thick flex md:hidden h-16 px-6 rounded-full items-center gap-2 shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-white/30 max-w-[95vw] w-fit"
       >
         {visibleItems.slice(0, 4).map(item => {
-          const isActive = location.pathname === item.path;
+          const fullPath = getFullPath(item.path);
+          const isActive = location.pathname === fullPath || (item.path === '/' && location.pathname.endsWith('/dashboard'));
           return (
             <button
               key={item.path}
-              onClick={() => navigate(item.path)}
+              onClick={() => navigate(fullPath)}
               className={cn(
                 "flex-1 min-w-[60px] flex flex-col items-center justify-center gap-1 transition-all relative px-2 h-12 rounded-full",
                 isActive ? "text-blue-600" : "text-slate-950 dark:text-white"
@@ -251,7 +275,8 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
             <div className="flex-1 overflow-auto p-4 grid grid-cols-5 gap-2 pb-6">
               {visibleItems.map(item => {
-                const isActive = location.pathname === item.path;
+                const fullPath = getFullPath(item.path);
+                const isActive = location.pathname === fullPath || (item.path === '/' && location.pathname.endsWith('/dashboard'));
                 return (
                   <button
                     key={item.path}
@@ -306,7 +331,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       </motion.nav>
 
       <main ref={scrollRef} className="flex-1 overflow-auto bg-transparent relative h-screen">
-        <div className="min-h-full lg:p-8 md:p-5 p-3 pb-36">
+        <div className="min-h-full lg:p-10 md:p-6 p-3 pb-44">
           <motion.div
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}

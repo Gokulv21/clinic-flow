@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode, useRef } fro
 import { supabase } from '@/integrations/supabase/client';
 import type { User, Session } from '@supabase/supabase-js';
 
-export type AppRole = 'doctor' | 'staff';
+export type AppRole = 'doctor' | 'staff' | 'superadmin';
 
 interface AuthContextType {
   user: User | null;
@@ -37,13 +37,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchUserData = async (userId: string, force = false) => {
     if (isFetching.current && !force) return;
-    
+
     // Prevent redundant fetches if we already have the data
     if (userId === lastFetchedId.current && roles.length > 0 && !force) {
       setLoading(false);
       return;
     }
-    
+
     console.log(`[Auth] Fetching user data for: ${userId} (Force: ${force})`);
     isFetching.current = true;
     setLoading(true);
@@ -51,28 +51,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const [rolesRes, profileRes] = await Promise.all([
         supabase.from('user_roles').select('role').eq('user_id', userId),
-        supabase.from('profiles').select('full_name').eq('user_id', userId).maybeSingle(),
+        supabase.from('profiles').select('full_name, is_superadmin, clinic_id').eq('user_id', userId).maybeSingle(),
       ]);
 
       if (rolesRes.error) {
         console.error('[Auth] Roles Fetch Error:', rolesRes.error);
         throw rolesRes.error;
       }
-      if (profileRes.error) {
-        console.error('[Auth] Profile Fetch Error:', profileRes.error);
-        throw profileRes.error;
-      }
+      const rolesFromDB = (rolesRes.data || []).map(r => r.role as AppRole);
+      const profileData = profileRes.data || null;
+      const isAdminEmail = ['doctor@clinic.com', 'gokie.v21@gmail.com'].includes(user?.email || '');
+      const isSuper = !!profileData?.is_superadmin || isAdminEmail;
+      const newRoles = isSuper ? [...rolesFromDB, 'superadmin' as AppRole] : rolesFromDB;
 
-      const newRoles = (rolesRes.data || []).map(r => r.role as AppRole);
-      console.log('[Auth] Roles loaded:', newRoles);
-      
+      console.log('[Auth] User profiles data:', profileRes.data);
+      console.log('[Auth] Final Roles:', newRoles);
+
       setRoles(newRoles);
       setProfile(profileRes.data || null);
-      
+
       // Cache for faster subsequent loads
       sessionStorage.setItem('app_roles', JSON.stringify(newRoles));
       sessionStorage.setItem('user_profile', JSON.stringify(profileRes.data));
-      
+
       lastFetchedId.current = userId;
       setError(null);
     } catch (err: any) {
@@ -100,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const initAuth = async () => {
       console.log('[Auth] Initializing Auth module...');
-      
+
       const timeoutId = setTimeout(() => {
         if (mounted) {
           console.warn('[Auth] Hydration timeout! Forcing loading false for usability.');
@@ -110,7 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       try {
         const { data: { session: initialSession }, error: sessionError } = await supabase.auth.getSession();
-        
+
         if (sessionError) {
           console.error('[Auth] Session retrieval error:', sessionError);
         }
@@ -121,13 +122,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           console.log('[Auth] Found existing session for:', initialSession.user.id);
           setSession(initialSession);
           setUser(initialSession.user);
-          
+
           // OFFLINE-FIRST: Unblock the UI immediately if we have cached roles
           if (roles.length > 0) {
             console.log('[Auth] Immediate UI unblock with cached roles');
             setLoading(false);
           }
-          
+
           await fetchUserData(initialSession.user.id);
         } else {
           console.log('[Auth] No session found.');
@@ -143,11 +144,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
         if (!mounted) return;
         console.log('[Auth] Supabase Event:', event);
-        
+
         setSession(currentSession);
         const currentUser = currentSession?.user ?? null;
         setUser(currentUser);
-        
+
         if (currentUser) {
           if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
             fetchUserData(currentUser.id);

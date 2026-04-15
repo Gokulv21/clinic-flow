@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useOutletContext } from "react-router-dom";
 import PageBanner from "@/components/PageBanner";
 import patientEntryBanner from "@/assets/patient_entry_banner.png";
 import { formatAge } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -46,7 +47,18 @@ export default function NurseEntry() {
   const [selectedPatientFull, setSelectedPatientFull] = useState<any>(null); // To show full details in confirmation
   const [ageUnit, setAgeUnit] = useState<'years' | 'months' | 'days'>('years');
   const [tokenNumber, setTokenNumber] = useState<number | null>(null);
+  const [assignedDoctorId, setAssignedDoctorId] = useState<string>("general");
+  const { clinic } = useOutletContext<{ clinic: any }>();
+  const { profile } = useAuth();
   const [showSearch, setShowSearch] = useState(false);
+  
+  useEffect(() => {
+    if (profile && (profile as any).clinic_id && clinic?.id && (profile as any).clinic_id !== clinic.id) {
+       console.warn("Clinic ID mismatch:", (profile as any).clinic_id, clinic.id);
+       toast.error("Security Warning: Your account is assigned to a different clinic than current view. Entries may not be visible.");
+    }
+  }, [profile, clinic?.id]);
+
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
   const ageRef = useRef<HTMLInputElement>(null);
@@ -70,6 +82,15 @@ export default function NurseEntry() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const { data: doctors } = useQuery({
+    queryKey: ['doctors', clinic?.id],
+    queryFn: async () => {
+       const { data } = await supabase.from('profiles').select('id, full_name').eq('role', 'doctor').eq('clinic_id', clinic?.id);
+       return data || [];
+    },
+    enabled: !!clinic?.id
+  });
+
   const searchPatients = async (query: string = searchQuery) => {
     if (!query.trim()) {
         setSearchResults([]);
@@ -80,6 +101,7 @@ export default function NurseEntry() {
     const { data } = await supabase
       .from('patients')
       .select('*')
+      .eq('clinic_id', clinic?.id)
       .or(`phone.ilike.%${query}%,name.ilike.%${query}%,registration_id.ilike.%${query}%`)
       .limit(10);
     setSearchResults(data || []);
@@ -111,11 +133,12 @@ export default function NurseEntry() {
     setStep('confirm'); // Move to confirmation step first
   };
 
-  const handleNewPatientNext = () => {
+  const handleNewPatientNext = async () => {
     if (!patient.name || !patient.age || !patient.sex || !patient.phone || !patient.title) {
       toast.error('Please fill all required fields');
       return;
     }
+    // We move to vitals first, but submitVisit will now handle both
     setStep('vitals');
   };
 
@@ -154,6 +177,7 @@ export default function NurseEntry() {
         if (ageUnit === 'days') ageInYearsRaw = ageInYearsRaw / 365;
         const ageInYears = ageInYearsRaw >= 1 ? Math.floor(ageInYearsRaw) : ageInYearsRaw;
 
+        console.log('[NurseEntry] Creating new patient with Reg ID:', regId);
         const { data: newPatient, error } = await supabase
           .from('patients')
           .insert({
@@ -164,13 +188,18 @@ export default function NurseEntry() {
             phone: patient.phone,
             address: patient.address || null,
             registration_id: String(regId),
-            last_opened_at: new Date().toISOString()
+            last_opened_at: new Date().toISOString(),
+            clinic_id: clinic?.id
           })
           .select()
           .single();
         
-        if (error) throw error;
+        if (error) {
+          console.error('[NurseEntry] Patient insert error:', error);
+          throw error;
+        }
         patientId = newPatient.id;
+        console.log('[NurseEntry] Patient created successfully:', patientId);
       } else {
         // EXISTING PATIENT PATH: Just get token
         const { data: tokenData } = await supabase.rpc('get_next_token');
@@ -178,6 +207,7 @@ export default function NurseEntry() {
       }
 
       // Now insert the visit
+      console.log('[NurseEntry] Creating visit for patient:', patientId, 'with token:', token);
       const { error: visitError } = await supabase.from('visits').insert({
         patient_id: patientId!,
         token_number: token,
@@ -187,7 +217,10 @@ export default function NurseEntry() {
         spo2: vitals.spo2 ? parseFloat(vitals.spo2) : null,
         temperature: vitals.temperature ? parseFloat(vitals.temperature) : null,
         cbg: vitals.cbg ? parseFloat(vitals.cbg) : null,
+        assigned_doctor_id: assignedDoctorId === "general" ? null : assignedDoctorId,
+        clinic_id: clinic?.id
       });
+      console.log('[NurseEntry] Visit insert result:', visitError ? 'Error: ' + visitError.message : 'Success');
 
       if (visitError) throw visitError;
 
@@ -213,6 +246,7 @@ export default function NurseEntry() {
     setSearchQuery('');
     setSearchResults([]);
     setAgeUnit('years');
+    setAssignedDoctorId('general');
     setTab('new'); // Keep for internal logic if needed
   };
   
@@ -262,7 +296,7 @@ export default function NurseEntry() {
   }
 
   return (
-    <div className="max-w-[1600px] mx-auto animate-in fade-in duration-500 pb-12">
+    <div className="max-w-[1600px] mx-auto animate-in fade-in duration-500 pb-32">
       <PageBanner
         title="Patient Registration"
         description="Search for existing patients or register new ones with vitals and history."
@@ -584,6 +618,21 @@ export default function NurseEntry() {
                 </div>
             </CardHeader>
             <CardContent className="pt-10 space-y-10 pb-10">
+              <div className="bg-primary/5 p-4 rounded-xl border border-primary/10">
+                 <Label className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2 mb-3">Route to Specific Doctor (Optional)</Label>
+                 <Select value={assignedDoctorId} onValueChange={setAssignedDoctorId}>
+                     <SelectTrigger className="h-14 rounded-2xl border-border bg-card font-bold text-lg focus:ring-primary/10">
+                         <SelectValue placeholder="General Queue" />
+                     </SelectTrigger>
+                     <SelectContent>
+                         <SelectItem value="general" className="font-bold">General Queue (Any Doctor)</SelectItem>
+                         {doctors?.map(doc => (
+                             <SelectItem key={doc.id} value={doc.id}>Dr. {doc.full_name}</SelectItem>
+                         ))}
+                     </SelectContent>
+                 </Select>
+                 <p className="text-[10px] text-muted-foreground mt-2 font-medium">If left unassigned, this visit will appear in the general waiting list for all active doctors.</p>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 <div className="space-y-3">
                   <Label className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">Weight <span className="text-muted-foreground/40">(kg)</span></Label>

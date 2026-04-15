@@ -10,23 +10,14 @@ import { toast } from 'sonner';
 import { UserPlus, Loader2, Shield, RefreshCw } from 'lucide-react';
 import type { AppRole } from '@/lib/auth';
 import { createClient } from '@supabase/supabase-js';
+import { registerClient } from '@/lib/supabase-auth-admin';
+import { useOutletContext } from 'react-router-dom';
 import type { Database } from '@/integrations/supabase/types';
 
-// Create a separate client for registration that DOES NOT persist session.
-// This prevents Supabase from automatically logging out the admin when a new user is created.
-const registerClient = createClient<Database>(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-  {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false
-    }
-  }
-);
+
 
 export default function UserManagement() {
+  const { clinic } = useOutletContext<{ clinic: any }>();
   const [users, setUsers] = useState<any[]>([]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -36,31 +27,26 @@ export default function UserManagement() {
 
   const fetchUsers = async () => {
     try {
-      const [{ data: profilesData, error: profError }, { data: rolesData, error: rolesError }] = await Promise.all([
-        supabase.from('profiles').select('*'),
-        supabase.from('user_roles').select('*')
+      const [{ data: profilesData, error: profError }] = await Promise.all([
+        supabase.from('profiles').select('*').eq('clinic_id', clinic?.id)
       ]);
 
       if (profError) throw profError;
-      if (rolesError) throw rolesError;
 
       console.log("Raw Profiles Data:", profilesData);
-      console.log("Raw Roles Data:", rolesData);
 
       // Base the list on profiles to show everyone, even if they lack a role
       const merged = (profilesData || []).map(p => {
-        const r = rolesData?.find(role => role.user_id === p.user_id);
-
         const displayName = (p?.full_name && p.full_name !== 'Staff Member')
           ? p.full_name
           : (p?.email || 'Staff Member');
 
         return {
           id: p.user_id,
-          registration_id: r?.id || 'NO-ROLE',
+          registration_id: p.id || 'NO-ROLE',
           full_name: displayName,
           email: p?.email || 'No email synced',
-          role: r?.role || null // Null means pending role assignment
+          role: p?.role || null // Use the role from profiles
         };
       });
 
@@ -71,7 +57,9 @@ export default function UserManagement() {
     }
   };
 
-  useEffect(() => { fetchUsers(); }, []);
+  useEffect(() => { 
+    if (clinic?.id) fetchUsers(); 
+  }, [clinic?.id]);
 
   const createUser = async () => {
     if (!email.trim() || !password.trim() || !fullName.trim()) {
@@ -105,7 +93,9 @@ export default function UserManagement() {
         user_id: data.user.id,
         full_name: fullName.trim(),
         email: email.trim(),
-        id: data.user.id
+        id: data.user.id,
+        role: role as AppRole,
+        clinic_id: clinic?.id
       });
       if (profileError) {
         console.error("Profile Error:", profileError);

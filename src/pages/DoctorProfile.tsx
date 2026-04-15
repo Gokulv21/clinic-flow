@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams, useOutletContext } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
     Users, Calendar, Activity, Clock, ShieldCheck, User, Loader2,
@@ -62,6 +62,8 @@ const getAvatarUrl = (url?: string) => {
 export default function DoctorProfile() {
     const { user, roles, hasRole } = useAuth();
     const { theme, setTheme } = useTheme();
+    const { slug } = useParams();
+    const { clinic } = useOutletContext<{ clinic: any }>();
     const navigate = useNavigate();
     const [profile, setProfile] = useState<ProfileData | null>(null);
     const [activeTab, setActiveTab] = useState(() => {
@@ -112,8 +114,8 @@ export default function DoctorProfile() {
 
             // 2. Fetch Stats
             const todayStart = startOfDay(new Date()).toISOString();
-            const { count: totalCount } = await supabase.from('patients').select('*', { count: 'exact', head: true });
-            const { count: todayCount } = await supabase.from('visits').select('*', { count: 'exact', head: true }).gte('created_at', todayStart);
+            const { count: totalCount } = await supabase.from('patients').select('*', { count: 'exact', head: true }).eq('clinic_id', clinic?.id);
+            const { count: todayCount } = await supabase.from('visits').select('*', { count: 'exact', head: true }).eq('clinic_id', clinic?.id).gte('created_at', todayStart);
 
             // 3. Weekly Traffic (Last 7 days)
             const last7Days = Array.from({ length: 7 }, (_, i) => {
@@ -128,6 +130,7 @@ export default function DoctorProfile() {
             const { data: weeklyVisits } = await supabase
                 .from('visits')
                 .select('created_at')
+                .eq('clinic_id', clinic?.id)
                 .gte('created_at', subDays(startOfDay(new Date()), 6).toISOString());
 
             if (weeklyVisits) {
@@ -139,7 +142,7 @@ export default function DoctorProfile() {
             }
 
             // 4. Demographics (Age + Gender)
-            const { data: patients } = await supabase.from('patients').select('sex, age');
+            const { data: patients } = await supabase.from('patients').select('sex, age').eq('clinic_id', clinic?.id);
             const ageThreshold = 18;
             const demoData = [
                 { name: 'Men (>= 18)', value: patients?.filter(p => p.sex === 'Male' && (p.age || 0) >= ageThreshold).length || 0, color: '#2563eb' },
@@ -153,14 +156,16 @@ export default function DoctorProfile() {
             const { data: recent } = await supabase
                 .from('visits')
                 .select('id, created_at, status, patients(name, age, sex)')
+                .eq('clinic_id', clinic?.id)
                 .order('created_at', { ascending: false })
                 .limit(8);
 
             // 6. Staff List (if doctor)
             if (hasRole('doctor')) {
                 const { data: staffData } = await supabase
-                    .from('user_roles')
-                    .select('role, profiles(full_name, user_id)')
+                    .from('profiles')
+                    .select('full_name, user_id, role')
+                    .eq('clinic_id', clinic?.id)
                     .neq('role', 'doctor');
                 setStaff(staffData || []);
             }
@@ -524,9 +529,9 @@ export default function DoctorProfile() {
                             <h4 className="text-[11px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Quick Actions</h4>
                             <div className="grid grid-cols-3 gap-2">
                                 {[
-                                    { icon: <Plus className="w-5 h-5" />, label: "Entry", color: "bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400", path: "/nurse" },
-                                    { icon: <Stethoscope className="w-5 h-5" />, label: "Queue", color: "bg-purple-50 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400", path: "/consultation" },
-                                    { icon: <Printer className="w-5 h-5" />, label: "Print", color: "bg-emerald-50 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400", path: "/print" }
+                                    { icon: <Plus className="w-5 h-5" />, label: "Entry", color: "bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400", path: slug ? `/${slug}/nurse` : "/nurse" },
+                                    { icon: <Stethoscope className="w-5 h-5" />, label: "Queue", color: "bg-purple-50 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400", path: slug ? `/${slug}/consultation` : "/consultation" },
+                                    { icon: <Printer className="w-5 h-5" />, label: "Print", color: "bg-emerald-50 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400", path: slug ? `/${slug}/print` : "/print" }
                                 ].map(a => (
                                     <button
                                         key={a.label}

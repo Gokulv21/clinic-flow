@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
+import { useOutletContext } from 'react-router-dom';
 import PageBanner from "@/components/PageBanner";
 import patientListBanner from "@/assets/patient_list_banner.png";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,6 +23,7 @@ import {
 } from "@/components/ui/pagination";
 
 export default function PatientList() {
+  const { clinic } = useOutletContext<{ clinic: any }>();
   const [patients, setPatients] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [selectedPatient, setSelectedPatient] = useState<any>(null);
@@ -37,7 +39,7 @@ export default function PatientList() {
     const start = (page - 1) * pageSize;
     const end = start + pageSize - 1;
 
-    let query = supabase.from('patients').select('*', { count: 'exact' }).order('last_opened_at', { ascending: false, nullsFirst: false }).range(start, end);
+    let query = supabase.from('patients').select('*', { count: 'exact' }).eq('clinic_id', clinic?.id).order('last_opened_at', { ascending: false, nullsFirst: false }).range(start, end);
     if (search.trim()) {
       // Check if search looks like a UUID for ID search
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(search.trim());
@@ -58,13 +60,13 @@ export default function PatientList() {
   };
 
   useEffect(() => { 
-    setPage(1); // Reset page on search
+    setPage(1); // Reset page on search or clinic change
     fetchPatients(); 
-  }, [search]);
+  }, [search, clinic?.id]);
 
   useEffect(() => {
     fetchPatients();
-  }, [page]);
+  }, [page, clinic?.id]);
 
   const viewPatient = async (p: any) => {
     setSelectedPatient(p);

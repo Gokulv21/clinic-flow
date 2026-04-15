@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useOutletContext } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,11 +16,12 @@ import PrescriptionTemplate from '@/components/PrescriptionTemplate';
 import { printPrescription as renderAndPrintPrescription } from '@/lib/printPrescription';
 
 export default function PrintQueue() {
+  const { clinic } = useOutletContext<{ clinic: any }>();
   const queryClient = useQueryClient();
 
   // 1. Fetch Active Print Requests via React Query
   const { data: prescriptions = [], isLoading, refetch: refetchPrescriptions } = useQuery({
-    queryKey: ['prescriptionsToPrint'],
+    queryKey: ['prescriptionsToPrint', clinic?.id],
     queryFn: async () => {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -27,6 +29,7 @@ export default function PrintQueue() {
       const { data, error } = await supabase
         .from('prescriptions')
         .select('*, patients(*), visits(*) ')
+        .eq('clinic_id', clinic?.id)
         .eq('is_printed', false) // FOCUS ONLY on unprinted for less server load
         .gte('created_at', today.toISOString())
         .order('created_at', { ascending: true }); // Process oldest first
@@ -38,25 +41,26 @@ export default function PrintQueue() {
   });
 
   useEffect(() => {
+    if (!clinic?.id) return;
+
     let debounceTimer: any;
     const channel = supabase
-      .channel('prescriptions-realtime-v2')
+      .channel(`prescriptions-realtime-${clinic.id}`)
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
-        table: 'prescriptions',
-        filter: 'is_printed=eq.false' // Listen ONLY for new unprinted items
+        table: 'prescriptions'
       }, () => {
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
           if (!document.hidden) {
-            queryClient.invalidateQueries({ queryKey: ['prescriptionsToPrint'] });
+            queryClient.invalidateQueries({ queryKey: ['prescriptionsToPrint', clinic.id] });
           }
-        }, 1500); 
+        }, 500); // Super fast 500ms sync for prints
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [queryClient]);
+  }, [queryClient, clinic?.id]);
 
   const [printData, setPrintData] = useState<any>(null);
 

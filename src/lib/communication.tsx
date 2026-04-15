@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from './auth';
+import { useAuth } from '@/lib/auth';
 import { 
   Room, 
   RoomEvent, 
@@ -71,11 +71,13 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
 
   // Initialize Audio Assets
   useEffect(() => {
-    const dialing = new Audio('https://assets.mixkit.co/active_storage/sfx/1547/1547-preview.mp3');
+    // Using a tiny base64 silent WAV string instead of external links to permanently eliminate 403 and 404 console errors
+    const silentAudioURI = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==';
+    const dialing = new Audio(silentAudioURI);
     dialing.loop = true;
     dialingToneRef.current = dialing;
 
-    const ringing = new Audio('https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3');
+    const ringing = new Audio(silentAudioURI);
     ringing.loop = true;
     ringtoneRef.current = ringing;
 

@@ -1,6 +1,6 @@
 import { useAuth } from '@/lib/auth';
 import { Card, CardContent } from '@/components/ui/card';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams, useOutletContext } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { ClipboardPlus, Stethoscope, Printer, BarChart3, Users, Activity, TrendingUp, CalendarDays, UserCheck } from 'lucide-react';
 import { useState, useEffect } from 'react';
@@ -11,49 +11,76 @@ import { motion } from 'framer-motion';
 
 export default function Dashboard() {
   const { profile, roles, hasRole } = useAuth();
-  const navigate = useNavigate();
+  const { slug } = useParams();
+  const { clinic } = useOutletContext<{ clinic: any }>();
+  
+  useEffect(() => {
+    if (profile && (profile as any).clinic_id && clinic?.id && (profile as any).clinic_id !== clinic.id) {
+       toast.error("Account Mismatch: You are viewing " + clinic.name + " but your account is assigned to another clinic.");
+    }
+  }, [profile, clinic?.id]);
+
   const queryClient = useQueryClient();
 
-  const { data: stats = { total: 0, today: 0, completed: 0 }, isLoading } = useQuery({
-    queryKey: ['dashboardStats'],
+  const { data: dashboardData = { stats: { total: 0, today: 0, completed: 0 }, completedList: [] }, isLoading } = useQuery({
+    queryKey: ['dashboardData', clinic?.id],
     queryFn: async () => {
+      if (!clinic?.id) return { stats: { total: 0, today: 0, completed: 0 }, completedList: [] };
       const todayStart = startOfDay(new Date()).toISOString();
       const todayEnd = endOfDay(new Date()).toISOString();
 
-      const [totalPatients, todayVisits, completedToday] = await Promise.all([
-        supabase.from('patients').select('*', { count: 'exact', head: true }),
-        supabase.from('visits').select('*', { count: 'exact', head: true }).gte('created_at', todayStart).lte('created_at', todayEnd),
-        supabase.from('visits').select('*', { count: 'exact', head: true }).gte('created_at', todayStart).lte('created_at', todayEnd).eq('status', 'completed')
+      const [totalPatients, totalVisitsToday, completedToday, completedListData] = await Promise.all([
+        supabase.from('patients').select('*', { count: 'exact', head: true }).eq('clinic_id', clinic.id),
+        supabase.from('visits').select('*', { count: 'exact', head: true }).eq('clinic_id', clinic.id).gte('created_at', todayStart).lte('created_at', todayEnd),
+        supabase.from('visits').select('*', { count: 'exact', head: true }).eq('clinic_id', clinic.id).gte('created_at', todayStart).lte('created_at', todayEnd).eq('status', 'completed'),
+        supabase.from('visits').select('id, token_number, patients(title, name)').eq('clinic_id', clinic.id).gte('created_at', todayStart).lte('created_at', todayEnd).eq('status', 'completed').order('updated_at', { ascending: false }).limit(5)
       ]);
 
       return {
-        total: totalPatients.count || 0,
-        today: todayVisits.count || 0,
-        completed: completedToday.count || 0
+        stats: {
+          total: totalPatients.count || 0,
+          today: totalVisitsToday.count || 0,
+          completed: completedToday.count || 0
+        },
+        completedList: completedListData.data || []
       };
     },
-    staleTime: 30000, // Stats can be slightly stale
+    staleTime: 5000, 
   });
 
+  const stats = dashboardData.stats;
+  const completedList = dashboardData.completedList;
+
   useEffect(() => {
+    if (!clinic?.id) return;
+
     let debounceTimer: any;
     const channel = supabase
-      .channel('dashboard-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'visits' }, () => {
+      .channel(`dashboard-realtime-${clinic.id}`)
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'visits'
+      }, () => {
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
           queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
-        }, 5000); // Drastically increased for resource relief
+        }, 500); 
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'patients' }, () => {
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'patients'
+      }, () => {
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
-          queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
-        }, 5000);
+          queryClient.invalidateQueries({ queryKey: ['dashboardStats', clinic.id] });
+        }, 500);
       })
       .subscribe();
+      
     return () => { supabase.removeChannel(channel); };
-  }, [queryClient]);
+  }, [queryClient, clinic?.id]);
 
   const modules = [
     { label: 'Patient Entry', desc: 'Register & record vitals', icon: <ClipboardPlus className="w-6 h-6" />, path: '/nurse', roles: ['staff', 'doctor'] as const, color: 'from-blue-500 to-cyan-500' },
@@ -65,7 +92,7 @@ export default function Dashboard() {
   const visibleModules = modules.filter(m => m.roles.some(r => hasRole(r)));
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-10 font-jakarta-sans pb-20">
+    <div className="p-6 max-w-6xl mx-auto space-y-12 font-jakarta-sans pb-32">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <h1 className="text-4xl font-black tracking-tight text-foreground">
@@ -124,7 +151,10 @@ export default function Dashboard() {
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.3 + i * 0.1 }}
-              onClick={() => navigate(m.path)}
+              onClick={() => {
+                const fullPath = slug ? `/${slug}${m.path}` : m.path;
+                navigate(fullPath);
+              }}
               className="group relative flex flex-col p-8 glass-thick rounded-[3rem] border border-white/20 transition-all duration-500 text-left shadow-2xl overflow-hidden active:scale-90"
             >
               <div className={cn("w-16 h-16 rounded-[1.5rem] flex items-center justify-center mb-8 bg-gradient-to-br shadow-2xl group-hover:rotate-6 transition-all duration-500", m.color)}>
@@ -141,6 +171,41 @@ export default function Dashboard() {
           ))}
         </div>
       </div>
+
+      {completedList.length > 0 && (
+        <div className="animate-in fade-in slide-in-from-bottom-5 duration-700">
+          <div className="flex items-center gap-2 mb-6">
+            <UserCheck className="w-5 h-5 text-emerald-500" />
+            <h2 className="text-[13px] font-black tracking-[0.2em] text-muted-foreground uppercase">Recently Completed</h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {completedList.map((visit: any, i: number) => (
+              <motion.div
+                key={visit.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.1 }}
+                className="flex items-center justify-between p-5 glass-regular rounded-3xl border border-white/10 group hover:bg-emerald-500/5 transition-all"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 font-black text-xs shadow-inner group-hover:scale-110 transition-transform">
+                    #{visit.token_number}
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-slate-900 dark:text-white group-hover:text-emerald-500 transition-colors">
+                      {(visit.patients?.title ? visit.patients.title + ' ' : '') + visit.patients?.name}
+                    </h4>
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest leading-none mt-1">Consultation Finished</p>
+                  </div>
+                </div>
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-emerald-500/20 group-hover:text-emerald-500 transition-colors">
+                  <UserCheck className="w-5 h-5" />
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
