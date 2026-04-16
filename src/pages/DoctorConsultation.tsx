@@ -98,13 +98,47 @@ export default function DoctorConsultation() {
   const [protocols, setProtocols] = useState<any[]>([]);
   const [showProtocolDialog, setShowProtocolDialog] = useState(false);
   const [isDraftRestored, setIsDraftRestored] = useState(false);
+  const [diagnoses, setDiagnoses] = useState<string[]>([]);
+  const [diagnosisHistory, setDiagnosisHistory] = useState<string[]>([]);
+  const [showDiagnosisSuggestions, setShowDiagnosisSuggestions] = useState(false);
   const lastLoadedVisitId = useRef<string | null>(null);
 
   useEffect(() => {
     if (clinic?.id) {
       fetchProtocols();
+      fetchDiagnosisHistory();
     }
   }, [clinic?.id]);
+
+  async function fetchDiagnosisHistory() {
+    try {
+      const { data, error } = await supabase
+        .from('prescriptions')
+        .select('diagnosis')
+        .eq('doctor_id', user?.id)
+        .order('created_at', { ascending: false })
+        .limit(100);
+      
+      if (data) {
+        // Flatten and clean up duplicates
+        const all = data
+          .map(d => d.diagnosis)
+          .filter(Boolean)
+          .flatMap(d => d.split(' / '))
+          .map(d => d.trim())
+          .filter(d => d.length > 0);
+        
+        // Also keep common combinations if they appear often
+        const combinations = data
+          .map(d => d.diagnosis)
+          .filter(d => d && d.includes(' / '));
+
+        setDiagnosisHistory([...new Set([...all, ...combinations])]);
+      }
+    } catch (e) {
+      console.error("Error fetching diagnosis history", e);
+    }
+  }
 
   async function fetchProtocols() {
     const { data } = await supabase
@@ -238,7 +272,8 @@ export default function DoctorConsultation() {
       try {
         const draft = JSON.parse(savedDraft);
         if (Date.now() - draft.timestamp < 24 * 60 * 60 * 1000) {
-          setDiagnosis(draft.diagnosis || '');
+          setDiagnosis(''); // Clear input, tags will hold data
+          setDiagnoses(draft.diagnoses || (draft.diagnosis ? draft.diagnosis.split(' / ') : []));
           setClinicalNotes(draft.clinicalNotes || '');
           setMedicines(draft.medicines || [{ type: 'Tab.', name: '', dosage: '', frequency: '', duration: '' }]);
           setAdvice(draft.advice || '');
@@ -266,7 +301,8 @@ export default function DoctorConsultation() {
     let rxImage = rxData?.advice_image;
     const rxPaths = rxData?.raw_paths || [];
     
-    setDiagnosis(rxData?.diagnosis || '');
+    setDiagnosis(''); // Clear input
+    setDiagnoses(rxData?.diagnosis ? rxData.diagnosis.split(' / ') : []);
     setClinicalNotes(rxData?.clinical_notes || '');
     setMedicines(rxData?.medicines || [{ type: 'Tab.', name: '', dosage: '', frequency: '', duration: '' }]);
     
@@ -308,6 +344,19 @@ export default function DoctorConsultation() {
       .limit(10);
     setHistory(data || []);
     lastLoadedVisitId.current = visit.id;
+  };
+
+  const addDiagnosisTag = (tag: string) => {
+    const cleaned = tag.trim().replace(/\/$/, '').trim();
+    if (cleaned && !diagnoses.includes(cleaned)) {
+      setDiagnoses([...diagnoses, cleaned]);
+    }
+    setDiagnosis('');
+    setShowDiagnosisSuggestions(false);
+  };
+
+  const removeDiagnosisTag = (index: number) => {
+    setDiagnoses(diagnoses.filter((_, i) => i !== index));
   };
 
   const applyProtocol = (protocol: any) => {
@@ -389,7 +438,7 @@ export default function DoctorConsultation() {
   const savePrescription = async () => {
     if (!selectedVisit || !patient) return;
     const isWriting = lastInputWay === 'writing';
-    const finalDiagnosis = diagnosis || null;
+    const finalDiagnosis = isWriting ? diagnosis : (diagnoses.join(' / ') || diagnosis || null);
     const finalClinicalNotes = clinicalNotes || null;
     const finalMedicines = medicines.filter(m => m.name.trim());
     const finalAdviceImage = isWriting ? prescriptionImage : (advice || null);
@@ -444,9 +493,11 @@ export default function DoctorConsultation() {
       setAdvice('');
       setSelectedVisit(null);
       setPatient(null);
+      setHistory([]);
       setPrescriptionImage(null);
       setPrescriptionPaths([]);
       setDiagnosis('');
+      setDiagnoses([]);
       setClinicalNotes('');
       setMedicines([{ type: 'Tab.', name: '', dosage: '', frequency: '', duration: '' }]);
       setSaveError(null);
@@ -797,7 +848,7 @@ export default function DoctorConsultation() {
                 )}
 
 
-                <div className="space-y-3">
+                <div className="space-y-3 relative">
                   <div className="flex items-center justify-between ml-1">
                     <Label className="text-[12px] font-extrabold text-muted-foreground uppercase tracking-widest">Diagnosis</Label>
                     {isWritingMode && (
@@ -806,15 +857,70 @@ export default function DoctorConsultation() {
                       </Badge>
                     )}
                   </div>
-                  <Input 
-                    value={diagnosis} 
-                    onChange={e => {
-                      setDiagnosis(e.target.value);
-                      if (!isWritingMode) setLastInputWay('typing');
-                    }} 
-                    placeholder="Enter diagnosis (e.g. Gastritis, Hypertension)" 
-                    className="h-12 text-base font-bold bg-muted/50 border-border focus:bg-card focus:ring-blue-500 transition-all rounded-xl shadow-inner"
-                  />
+                  
+                  <div className="min-h-[56px] p-2 bg-muted/50 border border-border rounded-xl focus-within:ring-2 focus-within:ring-blue-500 transition-all flex flex-wrap gap-2 items-center">
+                    {diagnoses.map((tag, idx) => (
+                      <Badge key={idx} variant="secondary" className="pl-3 pr-1 py-1 h-8 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold flex items-center gap-1 border border-slate-200 dark:border-slate-700 shadow-sm animate-in zoom-in-50">
+                        {tag}
+                        <button 
+                          onClick={() => removeDiagnosisTag(idx)}
+                          className="w-5 h-5 rounded-md hover:bg-red-50 hover:text-red-500 transition-colors flex items-center justify-center"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                    <Input 
+                      value={diagnosis} 
+                      onChange={e => {
+                        const val = e.target.value;
+                        if (val.includes('/') || val.includes(',') || val.includes('|')) {
+                           addDiagnosisTag(val.replace(/[/,|]/g, ''));
+                        } else {
+                           setDiagnosis(val);
+                           setShowDiagnosisSuggestions(true);
+                        }
+                        if (!isWritingMode) setLastInputWay('typing');
+                      }} 
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && diagnosis.trim()) {
+                          e.preventDefault();
+                          addDiagnosisTag(diagnosis);
+                        } else if (e.key === 'Backspace' && !diagnosis && diagnoses.length > 0) {
+                          removeDiagnosisTag(diagnoses.length - 1);
+                        }
+                      }}
+                      onFocus={() => setShowDiagnosisSuggestions(true)}
+                      placeholder={diagnoses.length === 0 ? "Type diagnosis & press Enter..." : ""} 
+                      className="flex-1 border-none shadow-none bg-transparent h-9 focus-visible:ring-0 text-base font-bold min-w-[120px]"
+                    />
+                  </div>
+
+                  {showDiagnosisSuggestions && diagnosis.trim() && (
+                    <div className="absolute top-full left-0 w-full mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
+                       <div className="max-h-60 overflow-y-auto p-1">
+                          {diagnosisHistory
+                            .filter(h => h.toLowerCase().includes(diagnosis.toLowerCase()) && !diagnoses.includes(h))
+                            .slice(0, 10)
+                            .map((h, i) => (
+                              <button 
+                                key={i}
+                                onClick={() => addDiagnosisTag(h)}
+                                className="w-full text-left px-4 py-2.5 text-sm font-bold hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors flex items-center gap-2"
+                              >
+                                <Search className="w-3.5 h-3.5 text-slate-400" />
+                                {h}
+                              </button>
+                            ))
+                          }
+                          {diagnosisHistory.filter(h => h.toLowerCase().includes(diagnosis.toLowerCase()) && !diagnoses.includes(h)).length === 0 && (
+                            <div className="px-4 py-3 text-xs font-bold text-muted-foreground uppercase tracking-widest text-center">
+                               New Diagnosis
+                            </div>
+                          )}
+                       </div>
+                    </div>
+                  )}
                 </div>
 
                 {!isWritingMode && (
@@ -842,9 +948,6 @@ export default function DoctorConsultation() {
                         <div className="flex items-center gap-2">
                           <Button size="sm" variant="outline" onClick={() => setShowProtocolDialog(true)} className="h-8 pr-3 pl-2 text-[11px] font-bold border-amber-500/20 text-amber-600 hover:bg-amber-500/10 bg-card rounded-lg">
                             <HeartPulse className="w-3.5 h-3.5 mr-1" /> Protocol List
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={addMedicine} className="h-8 pr-3 pl-2 text-[11px] font-bold border-blue-500/20 text-blue-600 hover:bg-blue-500/10 bg-card rounded-lg">
-                            <Plus className="w-3.5 h-3.5 mr-1" /> Add Medicine
                           </Button>
                         </div>
                       </div>
@@ -921,7 +1024,7 @@ export default function DoctorConsultation() {
                                             </Button>
                                           </PopoverTrigger>
                                           <PopoverContent className="w-[180px] p-0 shadow-xl border-border" align="end">
-                                            <div className="max-h-60 overflow-auto p-1 bg-card rounded-lg">
+                                            <div className="max-h-60 overflow-auto p-1 bg-card rounded-lg touch-pan-y">
                                               {COMMON_FREQUENCIES.map(freq => (
                                                 <button
                                                   key={freq}
@@ -939,7 +1042,7 @@ export default function DoctorConsultation() {
                                   </>
                                 )}
 
-                                {(med.type === 'Syp.' || med.type === 'Tab.' || med.type === 'Cap.') && (
+                                 {(med.type === 'Syp.' || med.type === 'Tab.' || med.type === 'Cap.' || med.type === 'Sac.' || med.type === 'Inj.' || med.type === 'Pdr.' || med.type === 'Susp.' || med.type === 'Lot.') && (
                                   <>
                                     <div className="space-y-1">
                                       <p className="text-[9px] font-bold text-muted-foreground uppercase ml-1">Dosage</p>
@@ -967,7 +1070,7 @@ export default function DoctorConsultation() {
                                             </Button>
                                           </PopoverTrigger>
                                           <PopoverContent className="w-[180px] p-0 shadow-xl border-purple-500/20" align="end">
-                                            <div className="max-h-60 overflow-auto p-1 bg-card rounded-lg">
+                                            <div className="max-h-60 overflow-auto p-1 bg-card rounded-lg touch-pan-y">
                                               {COMMON_FREQUENCIES.map(freq => (
                                                 <button
                                                   key={freq}
@@ -1034,7 +1137,7 @@ export default function DoctorConsultation() {
                                             </Button>
                                           </PopoverTrigger>
                                           <PopoverContent className="w-[180px] p-0 shadow-xl border-sky-500/20" align="end">
-                                            <div className="max-h-60 overflow-auto p-1 bg-card rounded-lg">
+                                            <div className="max-h-60 overflow-auto p-1 bg-card rounded-lg touch-pan-y">
                                               {COMMON_FREQUENCIES.map(freq => (
                                                 <button
                                                   key={freq}
@@ -1084,7 +1187,7 @@ export default function DoctorConsultation() {
                                             </Button>
                                           </PopoverTrigger>
                                           <PopoverContent className="w-[180px] p-0 shadow-xl border-amber-500/20" align="end">
-                                            <div className="max-h-60 overflow-auto p-1 bg-card rounded-lg">
+                                            <div className="max-h-60 overflow-auto p-1 bg-card rounded-lg touch-pan-y">
                                               {COMMON_FREQUENCIES.map(freq => (
                                                 <button
                                                   key={freq}
@@ -1113,6 +1216,15 @@ export default function DoctorConsultation() {
                             </Button>
                           </div>
                         ))}
+                        <div className="pt-4 flex justify-center">
+                          <Button 
+                            variant="outline" 
+                            onClick={addMedicine} 
+                            className="h-11 px-8 text-sm font-bold border-dashed border-2 border-blue-500/30 text-blue-600 hover:bg-blue-500/5 bg-transparent rounded-2xl transition-all hover:scale-105 active:scale-95 group"
+                          >
+                            <Plus className="w-4 h-4 mr-2 group-hover:rotate-90 transition-transform" /> Add Another Medicine
+                          </Button>
+                        </div>
                       </div>
                     </div>
 
