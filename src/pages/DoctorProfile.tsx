@@ -84,11 +84,11 @@ export default function DoctorProfile() {
         recentActivity: [] as any[]
     });
 
-    const [staff, setStaff] = useState<any[]>([]);
-    const [allProfiles, setAllProfiles] = useState<any[]>([]);
-    const [showAddStaffDialog, setShowAddStaffDialog] = useState(false);
-    const [staffSearchQuery, setStaffSearchQuery] = useState('');
-    const [addingStaffId, setAddingStaffId] = useState<string | null>(null);
+    const [protocols, setProtocols] = useState<any[]>([]);
+    const [showAddProtocolDialog, setShowAddProtocolDialog] = useState(false);
+    const [isSavingProtocol, setIsSavingProtocol] = useState(false);
+    const [newProtocolName, setNewProtocolName] = useState('');
+    const [newProtocolMedicines, setNewProtocolMedicines] = useState<any[]>([]);
 
     useEffect(() => {
         fetchData();
@@ -160,15 +160,13 @@ export default function DoctorProfile() {
                 .order('created_at', { ascending: false })
                 .limit(8);
 
-            // 6. Staff List (if doctor)
-            if (hasRole('doctor')) {
-                const { data: staffData } = await supabase
-                    .from('profiles')
-                    .select('full_name, user_id, role')
-                    .eq('clinic_id', clinic?.id)
-                    .neq('role', 'doctor');
-                setStaff(staffData || []);
-            }
+            // 6. Protocols List
+            const { data: protocolData } = await supabase
+                .from('medicine_protocols')
+                .select('*')
+                .eq('clinic_id', clinic?.id)
+                .order('name');
+            setProtocols(protocolData || []);
 
             setStats({
                 totalPatients: totalCount || 0,
@@ -317,44 +315,47 @@ export default function DoctorProfile() {
         }
     };
 
-    async function fetchAllProfiles() {
-        try {
-            const { data } = await supabase
-                .from('profiles')
-                .select('user_id, full_name, email');
-            setAllProfiles(data || []);
-        } catch (err) {
-            console.error(err);
-        }
+    async function fetchProtocols() {
+        if (!clinic?.id) return;
+        const { data } = await supabase
+            .from('medicine_protocols')
+            .select('*')
+            .eq('clinic_id', clinic.id)
+            .order('name');
+        setProtocols(data || []);
     }
 
-    const handleAddStaff = async (userId: string) => {
-        setAddingStaffId(userId);
+    const handleSaveProtocol = async () => {
+        if (!newProtocolName || newProtocolMedicines.length === 0 || !clinic?.id) return;
+        setIsSavingProtocol(true);
         try {
-            const { data: existingRole } = await supabase
-                .from('user_roles')
-                .select('role')
-                .eq('user_id', userId)
-                .single();
-
-            if (existingRole?.role === 'doctor') {
-                toast.error('This user is already a doctor');
-                return;
-            }
-
-            const { error: roleError } = await supabase
-                .from('user_roles')
-                .upsert({ user_id: userId, role: 'staff' }, { onConflict: 'user_id' });
-
-            if (roleError) throw roleError;
-
-            toast.success('Staff member added to team');
-            fetchData();
-            setShowAddStaffDialog(false);
+            const { error } = await supabase.from('medicine_protocols').insert({
+                name: newProtocolName,
+                clinic_id: clinic.id,
+                medicines: newProtocolMedicines
+            });
+            if (error) throw error;
+            toast.success('Protocol saved successfully');
+            setNewProtocolName('');
+            setNewProtocolMedicines([]);
+            setShowAddProtocolDialog(false);
+            fetchProtocols();
         } catch (err: any) {
             toast.error(err.message);
         } finally {
-            setAddingStaffId(null);
+            setIsSavingProtocol(false);
+        }
+    };
+
+    const handleDeleteProtocol = async (id: string) => {
+        if (!window.confirm('Are you sure you want to delete this protocol?')) return;
+        try {
+            const { error } = await supabase.from('medicine_protocols').delete().eq('id', id);
+            if (error) throw error;
+            toast.success('Protocol deleted');
+            fetchProtocols();
+        } catch (err: any) {
+            toast.error(err.message);
         }
     };
 
@@ -496,8 +497,8 @@ export default function DoctorProfile() {
                     <TabsTrigger value="analytics" className="rounded-full px-8 py-3 data-[state=active]:bg-slate-900 data-[state=active]:text-white font-black text-xs uppercase tracking-widest gap-2">
                         <BarChart3 className="w-4 h-4" /> Analytics
                     </TabsTrigger>
-                    <TabsTrigger value="team" className="rounded-full px-8 py-3 data-[state=active]:bg-slate-900 data-[state=active]:text-white font-black text-xs uppercase tracking-widest gap-2">
-                        <Group className="w-4 h-4" /> Team
+                    <TabsTrigger value="protocols" className="rounded-full px-8 py-3 data-[state=active]:bg-slate-900 data-[state=active]:text-white font-black text-xs uppercase tracking-widest gap-2">
+                        <Stethoscope className="w-4 h-4" /> Protocols
                     </TabsTrigger>
                     <TabsTrigger value="settings" className="rounded-full px-8 py-3 data-[state=active]:bg-slate-900 data-[state=active]:text-white font-black text-xs uppercase tracking-widest gap-2">
                         <Settings className="w-4 h-4" /> Settings
@@ -717,58 +718,70 @@ export default function DoctorProfile() {
                     </div>
                 </TabsContent>
 
-                <TabsContent value="team" className="focus-visible:outline-none">
+
+                <TabsContent value="protocols" className="space-y-6 focus-visible:outline-none">
                     <Card className="border-slate-100 dark:border-slate-800 rounded-[2rem] p-8 bg-white dark:bg-slate-900 shadow-sm">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
                             <div>
-                                <CardTitle className="text-3xl font-black tracking-tighter mb-1 dark:text-slate-100">Clinic Staff members</CardTitle>
-                                <CardDescription className="dark:text-slate-400">Manage your nurse and support team access levels.</CardDescription>
+                                <CardTitle className="text-3xl font-black tracking-tighter mb-1 dark:text-slate-100">Medicine Protocols</CardTitle>
+                                <CardDescription className="dark:text-slate-400">Save common medicine combinations as reusable favorites.</CardDescription>
                             </div>
-                            {hasRole('doctor') && (
-                                <Button
-                                    onClick={() => {
-                                        fetchAllProfiles();
-                                        setShowAddStaffDialog(true);
-                                    }}
-                                    className="bg-slate-900 dark:bg-slate-50 dark:text-slate-900 text-white font-black uppercase text-[10px] tracking-widest px-8 rounded-full h-auto py-3 shadow-lg"
-                                >
-                                    <Plus className="w-3.5 h-3.5 mr-2" /> Add Staff Member
-                                </Button>
-                            )}
+                            <Button
+                                onClick={() => setShowAddProtocolDialog(true)}
+                                className="bg-slate-900 dark:bg-slate-50 dark:text-slate-900 text-white font-black uppercase text-[10px] tracking-widest px-8 rounded-full h-auto py-3 shadow-lg"
+                            >
+                                <Plus className="w-3.5 h-3.5 mr-2" /> Create New Protocol
+                            </Button>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {staff.map((s, i) => (
-                                <Card key={i} className="group relative border-slate-100 dark:border-slate-800 rounded-3xl hover:border-blue-200 dark:hover:border-blue-700 transition-all hover:shadow-xl hover:-translate-y-1 bg-white dark:bg-slate-800/50 overflow-hidden">
+                            {protocols.map((p, i) => (
+                                <Card key={p.id} className="group relative border-slate-100 dark:border-slate-800 rounded-3xl hover:border-blue-200 dark:hover:border-blue-700 transition-all hover:shadow-xl hover:-translate-y-1 bg-white dark:bg-slate-800/50 overflow-hidden">
                                     <div className="absolute top-0 left-0 w-full h-1 bg-blue-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    <CardContent className="p-6 flex items-center gap-4">
-                                        <Avatar className="w-16 h-16 rounded-2xl border-4 border-slate-50 dark:border-slate-700">
-                                            <AvatarFallback className="bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 font-black text-xl">
-                                                {s.profiles?.full_name?.charAt(0)}
-                                            </AvatarFallback>
-                                        </Avatar>
-                                        <div className="space-y-1">
-                                            <h4 className="font-black text-slate-900 dark:text-slate-100 leading-tight">{s.profiles?.full_name}</h4>
-                                            <div className="flex items-center gap-2">
-                                                <span className="bg-emerald-50 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest">
-                                                    {s.role}
-                                                </span>
-                                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                    <CardContent className="p-6 space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 bg-blue-50 dark:bg-blue-900/40 rounded-xl">
+                                                    <HeartPulse className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                                                </div>
+                                                <h4 className="font-black text-slate-900 dark:text-slate-100 leading-tight">{p.name}</h4>
                                             </div>
+                                            <Button 
+                                                variant="ghost" 
+                                                size="icon" 
+                                                onClick={() => handleDeleteProtocol(p.id)}
+                                                className="h-8 w-8 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                        </div>
+                                        <div className="space-y-2">
+                                            {p.medicines.slice(0, 3).map((m: any, idx: number) => (
+                                                <div key={idx} className="flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400">
+                                                    <div className="w-1 h-1 rounded-full bg-slate-300" />
+                                                    {m.name} {m.dosage && <span className="text-[10px] opacity-60">({m.dosage})</span>}
+                                                </div>
+                                            ))}
+                                            {p.medicines.length > 3 && (
+                                                <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest pt-1">
+                                                    + {p.medicines.length - 3} more medicines
+                                                </p>
+                                            )}
                                         </div>
                                     </CardContent>
                                     <div className="border-t border-slate-50 dark:border-slate-700 p-4 flex items-center justify-between text-[11px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
-                                        <span>Last Active: Today</span>
-                                        <Button variant="ghost" size="sm" className="h-auto p-0 hover:bg-transparent hover:text-blue-600 dark:hover:text-blue-400">Permissions <ArrowRight className="w-3 h-3 ml-1" /></Button>
+                                        <span>Ready to use</span>
+                                        <span className="text-blue-500">{p.medicines.length} items</span>
                                     </div>
                                 </Card>
                             ))}
-                            {staff.length === 0 && (
+                            {protocols.length === 0 && (
                                 <div className="col-span-full py-20 text-center space-y-4">
                                     <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mx-auto">
-                                        <Users className="w-8 h-8 text-muted-foreground/30" />
+                                        <Stethoscope className="w-8 h-8 text-muted-foreground/30" />
                                     </div>
-                                    <p className="text-muted-foreground font-bold uppercase tracking-widest text-xs">No registered staff found</p>
+                                    <p className="text-muted-foreground font-bold uppercase tracking-widest text-xs">No protocols saved yet</p>
+                                    <Button variant="outline" size="sm" onClick={() => setShowAddProtocolDialog(true)} className="rounded-full">Create Your First</Button>
                                 </div>
                             )}
                         </div>
@@ -900,9 +913,34 @@ export default function DoctorProfile() {
                                     />
                                     <div className="bg-slate-50 dark:bg-slate-800/50 rounded-3xl p-8 border-2 border-dashed border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center min-h-[150px]">
                                         {profile?.signature_data ? (
-                                            <div className="space-y-4 text-center">
-                                                <img src={profile.signature_data} className="max-h-24 mx-auto contrast-125 dark:invert" alt="Preview" />
-                                                <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500">Live Signature Active</p>
+                                            <div className="space-y-4 text-center w-full">
+                                                <div className="relative group/sig mx-auto w-fit">
+                                                    <img src={profile.signature_data} className="max-h-24 mx-auto contrast-125 dark:invert" alt="Preview" />
+                                                    <div className="absolute -top-2 -right-2 opacity-0 group-hover/sig:opacity-100 transition-opacity">
+                                                        <Button
+                                                            variant="destructive"
+                                                            size="icon"
+                                                            onClick={(e) => {
+                                                                e.preventDefault();
+                                                                setProfile(p => ({ ...p!, signature_data: undefined }));
+                                                            }}
+                                                            className="h-7 w-7 rounded-full shadow-lg"
+                                                            title="Delete Signature"
+                                                        >
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                                <div className="flex flex-col items-center gap-1">
+                                                    <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500">Live Signature Active</p>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setProfile(p => ({ ...p!, signature_data: undefined }))}
+                                                        className="text-[9px] font-bold text-red-500 hover:underline uppercase tracking-tighter"
+                                                    >
+                                                        Clear ❌
+                                                    </button>
+                                                </div>
                                             </div>
                                         ) : (
                                             <div className="text-center space-y-2 opacity-30">
@@ -929,76 +967,120 @@ export default function DoctorProfile() {
                 </TabsContent>
             </Tabs>
 
-            {/* Add Staff Dialog */}
-            <Dialog open={showAddStaffDialog} onOpenChange={setShowAddStaffDialog}>
-                <DialogContent className="max-w-2xl w-[95vw] p-0 overflow-hidden border-none bg-slate-50 dark:bg-slate-900 rounded-[2.5rem] shadow-2xl">
+            {/* Add Protocol Dialog */}
+            <Dialog open={showAddProtocolDialog} onOpenChange={setShowAddProtocolDialog}>
+                <DialogContent className="max-w-4xl w-[95vw] p-0 overflow-hidden border-none bg-slate-50 dark:bg-slate-900 rounded-[2.5rem] shadow-2xl">
                     <DialogHeader className="p-8 bg-white dark:bg-slate-800 border-b dark:border-slate-700">
                         <div className="flex items-center gap-4">
                             <div className="p-3 bg-blue-50 dark:bg-blue-900/40 rounded-2xl">
-                                <UserPlus className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                                <Plus className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                             </div>
                             <div>
-                                <DialogTitle className="text-2xl font-black tracking-tight text-slate-900 dark:text-slate-100">System Staff Members</DialogTitle>
-                                <DialogDescription className="font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest text-[10px] mt-1">Select an existing user to add to your clinic team</DialogDescription>
+                                <DialogTitle className="text-2xl font-black tracking-tight text-slate-900 dark:text-slate-100">Create Medicine Protocol</DialogTitle>
+                                <DialogDescription className="font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest text-[10px] mt-1">Design a reusable set of medicines for common consults</DialogDescription>
                             </div>
                         </div>
                     </DialogHeader>
 
-                    <div className="p-6 space-y-6">
-                        <div className="relative">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <div className="p-8 space-y-8 max-h-[60vh] overflow-y-auto">
+                        <div className="space-y-3">
+                            <Label className="text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1">Protocol Name</Label>
                             <Input
-                                placeholder="Search by name or email..."
-                                value={staffSearchQuery}
-                                onChange={e => setStaffSearchQuery(e.target.value)}
-                                className="h-12 pl-12 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-2xl font-bold shadow-sm focus:ring-blue-500"
+                                placeholder="e.g. Standard Viral Fever, Post-Op Care"
+                                value={newProtocolName}
+                                onChange={e => setNewProtocolName(e.target.value)}
+                                className="h-14 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-2xl font-black text-lg shadow-sm focus:ring-blue-500"
                             />
                         </div>
 
-                        <div className="max-h-[40vh] overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-slate-200">
-                            {allProfiles
-                                .filter(p =>
-                                    p.full_name?.toLowerCase().includes(staffSearchQuery.toLowerCase()) ||
-                                    p.email?.toLowerCase().includes(staffSearchQuery.toLowerCase())
-                                )
-                                .filter(p => !staff.some(s => s.profiles?.user_id === p.user_id)) // Hide already added
-                                .filter(p => p.user_id !== user?.id) // Hide self
-                                .map(p => (
-                                    <div key={p.user_id} className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 group hover:border-blue-200 dark:hover:border-blue-700 transition-all shadow-sm">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-10 h-10 rounded-full bg-slate-50 dark:bg-slate-700 flex items-center justify-center font-black text-slate-400 dark:text-slate-500 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/40 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                                                {p.full_name?.charAt(0)}
-                                            </div>
-                                            <div>
-                                                <p className="font-bold text-slate-800 dark:text-slate-100 leading-tight">{p.full_name}</p>
-                                                <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">{p.email || 'No email synced'}</p>
-                                            </div>
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between ml-1">
+                                <Label className="text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Medicines in Protocol</Label>
+                                <Button 
+                                    type="button" 
+                                    variant="outline" 
+                                    size="sm" 
+                                    onClick={() => setNewProtocolMedicines([...newProtocolMedicines, { name: '', dosage: '', duration: '' }])}
+                                    className="rounded-full h-8 text-[10px] font-black uppercase tracking-widest border-blue-200 text-blue-600 bg-blue-50/50"
+                                >
+                                    <Plus className="w-3 h-3 mr-1" /> Add Medicine
+                                </Button>
+                            </div>
+
+                            <div className="space-y-3">
+                                {newProtocolMedicines.map((m, idx) => (
+                                    <div key={idx} className="grid grid-cols-12 gap-3 p-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 items-end animate-in fade-in slide-in-from-top-2 duration-300">
+                                        <div className="col-span-12 md:col-span-5 space-y-1.5">
+                                            <Label className="text-[10px] font-bold text-slate-400 ml-1">Medicine Name</Label>
+                                            <Input
+                                                value={m.name}
+                                                onChange={e => {
+                                                    const updated = [...newProtocolMedicines];
+                                                    updated[idx].name = e.target.value;
+                                                    setNewProtocolMedicines(updated);
+                                                }}
+                                                placeholder="e.g. Paracetamol 650mg"
+                                                className="h-11 rounded-xl bg-slate-50 dark:bg-slate-900 border-none font-bold"
+                                            />
                                         </div>
-                                        <Button
-                                            size="sm"
-                                            onClick={() => handleAddStaff(p.user_id)}
-                                            disabled={addingStaffId === p.user_id}
-                                            className="rounded-full bg-slate-900 dark:bg-slate-50 dark:text-slate-900 text-white font-black text-[9px] uppercase tracking-widest h-9 px-4 border-none shadow-lg shadow-slate-200"
-                                        >
-                                            {addingStaffId === p.user_id ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Activate as Staff'}
-                                        </Button>
+                                        <div className="col-span-5 md:col-span-3 space-y-1.5">
+                                            <Label className="text-[10px] font-bold text-slate-400 ml-1">Dosage</Label>
+                                            <Input
+                                                value={m.dosage}
+                                                onChange={e => {
+                                                    const updated = [...newProtocolMedicines];
+                                                    updated[idx].dosage = e.target.value;
+                                                    setNewProtocolMedicines(updated);
+                                                }}
+                                                placeholder="1-0-1"
+                                                className="h-11 rounded-xl bg-slate-50 dark:bg-slate-900 border-none font-bold"
+                                            />
+                                        </div>
+                                        <div className="col-span-5 md:col-span-3 space-y-1.5">
+                                            <Label className="text-[10px] font-bold text-slate-400 ml-1">Duration</Label>
+                                            <Input
+                                                value={m.duration}
+                                                onChange={e => {
+                                                    const updated = [...newProtocolMedicines];
+                                                    updated[idx].duration = e.target.value;
+                                                    setNewProtocolMedicines(updated);
+                                                }}
+                                                placeholder="5 Days"
+                                                className="h-11 rounded-xl bg-slate-50 dark:bg-slate-900 border-none font-bold"
+                                            />
+                                        </div>
+                                        <div className="col-span-2 md:col-span-1 flex justify-center pb-1">
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => setNewProtocolMedicines(newProtocolMedicines.filter((_, i) => i !== idx))}
+                                                className="text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                        </div>
                                     </div>
                                 ))}
-                            {allProfiles.length === 0 && (
-                                <div className="text-center py-10 space-y-3">
-                                    <RefreshCw className="w-8 h-8 text-slate-200 dark:text-slate-800 mx-auto animate-spin" />
-                                    <p className="text-slate-400 dark:text-slate-500 font-bold uppercase text-[10px] tracking-widest">Loading profiles...</p>
-                                </div>
-                            )}
-                            {allProfiles.length > 0 && allProfiles.filter(p => p.full_name?.toLowerCase().includes(staffSearchQuery.toLowerCase()) || p.email?.toLowerCase().includes(staffSearchQuery.toLowerCase())).length === 0 && (
-                                <p className="text-center py-10 text-slate-400 dark:text-slate-500 font-bold uppercase text-[10px] tracking-widest italic">No matching users found</p>
-                            )}
+                                {newProtocolMedicines.length === 0 && (
+                                    <div className="p-8 border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-2xl text-center text-slate-400 font-bold text-xs uppercase tracking-widest bg-white/30">
+                                        No medicines added yet
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
 
-                    <DialogFooter className="p-6 bg-slate-50 dark:bg-slate-800 border-t dark:border-slate-700 flex items-center justify-between">
-                        <p className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest hidden sm:block">Need to create a new user? Visit User Management.</p>
-                        <Button variant="ghost" onClick={() => setShowAddStaffDialog(false)} className="rounded-full font-bold h-11 px-6 uppercase text-[10px] tracking-widest dark:text-slate-300">Close</Button>
+                    <DialogFooter className="p-8 bg-white dark:bg-slate-800 border-t dark:border-slate-700 flex items-center justify-between">
+                        <Button variant="ghost" onClick={() => setShowAddProtocolDialog(false)} className="rounded-full font-bold h-12 px-8 uppercase text-[10px] tracking-widest dark:text-slate-300">Cancel</Button>
+                        <Button 
+                            onClick={handleSaveProtocol} 
+                            disabled={isSavingProtocol || !newProtocolName || newProtocolMedicines.length === 0}
+                            className="rounded-full bg-blue-600 hover:bg-blue-700 text-white font-black h-12 px-10 uppercase text-[10px] tracking-widest shadow-xl shadow-blue-200"
+                        >
+                            {isSavingProtocol ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                            Save Protocol
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

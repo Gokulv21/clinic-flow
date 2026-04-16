@@ -17,7 +17,7 @@ import {
   MapPin, Loader2, Save, X, MoreVertical, LayoutGrid, List,
   Activity, ClipboardList, Scale, Heart, Wind, Thermometer, 
   Droplet, Pencil, Calendar, RefreshCw, UserX, ChevronDown,
-  Eye, PenTool, CheckCircle, ArrowLeft
+  Eye, PenTool, CheckCircle, ArrowLeft, HeartPulse
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Textarea } from '@/components/ui/textarea';
@@ -25,7 +25,7 @@ import DigitalPrescription from '@/components/DigitalPrescription';
 import PrescriptionTemplate from '@/components/PrescriptionTemplate';
 import { format } from "date-fns";
 import prescriptionLogo from '@/assets/prescriptionLogo.png';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { printPrescription } from '@/lib/printPrescription';
@@ -95,7 +95,25 @@ export default function DoctorConsultation() {
   const [showVitalsEdit, setShowVitalsEdit] = useState(false);
   const [lastInputWay, setLastInputWay] = useState<'typing' | 'writing'>('typing');
   const [saveError, setSaveError] = useState<{ step: 'prescription' | 'visit', message: string } | null>(null);
+  const [protocols, setProtocols] = useState<any[]>([]);
+  const [showProtocolDialog, setShowProtocolDialog] = useState(false);
+  const [isDraftRestored, setIsDraftRestored] = useState(false);
   const lastLoadedVisitId = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (clinic?.id) {
+      fetchProtocols();
+    }
+  }, [clinic?.id]);
+
+  async function fetchProtocols() {
+    const { data } = await supabase
+      .from('medicine_protocols')
+      .select('*')
+      .eq('clinic_id', clinic?.id)
+      .order('name');
+    setProtocols(data || []);
+  }
 
   useEffect(() => {
     if (!clinic?.id) return;
@@ -120,6 +138,7 @@ export default function DoctorConsultation() {
     const restoreState = async () => {
       const savedVisitId = localStorage.getItem('active_consultation_id');
       if (savedVisitId) {
+        // Fetch full visit data including prescriptions for the saved ID
         const { data } = await supabase
           .from('visits')
           .select('*, patients(*), prescriptions(*)')
@@ -130,8 +149,7 @@ export default function DoctorConsultation() {
           selectVisit(data, true);
         } else {
           localStorage.removeItem('active_consultation_id');
-          setSelectedVisit(null);
-          setPatient(null);
+          trackActiveVisit(null);
         }
       }
     };
@@ -143,46 +161,78 @@ export default function DoctorConsultation() {
     };
   }, [queryClient, clinic?.id]);
 
+  // Helper to save current form state as a draft for a specific visit
+  const saveCurrentToDraft = (visitId: string | null) => {
+    if (!visitId) return;
+    
+    // Don't save if we hasn't actually loaded any patient data yet
+    if (visitId !== lastLoadedVisitId.current) return;
+
+    const draft = {
+      diagnosis,
+      clinicalNotes,
+      medicines,
+      advice,
+      prescriptionImage,
+      prescriptionPaths,
+      isWritingMode,
+      lastInputWay,
+      timestamp: Date.now()
+    };
+    
+    // Only save if there's actual content to save
+    const hasContent = diagnosis || clinicalNotes || medicines.some(m => m.name) || advice || prescriptionImage;
+    if (hasContent) {
+      localStorage.setItem(`draft_${visitId}`, JSON.stringify(draft));
+      localStorage.setItem('active_consultation_id', visitId);
+    }
+  };
+
+  const trackActiveVisit = (visit: any) => {
+    setSelectedVisit(visit);
+    setPatient(visit?.patients || null);
+    if (visit?.id) {
+       localStorage.setItem('active_consultation_id', visit.id);
+    } else {
+       localStorage.removeItem('active_consultation_id');
+    }
+  };
+
+  // Auto-save useEffect
   useEffect(() => {
     if (selectedVisit?.id && selectedVisit.id === lastLoadedVisitId.current) {
       const timer = setTimeout(() => {
-        const draft = {
-          diagnosis,
-          clinicalNotes,
-          medicines,
-          advice,
-          prescriptionImage,
-          prescriptionPaths,
-          isWritingMode,
-          lastInputWay,
-          timestamp: Date.now()
-        };
-        localStorage.setItem(`draft_${selectedVisit.id}`, JSON.stringify(draft));
-        localStorage.setItem('active_consultation_id', selectedVisit.id);
-      }, 1000);
+        saveCurrentToDraft(selectedVisit.id);
+      }, 1500); // Save every 1.5s of inactivity
       
       return () => clearTimeout(timer);
     }
   }, [selectedVisit?.id, diagnosis, clinicalNotes, medicines, advice, prescriptionImage, prescriptionPaths, isWritingMode, lastInputWay]);
 
+  // Tab close / App switch protection
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (selectedVisit?.id) {
+        saveCurrentToDraft(selectedVisit.id);
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [selectedVisit?.id, diagnosis, clinicalNotes, medicines, advice, prescriptionImage, prescriptionPaths, isWritingMode, lastInputWay]);
+
   const selectVisit = async (visit: any, checkForDrafts = false) => {
-    if (saving) {
-      toast.warning('Please wait for the current save to complete');
-      return;
-    }
-    
-    if (saveError) {
-      toast.error('Previous save failed. Please retry or clear the error before switching patients.');
-      return;
+    // 1. SAVE PREVIOUS PATIENT'S WORK before switching
+    if (lastLoadedVisitId.current && lastLoadedVisitId.current !== visit.id) {
+      saveCurrentToDraft(lastLoadedVisitId.current);
     }
 
-    setSelectedVisit(visit);
-    setPatient(visit.patients);
+    trackActiveVisit(visit);
     
     if (visit.patients?.id) {
       supabase.from('patients').update({ last_opened_at: new Date().toISOString() }).eq('id', visit.patients.id).then();
     }
     
+    // 2. CHECK FOR DRAFTS
     const savedDraft = localStorage.getItem(`draft_${visit.id}`);
     if (checkForDrafts && savedDraft) {
       try {
@@ -197,12 +247,20 @@ export default function DoctorConsultation() {
           setIsWritingMode(draft.isWritingMode ?? false);
           setLastInputWay(draft.lastInputWay || (draft.isWritingMode ? 'writing' : 'typing'));
           lastLoadedVisitId.current = visit.id;
+          setIsDraftRestored(true);
+          toast.info(`Draft restored for ${visit.patients?.name || 'patient'}`, { 
+            description: "Work recovered from your last session.",
+            position: 'top-center',
+            duration: 3000
+          });
           return;
         }
       } catch (e) {
         console.error("Error restoring draft", e);
       }
     }
+
+    setIsDraftRestored(false);
 
     const rxData = visit.prescriptions?.[0];
     let rxImage = rxData?.advice_image;
@@ -250,6 +308,25 @@ export default function DoctorConsultation() {
       .limit(10);
     setHistory(data || []);
     lastLoadedVisitId.current = visit.id;
+  };
+
+  const applyProtocol = (protocol: any) => {
+    const newMedicines = protocol.medicines.map((m: any) => ({
+      type: m.type || 'Tab.',
+      name: m.name,
+      dosage: m.dosage || '',
+      frequency: m.frequency || '',
+      duration: m.duration || '',
+      route: m.route || '',
+      notes: m.instructions || '' // Mapping protocol instructions to prescription notes
+    }));
+    
+    // Filter out empty initial row if it exists
+    const currentMedicines = medicines.length === 1 && !medicines[0].name ? [] : medicines;
+    setMedicines([...currentMedicines, ...newMedicines]);
+    setLastInputWay('typing');
+    setShowProtocolDialog(false);
+    toast.success(`Applied ${protocol.name} protocol`, { position: 'top-center' });
   };
 
   const markAsNoShow = async () => {
@@ -502,9 +579,10 @@ export default function DoctorConsultation() {
                       variant="ghost" 
                       size="icon" 
                       onClick={() => setSelectedVisit(null)} 
-                      className="xl:hidden h-8 w-8 rounded-full"
+                      className="h-10 w-10 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-90"
+                      title="Back to Queue"
                     >
-                      <ArrowLeft className="w-4 h-4" />
+                      <ArrowLeft className="w-6 h-6 text-slate-600 dark:text-slate-400" />
                     </Button>
                     <div className="p-2 bg-blue-50 dark:bg-blue-500/10 rounded-lg">
                       <User className="w-5 h-5 text-blue-600" />
@@ -512,6 +590,12 @@ export default function DoctorConsultation() {
                     <span className="text-xl font-extrabold tracking-tight text-foreground">
                       {(patient?.title ? patient.title + ' ' : '') + patient?.name}
                     </span>
+                    {isDraftRestored && (
+                      <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800/50 flex items-center gap-1.5 animate-pulse h-6">
+                        <History className="w-3 h-3" />
+                        <span className="text-[10px] font-bold uppercase tracking-wider">Draft Restored</span>
+                      </Badge>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <Button variant="ghost" size="sm" onClick={markAsNoShow} disabled={saving} className="h-8 px-2 text-red-500 hover:text-red-700 hover:bg-red-50 gap-1 rounded-lg">
@@ -713,6 +797,26 @@ export default function DoctorConsultation() {
                 )}
 
 
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between ml-1">
+                    <Label className="text-[12px] font-extrabold text-muted-foreground uppercase tracking-widest">Diagnosis</Label>
+                    {isWritingMode && (
+                      <Badge variant="outline" className="text-[9px] font-bold text-blue-600 bg-blue-50 border-blue-200 uppercase tracking-tighter">
+                        Required for Analytics
+                      </Badge>
+                    )}
+                  </div>
+                  <Input 
+                    value={diagnosis} 
+                    onChange={e => {
+                      setDiagnosis(e.target.value);
+                      if (!isWritingMode) setLastInputWay('typing');
+                    }} 
+                    placeholder="Enter diagnosis (e.g. Gastritis, Hypertension)" 
+                    className="h-12 text-base font-bold bg-muted/50 border-border focus:bg-card focus:ring-blue-500 transition-all rounded-xl shadow-inner"
+                  />
+                </div>
+
                 {!isWritingMode && (
                   <div className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-500">
                     <div className="space-y-3">
@@ -727,19 +831,6 @@ export default function DoctorConsultation() {
                         className="min-h-[120px] text-base font-bold bg-muted/50 border-border focus:bg-card focus:ring-blue-500 transition-all rounded-xl resize-none shadow-inner"
                       />
                     </div>
-
-                    <div className="space-y-3">
-                      <Label className="text-[12px] font-extrabold text-muted-foreground uppercase tracking-widest ml-1">Diagnosis</Label>
-                      <Input 
-                        value={diagnosis} 
-                        onChange={e => {
-                          setDiagnosis(e.target.value);
-                          setLastInputWay('typing');
-                        }} 
-                        placeholder="Enter diagnosis" 
-                        className="h-12 text-base font-bold bg-muted/50 border-border focus:bg-card focus:ring-blue-500 transition-all rounded-xl shadow-inner"
-                      />
-                    </div>
                   </div>
                 )}
 
@@ -748,9 +839,14 @@ export default function DoctorConsultation() {
                     <div className="space-y-4 pt-2">
                       <div className="flex items-center justify-between ml-1">
                         <Label className="text-[12px] font-extrabold text-muted-foreground uppercase tracking-widest">Medicines</Label>
-                        <Button size="sm" variant="outline" onClick={addMedicine} className="h-8 pr-3 pl-2 text-[11px] font-bold border-blue-500/20 text-blue-600 hover:bg-blue-500/10 bg-card rounded-lg">
-                          <Plus className="w-3.5 h-3.5 mr-1" /> Add Medicine
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button size="sm" variant="outline" onClick={() => setShowProtocolDialog(true)} className="h-8 pr-3 pl-2 text-[11px] font-bold border-amber-500/20 text-amber-600 hover:bg-amber-500/10 bg-card rounded-lg">
+                            <HeartPulse className="w-3.5 h-3.5 mr-1" /> Protocol List
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={addMedicine} className="h-8 pr-3 pl-2 text-[11px] font-bold border-blue-500/20 text-blue-600 hover:bg-blue-500/10 bg-card rounded-lg">
+                            <Plus className="w-3.5 h-3.5 mr-1" /> Add Medicine
+                          </Button>
+                        </div>
                       </div>
                       <div className="space-y-3">
                         {medicines.map((med, i) => (
@@ -797,18 +893,18 @@ export default function DoctorConsultation() {
                                   <>
                                     <div className="space-y-1 text-blue-600 dark:text-blue-400">
                                       <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Dosage</p>
-                                      <Input placeholder="1 ml" value={med.dosage} onChange={e => updateMedicine(i, 'dosage', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'dosage')} className="h-10 text-sm font-bold border-blue-500/20 bg-blue-500/5 rounded-lg placeholder:text-blue-200/50" />
+                                      <Input placeholder="1 ml" value={med.dosage || ''} onChange={e => updateMedicine(i, 'dosage', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'dosage')} className="h-10 text-sm font-bold border-blue-500/20 bg-blue-500/5 rounded-lg placeholder:text-blue-200/50" />
                                     </div>
                                     <div className="space-y-1 text-blue-600 dark:text-blue-400">
                                       <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Route</p>
-                                      <Input placeholder="I.M / I.V" value={med.route} onChange={e => updateMedicine(i, 'route', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'route')} className="h-10 text-sm font-bold border-blue-500/20 bg-blue-500/5 rounded-lg placeholder:text-blue-200/50" />
+                                      <Input placeholder="I.M / I.V" value={med.route || ''} onChange={e => updateMedicine(i, 'route', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'route')} className="h-10 text-sm font-bold border-blue-500/20 bg-blue-500/5 rounded-lg placeholder:text-blue-200/50" />
                                     </div>
                                     <div className="space-y-1">
                                       <p className="text-[9px] font-bold text-muted-foreground uppercase ml-1">Frequency</p>
                                       <div className="relative medicine-freq-container">
                                         <Input 
                                           placeholder="Stat / SOS" 
-                                          value={med.frequency} 
+                                          value={med.frequency || ''} 
                                           onChange={e => updateMedicine(i, 'frequency', e.target.value)} 
                                           onKeyDown={e => handleMedicineKeyDown(e, i, 'frequency')} 
                                           className="h-10 pr-9 text-sm font-bold border-border bg-card rounded-lg" 
@@ -847,14 +943,14 @@ export default function DoctorConsultation() {
                                   <>
                                     <div className="space-y-1">
                                       <p className="text-[9px] font-bold text-muted-foreground uppercase ml-1">Dosage</p>
-                                      <Input placeholder="500mg / 5ml" value={med.dosage} onChange={e => updateMedicine(i, 'dosage', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'dosage')} className="h-10 text-sm font-bold border-border bg-card rounded-lg" />
+                                      <Input placeholder="500mg / 5ml" value={med.dosage || ''} onChange={e => updateMedicine(i, 'dosage', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'dosage')} className="h-10 text-sm font-bold border-border bg-card rounded-lg" />
                                     </div>
                                     <div className="space-y-1 text-purple-600 dark:text-purple-400">
                                       <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Frequency</p>
                                       <div className="relative medicine-freq-container">
                                         <Input 
                                           placeholder="1-0-1" 
-                                          value={med.frequency} 
+                                          value={med.frequency || ''} 
                                           onChange={e => updateMedicine(i, 'frequency', e.target.value)} 
                                           onKeyDown={e => handleMedicineKeyDown(e, i, 'frequency')} 
                                           className="h-10 pr-9 text-sm font-bold border-purple-500/20 bg-purple-500/5 rounded-lg placeholder:text-purple-200/50" 
@@ -888,7 +984,7 @@ export default function DoctorConsultation() {
                                     </div>
                                     <div className="space-y-1 text-emerald-600 dark:text-emerald-400">
                                       <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Remarks</p>
-                                      <Input placeholder="After Food / HR (Notes)" value={med.notes} onChange={e => updateMedicine(i, 'notes', e.target.value)} onKeyDown={handleMedicineKeyDown ? (e) => handleMedicineKeyDown(e, i, 'notes') : undefined} className="h-10 text-sm font-bold border-emerald-500/20 bg-emerald-500/5 rounded-lg placeholder:text-emerald-200/50" />
+                                      <Input placeholder="After Food / HR (Notes)" value={med.notes || ''} onChange={e => updateMedicine(i, 'notes', e.target.value)} onKeyDown={(e) => handleMedicineKeyDown(e, i, 'notes')} className="h-10 text-sm font-bold border-emerald-500/20 bg-emerald-500/5 rounded-lg placeholder:text-emerald-200/50" />
                                     </div>
                                   </>
                                 )}
@@ -897,15 +993,15 @@ export default function DoctorConsultation() {
                                   <>
                                     <div className="space-y-1 text-orange-600 dark:text-orange-400">
                                       <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Count</p>
-                                      <Input placeholder="1 Tube / 1 Unit" value={med.count} onChange={e => updateMedicine(i, 'count', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'count')} className="h-10 text-sm font-bold border-orange-500/20 bg-orange-500/5 rounded-lg placeholder:text-orange-200/50" />
+                                      <Input placeholder="1 Tube / 1 Unit" value={med.count || ''} onChange={e => updateMedicine(i, 'count', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'count')} className="h-10 text-sm font-bold border-orange-500/20 bg-orange-500/5 rounded-lg placeholder:text-orange-200/50" />
                                     </div>
                                     <div className="space-y-1 text-orange-600 dark:text-orange-400">
                                       <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Route</p>
-                                      <Input placeholder="External / Local" value={med.route} onChange={e => updateMedicine(i, 'route', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'route')} className="h-10 text-sm font-bold border-orange-500/20 bg-orange-500/5 rounded-lg placeholder:text-orange-200/50" />
+                                      <Input placeholder="External / Local" value={med.route || ''} onChange={e => updateMedicine(i, 'route', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'route')} className="h-10 text-sm font-bold border-orange-500/20 bg-orange-500/5 rounded-lg placeholder:text-orange-200/50" />
                                     </div>
                                     <div className="space-y-1">
                                       <p className="text-[9px] font-bold text-muted-foreground uppercase ml-1">Remarks</p>
-                                      <Input placeholder="Apply 2 times" value={med.notes} onChange={e => updateMedicine(i, 'notes', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'notes')} className="h-10 text-sm font-bold border-border bg-card rounded-lg" />
+                                      <Input placeholder="Apply 2 times" value={med.notes || ''} onChange={e => updateMedicine(i, 'notes', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'notes')} className="h-10 text-sm font-bold border-border bg-card rounded-lg" />
                                     </div>
                                   </>
                                 )}
@@ -914,14 +1010,14 @@ export default function DoctorConsultation() {
                                   <>
                                     <div className="space-y-1 text-sky-600 dark:text-sky-400">
                                       <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Count</p>
-                                      <Input placeholder="1 Bottle / 5ml" value={med.count} onChange={e => updateMedicine(i, 'count', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'count')} className="h-10 text-sm font-bold border-sky-500/20 bg-sky-500/5 rounded-lg placeholder:text-sky-200/50" />
+                                      <Input placeholder="1 Bottle / 5ml" value={med.count || ''} onChange={e => updateMedicine(i, 'count', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'count')} className="h-10 text-sm font-bold border-sky-500/20 bg-sky-500/5 rounded-lg placeholder:text-sky-200/50" />
                                     </div>
                                     <div className="space-y-1 text-sky-600 dark:text-sky-400">
                                       <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Frequency</p>
                                       <div className="relative medicine-freq-container">
                                         <Input 
                                           placeholder="2 drops 3 times" 
-                                          value={med.frequency} 
+                                          value={med.frequency || ''} 
                                           onChange={e => updateMedicine(i, 'frequency', e.target.value)} 
                                           onKeyDown={e => handleMedicineKeyDown(e, i, 'frequency')} 
                                           className="h-10 pr-9 text-sm font-bold border-sky-500/20 bg-sky-500/5 rounded-lg placeholder:text-sky-200/50" 
@@ -955,7 +1051,7 @@ export default function DoctorConsultation() {
                                     </div>
                                     <div className="space-y-1">
                                       <p className="text-[9px] font-bold text-muted-foreground uppercase ml-1">Remarks</p>
-                                      <Input placeholder="Eye / Ear / Nose" value={med.notes} onChange={e => updateMedicine(i, 'notes', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'notes')} className="h-10 text-sm font-bold border-border bg-card rounded-lg" />
+                                      <Input placeholder="Eye / Ear / Nose" value={med.notes || ''} onChange={e => updateMedicine(i, 'notes', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'notes')} className="h-10 text-sm font-bold border-border bg-card rounded-lg" />
                                     </div>
                                   </>
                                 )}
@@ -964,14 +1060,14 @@ export default function DoctorConsultation() {
                                   <>
                                     <div className="space-y-1 text-amber-600 dark:text-amber-400">
                                       <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Count</p>
-                                      <Input placeholder="1 Sachet / 5 Sac" value={med.count} onChange={e => updateMedicine(i, 'count', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'count')} className="h-10 text-sm font-bold border-amber-500/20 bg-amber-500/5 rounded-lg placeholder:text-amber-200/50" />
+                                      <Input placeholder="1 Sachet / 5 Sac" value={med.count || ''} onChange={e => updateMedicine(i, 'count', e.target.value)} onKeyDown={e => handleMedicineKeyDown(e, i, 'count')} className="h-10 text-sm font-bold border-amber-500/20 bg-amber-500/5 rounded-lg placeholder:text-amber-200/50" />
                                     </div>
                                     <div className="space-y-1 text-amber-600 dark:text-amber-400">
                                       <p className="text-[9px] font-bold uppercase ml-1 italic opacity-60">Frequency</p>
                                       <div className="relative medicine-freq-container">
                                         <Input 
                                           placeholder="Daily night" 
-                                          value={med.frequency} 
+                                          value={med.frequency || ''} 
                                           onChange={e => updateMedicine(i, 'frequency', e.target.value)} 
                                           onKeyDown={e => handleMedicineKeyDown(e, i, 'frequency')} 
                                           className="h-10 pr-9 text-sm font-bold border-amber-500/20 bg-amber-500/5 rounded-lg placeholder:text-amber-200/50" 
@@ -1264,6 +1360,60 @@ export default function DoctorConsultation() {
               }
             }}>Save Changes</Button>
           </div>
+        </DialogContent>
+      </Dialog>
+      {/* Protocol Selection Dialog */}
+      <Dialog open={showProtocolDialog} onOpenChange={setShowProtocolDialog}>
+        <DialogContent className="max-w-2xl w-[95vw] p-0 overflow-hidden border-none bg-slate-50 dark:bg-slate-900 rounded-[2.5rem] shadow-2xl">
+          <DialogHeader className="p-8 bg-white dark:bg-slate-800 border-b dark:border-slate-700">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-amber-50 dark:bg-amber-900/40 rounded-2xl">
+                <HeartPulse className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div>
+                <DialogTitle className="text-2xl font-black tracking-tight text-slate-900 dark:text-slate-100">Apply Medicine Protocol</DialogTitle>
+                <DialogDescription className="font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest text-[10px] mt-1">Instantly fill prescription with your saved favorites</DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="p-6 space-y-4 max-h-[50vh] overflow-y-auto">
+            {protocols.map(p => (
+              <button
+                key={p.id}
+                onClick={() => applyProtocol(p)}
+                className="w-full flex items-center justify-between p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 group hover:border-blue-200 dark:hover:border-blue-700 transition-all shadow-sm text-left hover:-translate-y-1"
+              >
+                <div className="flex flex-col gap-1">
+                  <div className="font-black text-slate-900 dark:text-slate-100 leading-tight flex items-center gap-2">
+                    {p.name}
+                    <span className="text-[10px] bg-blue-100 dark:bg-blue-900/40 text-blue-600 px-2 py-0.5 rounded-full uppercase tracking-tighter">
+                      {p.medicines.length} Items
+                    </span>
+                  </div>
+                  <div className="text-[11px] font-bold text-slate-400 line-clamp-1">
+                    {p.medicines.map((m: any) => m.name).join(', ')}
+                  </div>
+                </div>
+                <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-blue-500 group-hover:translate-x-1 transition-all" />
+              </button>
+            ))}
+            {protocols.length === 0 && (
+              <div className="text-center py-12 space-y-4 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl">
+                <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto">
+                  <HeartPulse className="w-8 h-8 text-muted-foreground/30" />
+                </div>
+                <p className="text-muted-foreground font-bold uppercase tracking-widest text-[10px]">No protocols saved yet</p>
+                <Button variant="outline" size="sm" className="rounded-full" onClick={() => navigate(slug ? `/${slug}/profile` : '/profile')}>
+                  Create Protocols in Profile
+                </Button>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="p-6 bg-slate-50 dark:bg-slate-800 border-t dark:border-slate-700 flex items-center justify-end">
+            <Button variant="ghost" onClick={() => setShowProtocolDialog(false)} className="rounded-full font-bold h-11 px-8 uppercase text-[10px] tracking-widest dark:text-slate-300">Close</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
