@@ -17,7 +17,7 @@ import {
   MapPin, Loader2, Save, X, MoreVertical, LayoutGrid, List,
   Activity, ClipboardList, Scale, Heart, Wind, Thermometer, 
   Droplet, Pencil, Calendar, RefreshCw, UserX, ChevronDown,
-  Eye, PenTool, CheckCircle, ArrowLeft, HeartPulse
+  Eye, PenTool, CheckCircle, ArrowLeft, HeartPulse, MessageCircle
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Textarea } from '@/components/ui/textarea';
@@ -101,6 +101,7 @@ export default function DoctorConsultation() {
   const [diagnoses, setDiagnoses] = useState<string[]>([]);
   const [diagnosisHistory, setDiagnosisHistory] = useState<string[]>([]);
   const [showDiagnosisSuggestions, setShowDiagnosisSuggestions] = useState(false);
+  const [openFreqPopoverIndex, setOpenFreqPopoverIndex] = useState<number | null>(null);
   const lastLoadedVisitId = useRef<string | null>(null);
 
   useEffect(() => {
@@ -433,6 +434,34 @@ export default function DoctorConsultation() {
     if (s === 'waiting') return 'bg-warning/10 text-warning border-warning/30';
     if (s === 'in_consultation') return 'bg-info/10 text-info border-info/30';
     return 'bg-success/10 text-success border-success/30';
+  };
+
+  const shareToWhatsApp = (visitData: any, patientData: any) => {
+    if (!visitData || !patientData) return;
+    const patientPhone = patientData.phone || '';
+    let cleanPhone = patientPhone.replace(/\D/g, '');
+    if (cleanPhone.length === 10) cleanPhone = '91' + cleanPhone;
+
+    const patientName = (patientData.title ? patientData.title + ' ' : '') + (patientData.name ?? 'Patient');
+    const resolvedDoctorName = user?.user_metadata?.full_name || 'Dr. V Aravind';
+    const resolvedClinicName = clinic?.name || 'GV Clinic';
+    const publicLink = `${window.location.origin}/prescripto/rx/${visitData.id}`;
+
+    const message = `Hello ${patientName},  
+
+Your prescription 📝 from ${resolvedDoctorName} (${resolvedClinicName}) is ready.  
+Access it here:  👇🏻 
+
+🔗 ${publicLink}  
+
+Follow the instructions carefully.  
+💖 Wishing you a quick recovery!  
+
+— ${resolvedClinicName}`;
+
+    const encodedMsg = encodeURIComponent(message);
+    const whatsappUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedMsg}`;
+    window.open(whatsappUrl, '_blank');
   };
 
   const savePrescription = async () => {
@@ -1012,7 +1041,7 @@ export default function DoctorConsultation() {
                                           onKeyDown={e => handleMedicineKeyDown(e, i, 'frequency')} 
                                           className="h-10 pr-9 text-sm font-bold border-border bg-card rounded-lg" 
                                         />
-                                        <Popover>
+                                        <Popover open={openFreqPopoverIndex === i} onOpenChange={(open) => setOpenFreqPopoverIndex(open ? i : null)}>
                                           <PopoverTrigger asChild>
                                             <Button 
                                               variant="ghost" 
@@ -1289,16 +1318,19 @@ export default function DoctorConsultation() {
       {/* Preview Dialog */}
       <Dialog open={showPreview} onOpenChange={setShowPreview}>
         <DialogContent className="max-w-[900px] w-[95vw] p-0 overflow-hidden bg-background">
-          <DialogHeader className="bg-muted/50 p-4 border-b relative">
-            <div className="flex items-center justify-between w-full">
-              <Button variant="outline" size="sm" onClick={() => printPrescription('#consultation-print-preview')} className="gap-2 z-10">
-                <Printer className="w-4 h-4" /> Print
-              </Button>
-              <DialogTitle className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap">
+          <DialogHeader className="bg-muted/50 p-4 pr-12 border-b relative">
+              <div className="flex items-center gap-2 z-10">
+                <Button variant="outline" size="sm" onClick={() => printPrescription('#consultation-print-preview')} className="gap-2">
+                  <Printer className="w-4 h-4" /> Print
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => shareToWhatsApp(selectedVisit, patient)} className="gap-2 border-green-500/30 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/10">
+                  <MessageCircle className="w-4 h-4" /> Share
+                </Button>
+              </div>
+              <DialogTitle className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap text-sm font-black uppercase tracking-widest text-slate-400">
                 Prescription Preview
               </DialogTitle>
-              <div className="w-20" /> {/* Spacer for symmetry with print button */}
-            </div>
+              <div className="w-40" /> {/* Spacer for symmetry */}
           </DialogHeader>
           <div className="p-4 md:p-8 overflow-auto max-h-[85vh] bg-muted min-h-[500px]" id="consultation-print-preview">
             <PrescriptionTemplate
@@ -1306,7 +1338,7 @@ export default function DoctorConsultation() {
               visit={selectedVisit}
               handwrittenImage={prescriptionImage}
               clinicalNotes={clinicalNotes}
-              diagnosis={diagnosis}
+              diagnosis={diagnoses.length > 0 ? diagnoses.join(' / ') : diagnosis}
               medicines={medicines.filter(m => m.name.trim())}
               advice={advice}
               isWritingMode={lastInputWay === 'writing'}
@@ -1322,9 +1354,12 @@ export default function DoctorConsultation() {
       <Dialog open={!!viewingHistoryRx} onOpenChange={open => !open && setViewingHistoryRx(null)}>
         <DialogContent className="max-w-[800px] p-0 overflow-hidden bg-background border-none shadow-2xl">
           <div className="bg-background/80 p-4 border-b flex items-center justify-between sticky top-0 z-[60] backdrop-blur-md pr-16">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
               <Button size="sm" onClick={() => printPrescription('#history-print-preview')} className="gap-2">
                 <Printer className="w-4 h-4" /> Print
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => shareToWhatsApp(viewingHistoryRx, patient)} className="gap-2 border-green-500/30 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/10">
+                <MessageCircle className="w-4 h-4" /> Share
               </Button>
             </div>
             <h3 className="font-bold text-foreground">
@@ -1343,7 +1378,7 @@ export default function DoctorConsultation() {
                     visit={viewingHistoryRx}
                     handwrittenImage={rx?.advice_image}
                     clinicalNotes={rx?.clinical_notes}
-                    diagnosis={rx?.diagnosis || viewingHistoryRx.diagnosis}
+                  diagnosis={rx?.diagnosis || viewingHistoryRx.diagnosis}
                     medicines={rx?.medicines || []}
                     advice={!isWritingMode ? rx?.advice_image : null}
                     isWritingMode={isWritingMode}

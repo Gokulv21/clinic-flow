@@ -167,7 +167,6 @@ Follow the instructions carefully.
     ];
 
     const hasTyped = !!(diagnosis || clinicalNotes || (medicines && medicines.length > 0) || advice);
-    const showTyped = hasTyped; // Show typed content regardless of writing mode if it exists
 
     // Multi-page parsing logic
     let rawImages: (string | null)[] = [];
@@ -224,7 +223,7 @@ Follow the instructions carefully.
                             diagnosis={diagnosis}
                             medicines={medicines}
                             advice={advice}
-                            hasTyped={showTyped}
+                            hasTyped={hasTyped}
                             vitals={vitals}
                             doctorProfile={doctorProfile}
                             isWritingMode={isWritingMode}
@@ -426,24 +425,42 @@ function PageOne({
                                     <div style={{ whiteSpace: 'pre-wrap', fontWeight: 500, borderLeft: '3px solid #e2e8f0', paddingLeft: '0.8em', fontStyle: 'italic' }}>{clinicalNotes}</div>
                                 </div>
                             )}
-                            {diagnosis && <div style={{ fontWeight: 800, fontSize: '1.2em', marginBottom: '0.6em', color: '#1e293b' }}>Dx: {diagnosis}</div>}
-                            {medicines.map((m, i) => (
-                                <div key={i} style={{ marginBottom: '0.8em', paddingLeft: '1em', borderLeft: '3px solid #3b82f6', fontSize: '1.05em' }}>
-                                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '0.4em' }}>
-                                        <strong style={{ fontWeight: 800, color: '#0f172a' }}>{i + 1}. {m.type} {m.name}</strong>
-                                        {m.dosage && <span style={{ fontWeight: 600, color: '#334155' }}>{m.dosage}</span>}
-                                        {m.count && <span style={{ fontWeight: 600, color: '#334155' }}>({m.count})</span>}
-                                        {m.route && <span style={{ fontWeight: 700, color: '#2563eb', fontSize: '0.9em', textTransform: 'uppercase' }}>[{m.route}]</span>}
-                                        {m.frequency && <span style={{ fontWeight: 700, color: '#0f172a' }}>{m.frequency}</span>}
-                                        {m.duration && <span style={{ fontWeight: 600, color: '#475569' }}>for {m.duration}</span>}
-                                    </div>
-                                    {m.notes && (
-                                        <div style={{ fontSize: '0.85em', fontWeight: 600, color: '#64748b', marginTop: '0.1em', fontStyle: 'italic' }}>
-                                            Remarks: {m.notes}
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
+                            {/* Diagnosis hidden from writings, used only for analytics */}
+
+                            {medicines.length > 0 && (
+                                <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '0.8em', fontSize: '1.05em', border: '1px solid #e2e8f0', borderRadius: '0.5em', overflow: 'hidden' }}>
+                                    <thead>
+                                        <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #334155', textAlign: 'left' }}>
+                                            <th style={{ padding: '0.8em 0.6em', fontSize: '0.75em', fontWeight: 900, color: '#334155', textTransform: 'uppercase', width: '3.5em', letterSpacing: '0.05em' }}>#</th>
+                                            <th style={{ padding: '0.8em 0.6em', fontSize: '0.75em', fontWeight: 900, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Medicine Name</th>
+                                            <th style={{ padding: '0.8em 0.6em', fontSize: '0.75em', fontWeight: 900, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Dosage</th>
+                                            <th style={{ padding: '0.8em 0.6em', fontSize: '0.75em', fontWeight: 900, color: '#334155', textTransform: 'uppercase', width: '5.5em', letterSpacing: '0.05em' }}>Freq.</th>
+                                            <th style={{ padding: '0.8em 0.6em', fontSize: '0.75em', fontWeight: 900, color: '#334155', textTransform: 'uppercase', width: '6.5em', letterSpacing: '0.05em' }}>Dur.</th>
+                                            <th style={{ padding: '0.8em 0.6em', fontSize: '0.75em', fontWeight: 900, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Instructions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {medicines.map((m, i) => (
+                                            <tr key={i} style={{ 
+                                                borderBottom: '1px solid #f1f5f9',
+                                                backgroundColor: i % 2 === 0 ? '#ffffff' : '#f8fafc'
+                                            }}>
+                                                <td style={{ padding: '1em 0.6em', fontWeight: 700, verticalAlign: 'top', color: '#64748b' }}>{i + 1}</td>
+                                                <td style={{ padding: '1em 0.6em', fontWeight: 800, verticalAlign: 'top' }}>
+                                                    <div style={{ color: '#0f172a', fontSize: '1.1em' }}>{m.type} {m.name}</div>
+                                                    {m.route && <div style={{ fontSize: '0.75em', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase', marginTop: '0.3em', letterSpacing: '0.02em' }}>{m.route}</div>}
+                                                </td>
+                                                <td style={{ padding: '1em 0.6em', fontWeight: 700, color: '#334155', verticalAlign: 'top' }}>{m.dosage || m.count || '—'}</td>
+                                                <td style={{ padding: '1em 0.6em', fontWeight: 800, color: '#0f172a', verticalAlign: 'top' }}>{m.frequency || '—'}</td>
+                                                <td style={{ padding: '1em 0.6em', fontWeight: 700, color: '#475569', verticalAlign: 'top' }}>{m.duration ? `for ${m.duration}` : '—'}</td>
+                                                <td style={{ padding: '1em 0.6em', borderLeft: '1px solid #f1f5f9', verticalAlign: 'top' }}>
+                                                    <div style={{ fontSize: '0.85em', fontWeight: 700, color: '#475569', fontStyle: 'italic', lineHeight: 1.4, opacity: 0.9 }}>{m.notes || '—'}</div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
                             {advice && !isValidImage(advice) && <div style={{ marginTop: '1em', fontStyle: 'italic', color: '#475569', fontSize: '1em', fontWeight: 500 }}>Advice: {advice}</div>}
                         </div>
                     )}
