@@ -16,7 +16,6 @@ import {
 import { useTheme } from '@/components/ThemeProvider';
 import logo from '@/assets/logo.png';
 import { motion, AnimatePresence, useScroll, useMotionValueEvent } from 'framer-motion';
-import UpdateCarousel from './UpdateCarousel';
 
 interface NavItem {
   label: string;
@@ -85,7 +84,6 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen flex bg-slate-50 dark:bg-[#000000] font-jakarta-sans relative overflow-hidden">
-      <UpdateCarousel />
       {/* Decorative Background Elements for Glass effect */}
       <div className="fixed inset-0 pointer-events-none opacity-20 dark:opacity-40">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/30 blur-[120px] rounded-full" />
