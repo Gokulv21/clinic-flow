@@ -14,32 +14,33 @@ export default defineConfig(({ mode }) => ({
     react(),
     // mode === 'development' &&
     // componentTagger(),
-    VitePWA({
-      registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'prescriptionLogo.png'],
-      workbox: {
-        maximumFileSizeToCacheInBytes: 5000000, // Now 5MB to handle larger assets
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg,webmanifest}']
-      },
-      manifest: {
-        name: 'PreScripto',
-        short_name: 'PreScripto',
-        description: 'Advanced Clinic Management & Prescription System',
-        theme_color: '#0284c7',
-        icons: [
-          {
-            src: 'prescriptionLogo.png',
-            sizes: '192x192',
-            type: 'image/png'
-          },
-          {
-            src: 'prescriptionLogo.png',
-            sizes: '512x512',
-            type: 'image/png'
-          }
-        ]
-      }
-    })
+    // VitePWA({
+    //   registerType: 'autoUpdate',
+    //   includeAssets: ['favicon.ico', 'prescriptionLogo.png'],
+    //   workbox: {
+    //     maximumFileSizeToCacheInBytes: 5000000, // Now 5MB to handle larger assets
+    //     globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg,webmanifest}']
+    //   },
+    //   manifest: {
+    //     name: 'PreScripto',
+    //     short_name: 'PreScripto',
+    //     description: 'Advanced Clinic Management & Prescription System',
+    //     theme_color: '#0284c7',
+    //     icons: [
+    //       {
+    //         src: 'prescriptionLogo.png',
+    //         sizes: '192x192',
+    //         type: 'image/png'
+    //       },
+    //       {
+    //         src: 'prescriptionLogo.png',
+    //         sizes: '512x512',
+    //         type: 'image/png'
+    //       }
+    //     ]
+    //   }
+    // })
+
   ].filter(Boolean),
   build: {
     chunkSizeWarningLimit: 1000,

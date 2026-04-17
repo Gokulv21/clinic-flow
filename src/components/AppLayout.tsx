@@ -333,7 +333,11 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           <motion.div
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="min-h-full glass-thick md:rounded-[3rem] rounded-[2rem] border border-white/30 p-4 md:p-10 shadow-[0_40px_100px_rgba(0,0,0,0.3)] overflow-hidden relative"
+            className={cn(
+              "min-h-full md:rounded-[3rem] rounded-[2rem] p-4 md:p-10 overflow-hidden relative transition-all duration-700",
+              "glass-thick border border-white/30 shadow-[0_40px_100px_rgba(0,0,0,0.3)]",
+              "dark:glass3d dark:border-none dark:shadow-none"
+            )}
           >
             {/* Atmospheric Glow inside the sheet */}
             <div className="absolute top-[-20%] right-[-10%] w-[50%] h-[50%] bg-blue-500/5 blur-[120px] rounded-full pointer-events-none" />

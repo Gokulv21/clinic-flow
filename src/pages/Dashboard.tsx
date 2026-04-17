@@ -121,7 +121,11 @@ export default function Dashboard() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.1 }}
           >
-            <Card className="border-none shadow-2xl overflow-hidden group glass-regular rounded-[2.5rem] border border-white/10">
+            <Card className={cn(
+              "border-none shadow-2xl overflow-hidden group rounded-[2.5rem] border border-white/10 transition-all duration-500",
+              "glass-regular", 
+              "dark:glass3d dark:border-none dark:shadow-none"
+            )}>
               <CardContent className="p-7 flex items-center justify-between">
                 <div>
                   <p className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">{s.label}</p>
@@ -155,7 +159,11 @@ export default function Dashboard() {
                 const fullPath = slug ? `/${slug}${m.path}` : m.path;
                 navigate(fullPath);
               }}
-              className="group relative flex flex-col p-8 glass-thick rounded-[3rem] border border-white/20 transition-all duration-500 text-left shadow-2xl overflow-hidden active:scale-90"
+              className={cn(
+                "group relative flex flex-col p-8 rounded-[3rem] transition-all duration-500 text-left shadow-2xl overflow-hidden active:scale-90",
+                "glass-thick border border-white/20",
+                "dark:glass3d dark:border-none dark:shadow-none"
+              )}
             >
               <div className={cn("w-16 h-16 rounded-[1.5rem] flex items-center justify-center mb-8 bg-gradient-to-br shadow-2xl group-hover:rotate-6 transition-all duration-500", m.color)}>
                 <div className="text-white drop-shadow-md">{m.icon}</div>

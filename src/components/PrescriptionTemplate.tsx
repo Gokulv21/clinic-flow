@@ -137,7 +137,11 @@ const PrescriptionTemplate = React.memo(({
         const patientName = (patient?.title ? patient.title + ' ' : '') + (patient?.name ?? 'Patient');
         const resolvedDoctorName = doctorName || doctorProfile?.full_name || 'Dr. Gokul';
         const resolvedClinicName = clinicName || doctorProfile?.clinic_name || 'GV Clinic';
-        const publicLink = `${window.location.origin}/prescripto/rx/${visit.id}`;
+        const publicLink = visit?.id ? `${window.location.origin}/prescripto/rx/${visit.id}` : '';
+        if (!publicLink) {
+            toast.error("Visit data missing, cannot share.");
+            return;
+        }
 
         const message = `Hello ${patientName},  
 
@@ -416,27 +420,35 @@ function PageOne({
             <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
                 {/* LEFT — Rx writing area */}
                 <div style={{ flex: 1, position: 'relative', borderRight: '2px solid #e2e8f0', padding: '1.2em 1.5em', display: 'flex', flexDirection: 'column', background: '#fff', overflow: 'hidden' }}>
-                    <div style={{ height: '5em', flexShrink: 0 }} />
+                    <div style={{ height: '0.8em', flexShrink: 0 }} />
                     {hasTyped && (
                         <div style={{ lineHeight: 1.6, fontSize: '1.1em', overflow: 'hidden', zIndex: 30, position: 'relative' }}>
+                            {/* Diagnosis shown only in non-writing mode or if explicitly requested */}
+                            {!isWritingMode && diagnosis && (
+                                <div style={{ marginBottom: '1.2em', color: '#1e293b' }}>
+                                    <div style={{ fontWeight: 800, fontSize: '0.8em', textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.05em', marginBottom: '0.4em' }}>Diagnosis:</div>
+                                    <div style={{ fontWeight: 800, fontSize: '1.2em', color: '#0f172a' }}>{diagnosis}</div>
+                                </div>
+                            )}
+
                             {clinicalNotes && (
                                 <div style={{ marginBottom: '1.2em', color: '#334155' }}>
                                     <div style={{ fontWeight: 800, fontSize: '0.8em', textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.05em', marginBottom: '0.4em' }}>Clinical Notes & History:</div>
                                     <div style={{ whiteSpace: 'pre-wrap', fontWeight: 500, borderLeft: '3px solid #e2e8f0', paddingLeft: '0.8em', fontStyle: 'italic' }}>{clinicalNotes}</div>
                                 </div>
                             )}
-                            {/* Diagnosis hidden from writings, used only for analytics */}
 
-                            {medicines.length > 0 && (
+                            {(medicines && medicines.length > 0) && (
                                 <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '0.8em', fontSize: '1.05em', border: '1px solid #e2e8f0', borderRadius: '0.5em', overflow: 'hidden' }}>
                                     <thead>
                                         <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #334155', textAlign: 'left' }}>
-                                            <th style={{ padding: '0.8em 0.6em', fontSize: '0.75em', fontWeight: 900, color: '#334155', textTransform: 'uppercase', width: '3.5em', letterSpacing: '0.05em' }}>#</th>
-                                            <th style={{ padding: '0.8em 0.6em', fontSize: '0.75em', fontWeight: 900, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Medicine Name</th>
-                                            <th style={{ padding: '0.8em 0.6em', fontSize: '0.75em', fontWeight: 900, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Dosage</th>
-                                            <th style={{ padding: '0.8em 0.6em', fontSize: '0.75em', fontWeight: 900, color: '#334155', textTransform: 'uppercase', width: '5.5em', letterSpacing: '0.05em' }}>Freq.</th>
-                                            <th style={{ padding: '0.8em 0.6em', fontSize: '0.75em', fontWeight: 900, color: '#334155', textTransform: 'uppercase', width: '6.5em', letterSpacing: '0.05em' }}>Dur.</th>
-                                            <th style={{ padding: '0.8em 0.6em', fontSize: '0.75em', fontWeight: 900, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Instructions</th>
+                                            <th style={{ padding: '0.8em 0.4em', fontSize: '0.7em', fontWeight: 900, color: '#334155', textTransform: 'uppercase', width: '2.5em', letterSpacing: '0.05em' }}>#</th>
+                                            <th style={{ padding: '0.8em 0.4em', fontSize: '0.7em', fontWeight: 900, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Medicine Name</th>
+                                            <th style={{ padding: '0.8em 0.4em', fontSize: '0.7em', fontWeight: 900, color: '#334155', textTransform: 'uppercase', width: '7em', letterSpacing: '0.05em' }}>Route</th>
+                                            <th style={{ padding: '0.8em 0.4em', fontSize: '0.7em', fontWeight: 900, color: '#334155', textTransform: 'uppercase', width: '6.5em', letterSpacing: '0.05em' }}>Dosage</th>
+                                            <th style={{ padding: '0.8em 0.4em', fontSize: '0.7em', fontWeight: 900, color: '#334155', textTransform: 'uppercase', width: '5.5em', letterSpacing: '0.05em' }}>Freq.</th>
+                                            <th style={{ padding: '0.8em 0.4em', fontSize: '0.7em', fontWeight: 900, color: '#334155', textTransform: 'uppercase', width: '4.5em', letterSpacing: '0.05em' }}>Dur.</th>
+                                            <th style={{ padding: '0.8em 0.4em', fontSize: '0.7em', fontWeight: 900, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Instructions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -445,16 +457,16 @@ function PageOne({
                                                 borderBottom: '1px solid #f1f5f9',
                                                 backgroundColor: i % 2 === 0 ? '#ffffff' : '#f8fafc'
                                             }}>
-                                                <td style={{ padding: '1em 0.6em', fontWeight: 700, verticalAlign: 'top', color: '#64748b' }}>{i + 1}</td>
-                                                <td style={{ padding: '1em 0.6em', fontWeight: 800, verticalAlign: 'top' }}>
-                                                    <div style={{ color: '#0f172a', fontSize: '1.1em' }}>{m.type} {m.name}</div>
-                                                    {m.route && <div style={{ fontSize: '0.75em', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase', marginTop: '0.3em', letterSpacing: '0.02em' }}>{m.route}</div>}
+                                                <td style={{ padding: '0.8em 0.4em', fontWeight: 700, verticalAlign: 'top', color: '#64748b' }}>{i + 1}</td>
+                                                <td style={{ padding: '0.8em 0.4em', fontWeight: 800, verticalAlign: 'top' }}>
+                                                    <div style={{ color: '#0f172a', fontSize: '1.05em' }}>{m?.type} {m?.name}</div>
                                                 </td>
-                                                <td style={{ padding: '1em 0.6em', fontWeight: 700, color: '#334155', verticalAlign: 'top' }}>{m.dosage || m.count || '—'}</td>
-                                                <td style={{ padding: '1em 0.6em', fontWeight: 800, color: '#0f172a', verticalAlign: 'top' }}>{m.frequency || '—'}</td>
-                                                <td style={{ padding: '1em 0.6em', fontWeight: 700, color: '#475569', verticalAlign: 'top' }}>{m.duration ? `for ${m.duration}` : '—'}</td>
-                                                <td style={{ padding: '1em 0.6em', borderLeft: '1px solid #f1f5f9', verticalAlign: 'top' }}>
-                                                    <div style={{ fontSize: '0.85em', fontWeight: 700, color: '#475569', fontStyle: 'italic', lineHeight: 1.4, opacity: 0.9 }}>{m.notes || '—'}</div>
+                                                <td style={{ padding: '0.8em 0.4em', fontWeight: 800, color: '#2563eb', verticalAlign: 'top', textTransform: 'uppercase', fontSize: '0.85em' }}>{m?.route || '—'}</td>
+                                                <td style={{ padding: '0.8em 0.4em', fontWeight: 700, color: '#334155', verticalAlign: 'top' }}>{m?.dosage || m?.count || '—'}</td>
+                                                <td style={{ padding: '0.8em 0.4em', fontWeight: 800, color: '#0f172a', verticalAlign: 'top' }}>{m?.frequency || '—'}</td>
+                                                <td style={{ padding: '0.8em 0.4em', fontWeight: 700, color: '#475569', verticalAlign: 'top' }}>{m?.duration || '—'}</td>
+                                                <td style={{ padding: '0.8em 0.4em', borderLeft: '1px solid #f1f5f9', verticalAlign: 'top' }}>
+                                                    <div style={{ fontSize: '0.85em', fontWeight: 700, color: '#475569', fontStyle: 'italic', lineHeight: 1.4, opacity: 0.9 }}>{m?.notes || '—'}</div>
                                                 </td>
                                             </tr>
                                         ))}

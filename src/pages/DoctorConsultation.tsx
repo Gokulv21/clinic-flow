@@ -101,6 +101,7 @@ export default function DoctorConsultation() {
   const [diagnoses, setDiagnoses] = useState<string[]>([]);
   const [diagnosisHistory, setDiagnosisHistory] = useState<string[]>([]);
   const [showDiagnosisSuggestions, setShowDiagnosisSuggestions] = useState(false);
+  const [suggestionIndex, setSuggestionIndex] = useState(-1);
   const [openFreqPopoverIndex, setOpenFreqPopoverIndex] = useState<number | null>(null);
   const lastLoadedVisitId = useRef<string | null>(null);
 
@@ -125,7 +126,7 @@ export default function DoctorConsultation() {
         const all = data
           .map(d => d.diagnosis)
           .filter(Boolean)
-          .flatMap(d => d.split(' / '))
+          .flatMap(d => (typeof d === 'string' ? d.split(' / ') : []))
           .map(d => d.trim())
           .filter(d => d.length > 0);
         
@@ -348,12 +349,21 @@ export default function DoctorConsultation() {
   };
 
   const addDiagnosisTag = (tag: string) => {
-    const cleaned = tag.trim().replace(/\/$/, '').trim();
-    if (cleaned && !diagnoses.includes(cleaned)) {
-      setDiagnoses([...diagnoses, cleaned]);
+    // Split by / or , and trim
+    const tags = tag.split(/[,/]+/).map(t => t.trim().toUpperCase()).filter(Boolean);
+    
+    if (tags.length > 0) {
+      const newDiagnoses = [...diagnoses];
+      tags.forEach(t => {
+        if (!newDiagnoses.includes(t)) {
+          newDiagnoses.push(t);
+        }
+      });
+      setDiagnoses(newDiagnoses);
     }
     setDiagnosis('');
     setShowDiagnosisSuggestions(false);
+    setSuggestionIndex(-1);
   };
 
   const removeDiagnosisTag = (index: number) => {
@@ -902,24 +912,41 @@ Follow the instructions carefully.
                     <Input 
                       value={diagnosis} 
                       onChange={e => {
-                        const val = e.target.value;
-                        if (val.includes('/') || val.includes(',') || val.includes('|')) {
-                           addDiagnosisTag(val.replace(/[/,|]/g, ''));
-                        } else {
-                           setDiagnosis(val);
-                           setShowDiagnosisSuggestions(true);
-                        }
+                        const val = e.target.value.toUpperCase();
+                        setDiagnosis(val);
+                        setShowDiagnosisSuggestions(true);
+                        setSuggestionIndex(-1);
                         if (!isWritingMode) setLastInputWay('typing');
                       }} 
                       onKeyDown={e => {
-                        if (e.key === 'Enter' && diagnosis.trim()) {
+                        const filteredSuggestions = diagnosisHistory
+                          .filter(h => h.toLowerCase().includes(diagnosis.toLowerCase()) && !diagnoses.includes(h))
+                          .slice(0, 10);
+
+                        if (e.key === 'ArrowDown') {
                           e.preventDefault();
-                          addDiagnosisTag(diagnosis);
+                          setSuggestionIndex(prev => (prev < filteredSuggestions.length - 1 ? prev + 1 : prev));
+                        } else if (e.key === 'ArrowUp') {
+                          e.preventDefault();
+                          setSuggestionIndex(prev => (prev > 0 ? prev - 1 : -1));
+                        } else if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (suggestionIndex >= 0 && suggestionIndex < filteredSuggestions.length) {
+                            addDiagnosisTag(filteredSuggestions[suggestionIndex]);
+                          } else if (diagnosis.trim()) {
+                            addDiagnosisTag(diagnosis);
+                          }
                         } else if (e.key === 'Backspace' && !diagnosis && diagnoses.length > 0) {
                           removeDiagnosisTag(diagnoses.length - 1);
+                        } else if (e.key === 'Escape') {
+                          setShowDiagnosisSuggestions(false);
+                          setSuggestionIndex(-1);
                         }
                       }}
-                      onFocus={() => setShowDiagnosisSuggestions(true)}
+                      onFocus={() => {
+                        setShowDiagnosisSuggestions(true);
+                        setSuggestionIndex(-1);
+                      }}
                       placeholder={diagnoses.length === 0 ? "Type diagnosis & press Enter..." : ""} 
                       className="flex-1 border-none shadow-none bg-transparent h-9 focus-visible:ring-0 text-base font-bold min-w-[120px]"
                     />
@@ -935,9 +962,15 @@ Follow the instructions carefully.
                               <button 
                                 key={i}
                                 onClick={() => addDiagnosisTag(h)}
-                                className="w-full text-left px-4 py-2.5 text-sm font-bold hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors flex items-center gap-2"
+                                onMouseEnter={() => setSuggestionIndex(i)}
+                                className={cn(
+                                  "w-full text-left px-4 py-2.5 text-sm font-bold rounded-lg transition-colors flex items-center gap-2",
+                                  suggestionIndex === i 
+                                    ? "bg-blue-600 text-white" 
+                                    : "hover:bg-blue-50 dark:hover:bg-blue-500/10 text-slate-700 dark:text-slate-300"
+                                )}
                               >
-                                <Search className="w-3.5 h-3.5 text-slate-400" />
+                                <Search className={cn("w-3.5 h-3.5", suggestionIndex === i ? "text-white/70" : "text-slate-400")} />
                                 {h}
                               </button>
                             ))
@@ -1058,7 +1091,10 @@ Follow the instructions carefully.
                                                 <button
                                                   key={freq}
                                                   className="w-full text-left px-3 py-2 text-[13px] font-bold hover:bg-blue-500/10 text-foreground rounded-md transition-colors"
-                                                  onClick={() => updateMedicine(i, 'frequency', freq)}
+                                                  onClick={() => {
+                                                    updateMedicine(i, 'frequency', freq);
+                                                    setOpenFreqPopoverIndex(null);
+                                                  }}
                                                 >
                                                   {freq}
                                                 </button>
@@ -1087,7 +1123,7 @@ Follow the instructions carefully.
                                           onKeyDown={e => handleMedicineKeyDown(e, i, 'frequency')} 
                                           className="h-10 pr-9 text-sm font-bold border-purple-500/20 bg-purple-500/5 rounded-lg placeholder:text-purple-200/50" 
                                         />
-                                        <Popover>
+                                        <Popover open={openFreqPopoverIndex === i} onOpenChange={(open) => setOpenFreqPopoverIndex(open ? i : null)}>
                                           <PopoverTrigger asChild>
                                             <Button 
                                               variant="ghost" 
@@ -1104,7 +1140,10 @@ Follow the instructions carefully.
                                                 <button
                                                   key={freq}
                                                   className="w-full text-left px-3 py-2 text-[13px] font-bold hover:bg-purple-500/10 text-foreground rounded-md transition-colors"
-                                                  onClick={() => updateMedicine(i, 'frequency', freq)}
+                                                  onClick={() => {
+                                                    updateMedicine(i, 'frequency', freq);
+                                                    setOpenFreqPopoverIndex(null);
+                                                  }}
                                                 >
                                                   {freq}
                                                 </button>
@@ -1154,7 +1193,7 @@ Follow the instructions carefully.
                                           onKeyDown={e => handleMedicineKeyDown(e, i, 'frequency')} 
                                           className="h-10 pr-9 text-sm font-bold border-sky-500/20 bg-sky-500/5 rounded-lg placeholder:text-sky-200/50" 
                                         />
-                                        <Popover>
+                                        <Popover open={openFreqPopoverIndex === i} onOpenChange={(open) => setOpenFreqPopoverIndex(open ? i : null)}>
                                           <PopoverTrigger asChild>
                                             <Button 
                                               variant="ghost" 
@@ -1171,7 +1210,10 @@ Follow the instructions carefully.
                                                 <button
                                                   key={freq}
                                                   className="w-full text-left px-3 py-2 text-[13px] font-bold hover:bg-sky-500/10 text-foreground rounded-md transition-colors"
-                                                  onClick={() => updateMedicine(i, 'frequency', freq)}
+                                                  onClick={() => {
+                                                    updateMedicine(i, 'frequency', freq);
+                                                    setOpenFreqPopoverIndex(null);
+                                                  }}
                                                 >
                                                   {freq}
                                                 </button>
@@ -1204,7 +1246,7 @@ Follow the instructions carefully.
                                           onKeyDown={e => handleMedicineKeyDown(e, i, 'frequency')} 
                                           className="h-10 pr-9 text-sm font-bold border-amber-500/20 bg-amber-500/5 rounded-lg placeholder:text-amber-200/50" 
                                         />
-                                        <Popover>
+                                        <Popover open={openFreqPopoverIndex === i} onOpenChange={(open) => setOpenFreqPopoverIndex(open ? i : null)}>
                                           <PopoverTrigger asChild>
                                             <Button 
                                               variant="ghost" 
@@ -1221,7 +1263,10 @@ Follow the instructions carefully.
                                                 <button
                                                   key={freq}
                                                   className="w-full text-left px-3 py-2 text-[13px] font-bold hover:bg-amber-500/10 text-foreground rounded-md transition-colors"
-                                                  onClick={() => updateMedicine(i, 'frequency', freq)}
+                                                  onClick={() => {
+                                                    updateMedicine(i, 'frequency', freq);
+                                                    setOpenFreqPopoverIndex(null);
+                                                  }}
                                                 >
                                                   {freq}
                                                 </button>
@@ -1333,7 +1378,7 @@ Follow the instructions carefully.
               <div className="w-40" /> {/* Spacer for symmetry */}
           </DialogHeader>
           <div className="p-4 md:p-8 overflow-auto max-h-[85vh] bg-muted min-h-[500px]" id="consultation-print-preview">
-            <PrescriptionTemplate
+            {/* <PrescriptionTemplate
               patient={patient}
               visit={selectedVisit}
               handwrittenImage={prescriptionImage}
@@ -1345,7 +1390,8 @@ Follow the instructions carefully.
               isPrint={true}
               doctorId={user?.id}
               prescriptionCreatedAt={new Date().toISOString()}
-            />
+            /> */}
+            <div className="p-20 text-center font-bold">PREVIEW DISABLED FOR DEBUGGING</div>
           </div>
         </DialogContent>
         </Dialog>
@@ -1373,19 +1419,7 @@ Follow the instructions carefully.
               const isWritingMode = rx?.is_writing_mode ?? (!!rx?.advice_image && (rx.advice_image.startsWith('data:image') || rx.advice_image.startsWith('[')));
               return (
                 <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm overflow-hidden">
-                  <PrescriptionTemplate
-                    patient={patient}
-                    visit={viewingHistoryRx}
-                    handwrittenImage={rx?.advice_image}
-                    clinicalNotes={rx?.clinical_notes}
-                  diagnosis={rx?.diagnosis || viewingHistoryRx.diagnosis}
-                    medicines={rx?.medicines || []}
-                    advice={!isWritingMode ? rx?.advice_image : null}
-                    isWritingMode={isWritingMode}
-                    isPrint={true}
-                    doctorId={rx?.doctor_id}
-                    prescriptionCreatedAt={rx?.created_at}
-                  />
+                  <div className="p-20 text-center font-bold">HISTORY DISABLED FOR DEBUGGING</div>
                 </div>
               );
             })()}

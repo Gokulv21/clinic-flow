@@ -1099,7 +1099,7 @@ export default function DoctorProfile() {
 
                                         <div className="grid grid-cols-12 gap-3 pt-4 border-t border-slate-50 dark:border-slate-800">
                                             {/* Dosage/Frequency fields for most types */}
-                                            {(m.type === 'Tab.' || m.type === 'Syr.' || m.type === 'Cap.' || m.type === 'Sac.' || m.type === 'Inj.' || m.type === 'Pdr.' || m.type === 'Susp.' || m.type === 'Lot.') && (
+                                            {(m.type === 'Tab.' || m.type === 'Syr.' || m.type === 'Cap.' || m.type === 'Sac.' || m.type === 'Pdr.' || m.type === 'Susp.' || m.type === 'Lot.') && (
                                                 <>
                                                     <div className="col-span-6 md:col-span-3 space-y-1.5">
                                                         <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1">Dosage</Label>
@@ -1140,23 +1140,21 @@ export default function DoctorProfile() {
                                                                     </Button>
                                                                 </PopoverTrigger>
                                                                 <PopoverContent className="w-[200px] p-0 shadow-2xl border-slate-100 dark:border-slate-800 rounded-2xl overflow-hidden" align="end">
-                                                                    <div className="max-h-60 overflow-auto p-1.5 bg-white dark:bg-slate-900 touch-pan-y">
-                                                                        <div className="px-3 py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 dark:border-slate-800 mb-1">
-                                                                            Quick Select
-                                                                        </div>
+                                                                    <div className="p-1.5 bg-white dark:bg-slate-900 max-h-60 overflow-y-auto">
                                                                         {['1-0-1', '1-1-1', '0-0-1', '1-0-0', '0-1-0', 'Stat', 'SOS', 'Before food', 'After food'].map(freq => (
-                                                                            <button
-                                                                                key={freq}
-                                                                                type="button"
-                                                                                className="w-full text-left px-3 py-2.5 text-xs font-bold hover:bg-blue-50 dark:hover:bg-blue-900/30 text-slate-700 dark:text-slate-300 rounded-lg transition-colors"
-                                                                                onClick={() => {
-                                                                                    const updated = [...newProtocolMedicines];
-                                                                                    updated[idx].frequency = freq;
-                                                                                    setNewProtocolMedicines(updated);
-                                                                                }}
-                                                                            >
-                                                                                {freq}
-                                                                            </button>
+                                                                            <PopoverTrigger key={freq} asChild>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className="w-full text-left px-3 py-2.5 text-xs font-bold hover:bg-blue-50 dark:hover:bg-blue-900/30 text-slate-700 dark:text-slate-300 rounded-lg transition-colors"
+                                                                                    onClick={() => {
+                                                                                        const updated = [...newProtocolMedicines];
+                                                                                        updated[idx].frequency = freq;
+                                                                                        setNewProtocolMedicines(updated);
+                                                                                    }}
+                                                                                >
+                                                                                    {freq}
+                                                                                </button>
+                                                                            </PopoverTrigger>
                                                                         ))}
                                                                     </div>
                                                                 </PopoverContent>
@@ -1179,10 +1177,94 @@ export default function DoctorProfile() {
                                                 </>
                                             )}
 
+                                            {/* Inj. specific fields */}
+                                            {m.type === 'Inj.' && (
+                                                <>
+                                                    <div className="col-span-4 md:col-span-2 space-y-1.5">
+                                                        <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1">Dosage</Label>
+                                                        <Input
+                                                            value={m.dosage}
+                                                            onChange={e => {
+                                                                const updated = [...newProtocolMedicines];
+                                                                updated[idx].dosage = e.target.value;
+                                                                setNewProtocolMedicines(updated);
+                                                            }}
+                                                            placeholder="1ml"
+                                                            className="h-11 rounded-xl bg-slate-50 dark:bg-slate-900 border-none font-bold shadow-sm"
+                                                        />
+                                                    </div>
+                                                    <div className="col-span-4 md:col-span-2 space-y-1.5">
+                                                        <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1">Route</Label>
+                                                        <Input
+                                                            value={m.route}
+                                                            onChange={e => {
+                                                                const updated = [...newProtocolMedicines];
+                                                                updated[idx].route = e.target.value;
+                                                                setNewProtocolMedicines(updated);
+                                                            }}
+                                                            placeholder="I.M / I.V"
+                                                            className="h-11 rounded-xl bg-slate-50 dark:bg-slate-900 border-none font-bold shadow-sm text-blue-600"
+                                                        />
+                                                    </div>
+                                                    <div className="col-span-4 md:col-span-3 space-y-1.5">
+                                                        <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1">Frequency</Label>
+                                                        <div className="relative group/freq">
+                                                            <Input
+                                                                value={m.frequency}
+                                                                onChange={e => {
+                                                                    const updated = [...newProtocolMedicines];
+                                                                    updated[idx].frequency = e.target.value;
+                                                                    setNewProtocolMedicines(updated);
+                                                                }}
+                                                                placeholder="Stat"
+                                                                className="h-11 rounded-xl bg-blue-50/50 dark:bg-blue-900/10 border-none font-bold text-xs pr-10 shadow-sm"
+                                                            />
+                                                            <Popover>
+                                                                <PopoverTrigger asChild>
+                                                                    <Button variant="ghost" size="icon" className="absolute right-0 top-0 h-11 w-10"><ChevronDown className="h-4 w-4" /></Button>
+                                                                </PopoverTrigger>
+                                                                <PopoverContent className="w-[180px] p-1.5 shadow-2xl rounded-2xl overflow-hidden" align="end">
+                                                                    <div className="max-h-60 overflow-y-auto">
+                                                                        {['Stat', 'SOS', 'Once daily', 'Twice daily'].map(freq => (
+                                                                            <PopoverTrigger key={freq} asChild>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className="w-full text-left px-3 py-2 text-xs font-bold hover:bg-blue-50 rounded-lg"
+                                                                                    onClick={() => {
+                                                                                        const updated = [...newProtocolMedicines];
+                                                                                        updated[idx].frequency = freq;
+                                                                                        setNewProtocolMedicines(updated);
+                                                                                    }}
+                                                                                >
+                                                                                    {freq}
+                                                                                </button>
+                                                                            </PopoverTrigger>
+                                                                        ))}
+                                                                    </div>
+                                                                </PopoverContent>
+                                                            </Popover>
+                                                        </div>
+                                                    </div>
+                                                    <div className="col-span-12 md:col-span-5 space-y-1.5">
+                                                        <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1">Notes</Label>
+                                                        <Input
+                                                            value={m.duration || ''}
+                                                            onChange={e => {
+                                                                const updated = [...newProtocolMedicines];
+                                                                updated[idx].duration = e.target.value;
+                                                                setNewProtocolMedicines(updated);
+                                                            }}
+                                                            placeholder="Instructions"
+                                                            className="h-11 rounded-xl bg-slate-50 dark:bg-slate-900 border-none font-bold shadow-sm"
+                                                        />
+                                                    </div>
+                                                </>
+                                            )}
+
                                             {/* Count fields for Ointment / Drops */}
                                             {(m.type === 'Oin.' || m.type === 'cr.' || m.type === 'drops.') && (
                                                 <>
-                                                    <div className="col-span-6 md:col-span-4 space-y-1.5">
+                                                    <div className="col-span-4 md:col-span-2 space-y-1.5">
                                                         <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1">Count / Qty</Label>
                                                         <Input
                                                             value={(m as any).count || ''}
@@ -1195,8 +1277,24 @@ export default function DoctorProfile() {
                                                             className="h-11 rounded-xl bg-slate-50 dark:bg-slate-900 border-none font-bold shadow-sm"
                                                         />
                                                     </div>
+                                                    <div className="col-span-4 md:col-span-2 space-y-1.5">
+                                                        <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1">Route</Label>
+                                                        <Input
+                                                            value={m.route}
+                                                            onChange={e => {
+                                                                const updated = [...newProtocolMedicines];
+                                                                updated[idx].route = e.target.value;
+                                                                setNewProtocolMedicines(updated);
+                                                            }}
+                                                            placeholder="Local"
+                                                            className="h-11 rounded-xl bg-slate-50 dark:bg-slate-900 border-none font-bold shadow-sm text-orange-600"
+                                                        />
+                                                    </div>
                                                     <div className="col-span-12 md:col-span-8 space-y-1.5">
-                                                        <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1">Frequency / Remarks</Label>
+                                                        <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1 flex items-center justify-between">
+                                                            <span>Frequency / Remarks</span>
+                                                            {m.type === 'drops.' && <span className="text-[8px] opacity-40">e.g. 2 drops 3 times</span>}
+                                                        </Label>
                                                         <Input
                                                             value={m.frequency || ''}
                                                             onChange={e => {
