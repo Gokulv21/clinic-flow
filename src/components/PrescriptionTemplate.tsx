@@ -420,21 +420,21 @@ function PageOne({
             <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
                 {/* LEFT — Rx writing area */}
                 <div style={{ flex: 1, position: 'relative', borderRight: '2px solid #e2e8f0', padding: '1.2em 1.5em', display: 'flex', flexDirection: 'column', background: '#fff', overflow: 'hidden' }}>
-                    <div style={{ height: '0.8em', flexShrink: 0 }} />
+                    <div style={{ height: '0.1em', flexShrink: 0 }} />
                     {hasTyped && (
                         <div style={{ lineHeight: 1.6, fontSize: '1.1em', overflow: 'hidden', zIndex: 30, position: 'relative' }}>
+                            {clinicalNotes && (
+                                <div style={{ marginBottom: '1.2em', color: '#334155' }}>
+                                    <div style={{ fontWeight: 800, fontSize: '0.8em', textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.05em', marginBottom: '0.4em' }}>Clinical Notes & History:</div>
+                                    <div style={{ whiteSpace: 'pre-wrap', fontWeight: 500, borderLeft: '3px solid #e2e8f0', paddingLeft: '0.8em', fontStyle: 'italic' }}>{clinicalNotes}</div>
+                                </div>
+                            )}
+
                             {/* Diagnosis shown only in non-writing mode or if explicitly requested */}
                             {!isWritingMode && diagnosis && (
                                 <div style={{ marginBottom: '1.2em', color: '#1e293b' }}>
                                     <div style={{ fontWeight: 800, fontSize: '0.8em', textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.05em', marginBottom: '0.4em' }}>Diagnosis:</div>
                                     <div style={{ fontWeight: 800, fontSize: '1.2em', color: '#0f172a' }}>{diagnosis}</div>
-                                </div>
-                            )}
-
-                            {clinicalNotes && (
-                                <div style={{ marginBottom: '1.2em', color: '#334155' }}>
-                                    <div style={{ fontWeight: 800, fontSize: '0.8em', textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.05em', marginBottom: '0.4em' }}>Clinical Notes & History:</div>
-                                    <div style={{ whiteSpace: 'pre-wrap', fontWeight: 500, borderLeft: '3px solid #e2e8f0', paddingLeft: '0.8em', fontStyle: 'italic' }}>{clinicalNotes}</div>
                                 </div>
                             )}
 

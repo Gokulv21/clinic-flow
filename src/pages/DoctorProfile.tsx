@@ -100,6 +100,7 @@ export default function DoctorProfile() {
     const [newProtocolName, setNewProtocolName] = useState('');
     const [newProtocolMedicines, setNewProtocolMedicines] = useState<any[]>([]);
     const [editingProtocolId, setEditingProtocolId] = useState<string | null>(null);
+    const [openFreqPopoverIndex, setOpenFreqPopoverIndex] = useState<number | null>(null);
 
     useEffect(() => {
         fetchData();
@@ -382,7 +383,7 @@ export default function DoctorProfile() {
     const handleAddNewProtocol = () => {
         setEditingProtocolId(null);
         setNewProtocolName('');
-        setNewProtocolMedicines([{ type: 'Tab.', name: '', dosage: '', frequency: '', duration: '', instructions: '' }]);
+        setNewProtocolMedicines([{ type: 'Tab.', name: '', dosage: '', frequency: '', duration: '', route: '', instructions: '' }]);
         setShowAddProtocolDialog(true);
     };
 
@@ -1054,26 +1055,27 @@ export default function DoctorProfile() {
                             <div className="space-y-4">
                                 {newProtocolMedicines.map((m, idx) => (
                                     <div key={idx} className="p-5 bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-100 dark:border-slate-700 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300 relative group/row">
-                                         <div className="grid grid-cols-12 gap-3 items-end">
-                                            <div className="col-span-12 md:col-span-2 space-y-1.5">
-                                                <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1">Type</Label>
-                                                <select
-                                                    value={m.type || 'Tab.'}
-                                                    onChange={e => {
-                                                        const updated = [...newProtocolMedicines];
-                                                        updated[idx].type = e.target.value;
-                                                        setNewProtocolMedicines(updated);
-                                                    }}
-                                                    className="w-full h-11 rounded-xl bg-slate-50 dark:bg-slate-900 border-none font-bold text-xs px-3 focus:ring-2 focus:ring-blue-500 appearance-none shadow-sm cursor-pointer"
-                                                >
-                                                    {['Tab.', 'Syr.', 'Inj.', 'Cap.', 'Sac.', 'Oin.', 'cr.', 'drops.', 'Lot.', 'Susp.', 'Pdr.'].map(t => (
-                                                        <option key={t} value={t}>{t}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                            <div className="col-span-12 md:col-span-10 space-y-1.5">
-                                                <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1">Medicine Name</Label>
-                                                <div className="flex gap-2">
+                                        <div className="space-y-4">
+                                            {/* Row 1: Type + Name + Trash */}
+                                            <div className="grid grid-cols-12 gap-3 items-end">
+                                                <div className="col-span-12 md:col-span-2 space-y-1.5">
+                                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1">Type</Label>
+                                                    <select
+                                                        value={m.type || 'Tab.'}
+                                                        onChange={e => {
+                                                            const updated = [...newProtocolMedicines];
+                                                            updated[idx].type = e.target.value;
+                                                            setNewProtocolMedicines(updated);
+                                                        }}
+                                                        className="w-full h-11 rounded-xl bg-slate-50 dark:bg-slate-900 border-none font-bold text-xs px-3 focus:ring-2 focus:ring-blue-500 appearance-none shadow-sm cursor-pointer"
+                                                    >
+                                                        {['Tab.', 'Syr.', 'Inj.', 'Cap.', 'Sac.', 'Oin.', 'cr.', 'drops.', 'Lot.', 'Susp.', 'Pdr.'].map(t => (
+                                                            <option key={t} value={t}>{t}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                <div className="col-span-12 md:col-span-9 space-y-1.5">
+                                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1">Medicine Name</Label>
                                                     <Input
                                                         value={m.name}
                                                         onChange={e => {
@@ -1082,8 +1084,10 @@ export default function DoctorProfile() {
                                                             setNewProtocolMedicines(updated);
                                                         }}
                                                         placeholder="e.g. Paracetamol 650mg"
-                                                        className="h-11 flex-1 rounded-xl bg-slate-50 dark:bg-slate-900 border-none font-bold shadow-sm"
+                                                        className="h-11 rounded-xl bg-slate-50 dark:bg-slate-900 border-none font-bold shadow-sm"
                                                     />
+                                                </div>
+                                                <div className="col-span-12 md:col-span-1 pb-0.5 flex justify-end">
                                                     <Button
                                                         type="button"
                                                         variant="ghost"
@@ -1095,219 +1099,103 @@ export default function DoctorProfile() {
                                                     </Button>
                                                 </div>
                                             </div>
-                                        </div>
 
-                                        <div className="grid grid-cols-12 gap-3 pt-4 border-t border-slate-50 dark:border-slate-800">
-                                            {/* Dosage/Frequency fields for most types */}
-                                            {(m.type === 'Tab.' || m.type === 'Syr.' || m.type === 'Cap.' || m.type === 'Sac.' || m.type === 'Pdr.' || m.type === 'Susp.' || m.type === 'Lot.') && (
-                                                <>
-                                                    <div className="col-span-6 md:col-span-3 space-y-1.5">
-                                                        <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1">Dosage</Label>
-                                                        <Input
-                                                            value={m.dosage}
-                                                            onChange={e => {
-                                                                const updated = [...newProtocolMedicines];
+                                            {/* Row 2: Dosage + Route + Frequency + Remarks */}
+                                            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 pt-4 border-t border-slate-50 dark:border-slate-800">
+                                                <div className="col-span-6 md:col-span-2 space-y-1.5">
+                                                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1">
+                                                        {(m.type === 'Oin.' || m.type === 'cr.' || m.type === 'drops.' || m.type === 'Sac.') ? 'Count' : 'Dosage'}
+                                                    </Label>
+                                                    <Input
+                                                        value={m.dosage || m['count'] || ''}
+                                                        onChange={e => {
+                                                            const updated = [...newProtocolMedicines];
+                                                            if (m.type === 'Oin.' || m.type === 'cr.' || m.type === 'drops.' || m.type === 'Sac.') {
+                                                                updated[idx].count = e.target.value;
+                                                            } else {
                                                                 updated[idx].dosage = e.target.value;
-                                                                setNewProtocolMedicines(updated);
-                                                            }}
-                                                            placeholder="500mg / 5ml"
-                                                            className="h-11 rounded-xl bg-slate-50 dark:bg-slate-900 border-none font-bold shadow-sm"
-                                                        />
-                                                    </div>
-                                                    <div className="col-span-6 md:col-span-4 space-y-1.5">
-                                                        <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1 flex items-center gap-1">
-                                                            Frequency <Info className="w-2.5 h-2.5 opacity-50" />
-                                                        </Label>
-                                                        <div className="relative group/freq">
-                                                            <Input
-                                                                value={m.frequency}
-                                                                onChange={e => {
-                                                                    const updated = [...newProtocolMedicines];
-                                                                    updated[idx].frequency = e.target.value;
-                                                                    setNewProtocolMedicines(updated);
-                                                                }}
-                                                                placeholder="1-0-1"
-                                                                className="h-11 rounded-xl bg-blue-50/50 dark:bg-blue-900/10 border-none font-bold text-xs pr-10 shadow-sm text-blue-700 dark:text-blue-400"
-                                                            />
-                                                            <Popover>
-                                                                <PopoverTrigger asChild>
-                                                                    <Button 
-                                                                        variant="ghost" 
-                                                                        size="icon" 
-                                                                        className="absolute right-0 top-0 h-11 w-10 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-r-xl transition-colors"
-                                                                    >
-                                                                        <ChevronDown className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                                                                    </Button>
-                                                                </PopoverTrigger>
-                                                                <PopoverContent className="w-[200px] p-0 shadow-2xl border-slate-100 dark:border-slate-800 rounded-2xl overflow-hidden" align="end">
-                                                                    <div className="p-1.5 bg-white dark:bg-slate-900 max-h-60 overflow-y-auto">
-                                                                        {['1-0-1', '1-1-1', '0-0-1', '1-0-0', '0-1-0', 'Stat', 'SOS', 'Before food', 'After food'].map(freq => (
-                                                                            <PopoverTrigger key={freq} asChild>
-                                                                                <button
-                                                                                    type="button"
-                                                                                    className="w-full text-left px-3 py-2.5 text-xs font-bold hover:bg-blue-50 dark:hover:bg-blue-900/30 text-slate-700 dark:text-slate-300 rounded-lg transition-colors"
-                                                                                    onClick={() => {
-                                                                                        const updated = [...newProtocolMedicines];
-                                                                                        updated[idx].frequency = freq;
-                                                                                        setNewProtocolMedicines(updated);
-                                                                                    }}
-                                                                                >
-                                                                                    {freq}
-                                                                                </button>
-                                                                            </PopoverTrigger>
-                                                                        ))}
-                                                                    </div>
-                                                                </PopoverContent>
-                                                            </Popover>
-                                                        </div>
-                                                    </div>
-                                                    <div className="col-span-12 md:col-span-5 space-y-1.5">
-                                                        <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1">Duration / Remarks</Label>
-                                                        <Input
-                                                            value={m.duration || ''}
-                                                            onChange={e => {
-                                                                const updated = [...newProtocolMedicines];
-                                                                updated[idx].duration = e.target.value;
-                                                                setNewProtocolMedicines(updated);
-                                                            }}
-                                                            placeholder="5 Days / After Food"
-                                                            className="h-11 rounded-xl bg-slate-50 dark:bg-slate-900 border-none font-bold shadow-sm"
-                                                        />
-                                                    </div>
-                                                </>
-                                            )}
+                                                            }
+                                                            setNewProtocolMedicines(updated);
+                                                        }}
+                                                        placeholder={(m.type === 'Oin.' || m.type === 'cr.' || m.type === 'drops.' || m.type === 'Sac.') ? "1 Tube" : "500mg"}
+                                                        className="h-11 rounded-xl bg-slate-50 dark:bg-slate-900 border-none font-bold shadow-sm"
+                                                    />
+                                                </div>
 
-                                            {/* Inj. specific fields */}
-                                            {m.type === 'Inj.' && (
-                                                <>
-                                                    <div className="col-span-4 md:col-span-2 space-y-1.5">
-                                                        <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1">Dosage</Label>
-                                                        <Input
-                                                            value={m.dosage}
-                                                            onChange={e => {
-                                                                const updated = [...newProtocolMedicines];
-                                                                updated[idx].dosage = e.target.value;
-                                                                setNewProtocolMedicines(updated);
-                                                            }}
-                                                            placeholder="1ml"
-                                                            className="h-11 rounded-xl bg-slate-50 dark:bg-slate-900 border-none font-bold shadow-sm"
-                                                        />
-                                                    </div>
-                                                    <div className="col-span-4 md:col-span-2 space-y-1.5">
-                                                        <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1">Route</Label>
-                                                        <Input
-                                                            value={m.route}
-                                                            onChange={e => {
-                                                                const updated = [...newProtocolMedicines];
-                                                                updated[idx].route = e.target.value;
-                                                                setNewProtocolMedicines(updated);
-                                                            }}
-                                                            placeholder="I.M / I.V"
-                                                            className="h-11 rounded-xl bg-slate-50 dark:bg-slate-900 border-none font-bold shadow-sm text-blue-600"
-                                                        />
-                                                    </div>
-                                                    <div className="col-span-4 md:col-span-3 space-y-1.5">
-                                                        <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1">Frequency</Label>
-                                                        <div className="relative group/freq">
-                                                            <Input
-                                                                value={m.frequency}
-                                                                onChange={e => {
-                                                                    const updated = [...newProtocolMedicines];
-                                                                    updated[idx].frequency = e.target.value;
-                                                                    setNewProtocolMedicines(updated);
-                                                                }}
-                                                                placeholder="Stat"
-                                                                className="h-11 rounded-xl bg-blue-50/50 dark:bg-blue-900/10 border-none font-bold text-xs pr-10 shadow-sm"
-                                                            />
-                                                            <Popover>
-                                                                <PopoverTrigger asChild>
-                                                                    <Button variant="ghost" size="icon" className="absolute right-0 top-0 h-11 w-10"><ChevronDown className="h-4 w-4" /></Button>
-                                                                </PopoverTrigger>
-                                                                <PopoverContent className="w-[180px] p-1.5 shadow-2xl rounded-2xl overflow-hidden" align="end">
-                                                                    <div className="max-h-60 overflow-y-auto">
-                                                                        {['Stat', 'SOS', 'Once daily', 'Twice daily'].map(freq => (
-                                                                            <PopoverTrigger key={freq} asChild>
-                                                                                <button
-                                                                                    type="button"
-                                                                                    className="w-full text-left px-3 py-2 text-xs font-bold hover:bg-blue-50 rounded-lg"
-                                                                                    onClick={() => {
-                                                                                        const updated = [...newProtocolMedicines];
-                                                                                        updated[idx].frequency = freq;
-                                                                                        setNewProtocolMedicines(updated);
-                                                                                    }}
-                                                                                >
-                                                                                    {freq}
-                                                                                </button>
-                                                                            </PopoverTrigger>
-                                                                        ))}
-                                                                    </div>
-                                                                </PopoverContent>
-                                                            </Popover>
-                                                        </div>
-                                                    </div>
-                                                    <div className="col-span-12 md:col-span-5 space-y-1.5">
-                                                        <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1">Notes</Label>
-                                                        <Input
-                                                            value={m.duration || ''}
-                                                            onChange={e => {
-                                                                const updated = [...newProtocolMedicines];
-                                                                updated[idx].duration = e.target.value;
-                                                                setNewProtocolMedicines(updated);
-                                                            }}
-                                                            placeholder="Instructions"
-                                                            className="h-11 rounded-xl bg-slate-50 dark:bg-slate-900 border-none font-bold shadow-sm"
-                                                        />
-                                                    </div>
-                                                </>
-                                            )}
+                                                <div className="col-span-6 md:col-span-2 space-y-1.5">
+                                                    <Label className="text-[10px] font-black uppercase tracking-widest text-blue-400 dark:text-blue-500 ml-1">Route</Label>
+                                                    <Input
+                                                        value={m.route || ''}
+                                                        onChange={e => {
+                                                            const updated = [...newProtocolMedicines];
+                                                            updated[idx].route = e.target.value;
+                                                            setNewProtocolMedicines(updated);
+                                                        }}
+                                                        placeholder="Oral / I.M"
+                                                        className="h-11 rounded-xl bg-blue-50/50 dark:bg-blue-900/10 border-none font-bold text-blue-600 dark:text-blue-400 shadow-sm"
+                                                    />
+                                                </div>
 
-                                            {/* Count fields for Ointment / Drops */}
-                                            {(m.type === 'Oin.' || m.type === 'cr.' || m.type === 'drops.') && (
-                                                <>
-                                                    <div className="col-span-4 md:col-span-2 space-y-1.5">
-                                                        <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1">Count / Qty</Label>
+                                                <div className="col-span-6 md:col-span-3 space-y-1.5">
+                                                    <Label className="text-[10px] font-black uppercase tracking-widest text-purple-400 dark:text-purple-500 ml-1">Frequency</Label>
+                                                    <div className="relative group/freq overflow-visible">
                                                         <Input
-                                                            value={(m as any).count || ''}
-                                                            onChange={e => {
-                                                                const updated = [...newProtocolMedicines];
-                                                                (updated[idx] as any).count = e.target.value;
-                                                                setNewProtocolMedicines(updated);
-                                                            }}
-                                                            placeholder="1 Tube / 5ml"
-                                                            className="h-11 rounded-xl bg-slate-50 dark:bg-slate-900 border-none font-bold shadow-sm"
-                                                        />
-                                                    </div>
-                                                    <div className="col-span-4 md:col-span-2 space-y-1.5">
-                                                        <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1">Route</Label>
-                                                        <Input
-                                                            value={m.route}
-                                                            onChange={e => {
-                                                                const updated = [...newProtocolMedicines];
-                                                                updated[idx].route = e.target.value;
-                                                                setNewProtocolMedicines(updated);
-                                                            }}
-                                                            placeholder="Local"
-                                                            className="h-11 rounded-xl bg-slate-50 dark:bg-slate-900 border-none font-bold shadow-sm text-orange-600"
-                                                        />
-                                                    </div>
-                                                    <div className="col-span-12 md:col-span-8 space-y-1.5">
-                                                        <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1 flex items-center justify-between">
-                                                            <span>Frequency / Remarks</span>
-                                                            {m.type === 'drops.' && <span className="text-[8px] opacity-40">e.g. 2 drops 3 times</span>}
-                                                        </Label>
-                                                        <Input
-                                                            value={m.frequency || ''}
+                                                            value={m.frequency}
                                                             onChange={e => {
                                                                 const updated = [...newProtocolMedicines];
                                                                 updated[idx].frequency = e.target.value;
                                                                 setNewProtocolMedicines(updated);
                                                             }}
-                                                            placeholder="Apply localy 2 times / 2 drops twice"
-                                                            className="h-11 rounded-xl bg-slate-50 dark:bg-slate-900 border-none font-bold shadow-sm"
+                                                            placeholder="1-0-1"
+                                                            className="h-11 rounded-xl bg-purple-50/50 dark:bg-purple-900/10 border-none font-bold text-xs pr-10 shadow-sm text-purple-700 dark:text-purple-400"
                                                         />
+                                                        <Popover open={openFreqPopoverIndex === idx} onOpenChange={(open) => setOpenFreqPopoverIndex(open ? idx : null)}>
+                                                            <PopoverTrigger asChild>
+                                                                <Button 
+                                                                    variant="ghost" 
+                                                                    size="icon" 
+                                                                    className="absolute right-0 top-0 h-11 w-10 hover:bg-purple-100 dark:hover:bg-purple-900/40 rounded-r-xl transition-colors"
+                                                                >
+                                                                    <ChevronDown className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                                                                </Button>
+                                                            </PopoverTrigger>
+                                                            <PopoverContent className="w-[180px] p-0 shadow-2xl border-slate-100 dark:border-slate-800 rounded-2xl overflow-hidden" align="end">
+                                                                <div className="p-1.5 bg-white dark:bg-slate-900 max-h-60 overflow-y-auto">
+                                                                    {(m.type === 'Inj.' ? ['Stat', 'SOS', 'Once daily', 'Twice daily'] : ['1-0-1', '1-1-1', '0-0-1', '1-0-0', '0-1-0', 'Before food', 'After food']).map(freq => (
+                                                                        <button
+                                                                            key={freq}
+                                                                            type="button"
+                                                                            className="w-full text-left px-3 py-2.5 text-xs font-bold hover:bg-purple-50 dark:hover:bg-purple-900/30 text-slate-700 dark:text-slate-300 rounded-lg transition-colors"
+                                                                            onClick={() => {
+                                                                                const updated = [...newProtocolMedicines];
+                                                                                updated[idx].frequency = freq;
+                                                                                setNewProtocolMedicines(updated);
+                                                                                setOpenFreqPopoverIndex(null);
+                                                                            }}
+                                                                        >
+                                                                            {freq}
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            </PopoverContent>
+                                                        </Popover>
                                                     </div>
-                                                </>
-                                            )}
+                                                </div>
+
+                                                <div className="col-span-12 md:col-span-5 space-y-1.5">
+                                                    <Label className="text-[10px] font-black uppercase tracking-widest text-emerald-400 dark:text-emerald-500 ml-1">Duration / Remarks</Label>
+                                                    <Input
+                                                        value={m.duration || ''}
+                                                        onChange={e => {
+                                                            const updated = [...newProtocolMedicines];
+                                                            updated[idx].duration = e.target.value;
+                                                            setNewProtocolMedicines(updated);
+                                                        }}
+                                                        placeholder="5 Days / After Food"
+                                                        className="h-11 rounded-xl bg-emerald-50/50 dark:bg-emerald-900/10 border-none font-bold text-emerald-700 dark:text-emerald-400 shadow-sm"
+                                                    />
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 ))}
@@ -1320,7 +1208,7 @@ export default function DoctorProfile() {
                                         <Button 
                                             type="button" 
                                             variant="outline" 
-                                            onClick={() => setNewProtocolMedicines([...newProtocolMedicines, { type: 'Tab.', name: '', dosage: '', frequency: '', duration: '', instructions: '' }])}
+                                            onClick={() => setNewProtocolMedicines([...newProtocolMedicines, { type: 'Tab.', name: '', dosage: '', frequency: '', duration: '', route: '', instructions: '' }])}
                                             className="rounded-full h-11 px-8 text-[11px] font-black uppercase tracking-widest border-2 border-dashed border-blue-200 text-blue-600 hover:bg-blue-50 transition-all hover:scale-105 active:scale-95 group"
                                         >
                                             <Plus className="w-4 h-4 mr-2 group-hover:rotate-90 transition-transform" /> Add Another Medicine
