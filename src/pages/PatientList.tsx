@@ -305,9 +305,9 @@ export default function PatientList() {
                         {v.blood_pressure && <span>BP: {v.blood_pressure}</span>}
                         {v.pulse_rate && <span>PR: {v.pulse_rate}bpm</span>}
                       </div>
-                      {v.prescriptions?.map((rx: any) => (
+                      {Array.isArray(v.prescriptions) && v.prescriptions.map((rx: any) => (
                         <div key={rx.id} className="mt-2 p-2 rounded bg-muted text-xs">
-                          {(rx.medicines as any[])?.map((m: any, i: number) => (
+                          {Array.isArray(rx.medicines) && rx.medicines.map((m: any, i: number) => (
                             <div key={i}>{m.name} — {m.dosage} — {m.frequency} — {m.duration}</div>
                           ))}
                         </div>

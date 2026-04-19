@@ -189,8 +189,8 @@ Follow the instructions carefully.
     const images = rawImages.filter(isValidImage);
     const showHandwritten = isWritingMode && images.length > 0;
 
-    // If no handwriting or not in writing mode, we still need one "page" for typed content
-    const pagesToShow = showHandwritten ? images : [null];
+    // Ensure medicines is an array and items are valid
+    const safeMedicines = Array.isArray(medicines) ? medicines : [];
 
     return (
         <div className="flex flex-col items-center gap-8 w-full print-container print:gap-0">
@@ -225,7 +225,7 @@ Follow the instructions carefully.
                             time={time}
                             clinicalNotes={clinicalNotes}
                             diagnosis={diagnosis}
-                            medicines={medicines}
+                            medicines={safeMedicines}
                             advice={advice}
                             hasTyped={hasTyped}
                             vitals={vitals}
@@ -452,7 +452,7 @@ function PageOne({
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {medicines.map((m, i) => (
+                                        {Array.isArray(medicines) && medicines.map((m, i) => (
                                             <tr key={i} style={{ 
                                                 borderBottom: '1px solid #f1f5f9',
                                                 backgroundColor: i % 2 === 0 ? '#ffffff' : '#f8fafc'
