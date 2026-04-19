@@ -192,6 +192,9 @@ Follow the instructions carefully.
     // Ensure medicines is an array and items are valid
     const safeMedicines = Array.isArray(medicines) ? medicines : [];
 
+    // If no handwriting or not in writing mode, we still need one "page" for typed content
+    const pagesToShow = showHandwritten ? images : [null];
+
     return (
         <div className="flex flex-col items-center gap-8 w-full print-container print:gap-0">
             {pagesToShow.map((img, idx) => (
