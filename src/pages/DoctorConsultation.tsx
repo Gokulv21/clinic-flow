@@ -114,28 +114,26 @@ export default function DoctorConsultation() {
 
   async function fetchDiagnosisHistory() {
     try {
+      if (!clinic?.id) return;
+      
       const { data, error } = await supabase
         .from('prescriptions')
         .select('diagnosis')
-        .eq('doctor_id', user?.id)
+        .eq('clinic_id', clinic.id)
         .order('created_at', { ascending: false })
-        .limit(100);
+        .limit(1000);
       
       if (data) {
         // Flatten and clean up duplicates
-        const all = data
+        // Split by standard separators: /, \, or ,
+        const allIndividualTerms = data
           .map(d => d.diagnosis)
           .filter(Boolean)
-          .flatMap(d => (typeof d === 'string' ? d.split(' / ') : []))
+          .flatMap(d => (typeof d === 'string' ? d.split(/[/,\\,]+/) : []))
           .map(d => d.trim())
-          .filter(d => d.length > 0);
+          .filter(d => d.length > 1); // Ignore single characters or empty
         
-        // Also keep common combinations if they appear often
-        const combinations = data
-          .map(d => d.diagnosis)
-          .filter(d => d && d.includes(' / '));
-
-        setDiagnosisHistory([...new Set([...all, ...combinations])]);
+        setDiagnosisHistory([...new Set(allIndividualTerms)]);
       }
     } catch (e) {
       console.error("Error fetching diagnosis history", e);
@@ -498,7 +496,7 @@ Follow the instructions carefully.
 
     try {
       if (!saveError || saveError.step === 'prescription') {
-        const { error: rxError } = await supabase.from('prescriptions').insert({
+        const { error: rxError } = await supabase.from('prescriptions').upsert({
           visit_id: selectedVisit.id,
           patient_id: patient.id,
           diagnosis: finalDiagnosis,
@@ -509,8 +507,9 @@ Follow the instructions carefully.
           is_writing_mode: isWritingMode,
           doctor_id: user?.id,
           clinic_id: clinic?.id
-        });
-        if (rxError && rxError.code !== '23505') {
+        }, { onConflict: 'visit_id' });
+        
+        if (rxError) {
           setSaveError({ step: 'prescription', message: rxError.message });
           throw rxError;
         }
@@ -541,6 +540,7 @@ Follow the instructions carefully.
       setMedicines([{ type: 'Tab.', name: '', dosage: '', frequency: '', duration: '' }]);
       setSaveError(null);
       queryClient.invalidateQueries({ queryKey: ['visitQueue'] });
+      fetchDiagnosisHistory();
     } catch (err: any) {
       toast.error(`Save Failed: ${err.message || 'Unknown error'}`, { position: 'top-center' });
     } finally {

@@ -331,7 +331,7 @@ export default function PatientList() {
                 <Printer className="w-4 h-4" /> <span className="hidden sm:inline">Print</span>
               </Button>
               <Button size="sm" variant="outline" onClick={() => setViewingRx(null)} className="gap-1 border-muted-foreground/20 text-muted-foreground hover:bg-red-50 hover:text-red-600 hover:border-red-200">
-                <X className="w-4 h-4" /> <span className="hidden sm:inline">Close</span>
+                <span className="hidden sm:inline">Close</span>
               </Button>
             </div>
           </div>
