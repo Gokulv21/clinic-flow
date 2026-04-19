@@ -1,6 +1,6 @@
 import { useAuth } from '@/lib/auth';
 import { Card, CardContent } from '@/components/ui/card';
-import { useNavigate, useParams, useOutletContext } from 'react-router-dom';
+import { useNavigate, useParams, useOutletContext, Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { ClipboardPlus, Stethoscope, Printer, BarChart3, Users, Activity, TrendingUp, CalendarDays, UserCheck } from 'lucide-react';
 import { useState, useEffect } from 'react';
@@ -148,34 +148,32 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {visibleModules.map((m, i) => (
-            <motion.button
+            <motion.div
               key={m.path}
-              whileHover={{ y: -10, scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.3 + i * 0.1 }}
-              onClick={() => {
-                const fullPath = slug ? `/${slug}/${m.path}` : `/${m.path}`;
-                navigate(fullPath);
-              }}
-              className={cn(
-                "group relative flex flex-col p-8 rounded-[3rem] transition-all duration-500 text-left shadow-2xl overflow-hidden active:scale-90",
-                "glass-thick border border-white/20",
-                "dark:glass3d dark:border-none dark:shadow-none"
-              )}
             >
-              <div className={cn("w-16 h-16 rounded-[1.5rem] flex items-center justify-center mb-8 bg-gradient-to-br shadow-2xl group-hover:rotate-6 transition-all duration-500", m.color)}>
-                <div className="text-white drop-shadow-md">{m.icon}</div>
-              </div>
-              <div className="space-y-2">
-                <h3 className="font-black text-xl text-slate-900 dark:text-white group-hover:text-blue-500 transition-colors tracking-tight">{m.label}</h3>
-                <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 leading-relaxed">{m.desc}</p>
-              </div>
-              <div className="absolute top-6 right-6 text-blue-500/5 group-hover:text-blue-500/10 transition-all duration-700">
-                 <Activity className="w-16 h-16" />
-              </div>
-            </motion.button>
+              <Link
+                to={`../${m.path}`}
+                className={cn(
+                  "group relative flex flex-col p-8 rounded-[3rem] transition-all duration-500 text-left shadow-2xl overflow-hidden active:scale-90 h-full w-full block",
+                  "glass-thick border border-white/20",
+                  "dark:glass3d dark:border-none dark:shadow-none hover:-translate-y-2 transition-transform"
+                )}
+              >
+                <div className={cn("w-16 h-16 rounded-[1.5rem] flex items-center justify-center mb-8 bg-gradient-to-br shadow-2xl group-hover:rotate-6 transition-all duration-500", m.color)}>
+                  <div className="text-white drop-shadow-md">{m.icon}</div>
+                </div>
+                <div className="space-y-2">
+                  <h3 className="font-black text-xl text-slate-900 dark:text-white group-hover:text-blue-500 transition-colors tracking-tight">{m.label}</h3>
+                  <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 leading-relaxed">{m.desc}</p>
+                </div>
+                <div className="absolute top-6 right-6 text-blue-500/5 group-hover:text-blue-500/10 transition-all duration-700">
+                   <Activity className="w-16 h-16" />
+                </div>
+              </Link>
+            </motion.div>
           ))}
         </div>
       </div>

@@ -41,11 +41,18 @@ export const ChartContainer = ({ title, description, children, className, icon, 
 
 export const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
   if (active && payload && payload.length) {
+    // Deduplicate entries by name to avoid repetition in ComposedCharts
+    const uniquePayload = payload.reduce((acc: any[], current) => {
+      const x = acc.find(item => item.name === current.name);
+      if (!x) return acc.concat([current]);
+      else return acc;
+    }, []);
+
     return (
       <div className="bg-card/80 backdrop-blur-md border border-border p-3 rounded-2xl shadow-xl animate-in zoom-in-95 duration-200">
         <p className="text-xs font-black uppercase tracking-widest text-muted-foreground mb-1.5 border-b border-border/50 pb-1">{label}</p>
         <div className="space-y-1">
-          {payload.map((item, index) => (
+          {uniquePayload.map((item, index) => (
             <div key={index} className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />

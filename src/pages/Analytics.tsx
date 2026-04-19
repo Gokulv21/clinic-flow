@@ -317,7 +317,7 @@ export default function Analytics() {
     <div className="max-w-[1600px] mx-auto animate-in fade-in duration-700 pb-20 font-jakarta-sans bg-slate-50/50 dark:bg-slate-950/50">
       <PageBanner
         title="Predictive Analytics"
-        description="Leveraging clinical data to optimize patient care and operational efficiency."
+        description="Leveraging clinical data to optimize patient care and operational efficiency. (v1.1)"
         imageSrc={analyticsBanner}
       >
         <div className="w-24 h-24 md:w-40 md:h-40 -ml-6 -mt-4 opacity-90 drop-shadow-2xl">
