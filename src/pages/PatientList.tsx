@@ -33,6 +33,8 @@ export default function PatientList() {
   const [viewingRx, setViewingRx] = useState<any>(null);
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [currentRx, setCurrentRx] = useState<any>(null);
+  const [loadingRx, setLoadingRx] = useState(false);
   const pageSize = 25;
 
   const fetchPatients = async () => {
@@ -88,6 +90,32 @@ export default function PatientList() {
       .eq('patient_id', p.id)
       .order('created_at', { ascending: false });
     setVisits(data || []);
+  };
+
+  const handleViewPrescription = async (v: any) => {
+    setViewingRx(v);
+    setLoadingRx(true);
+    setCurrentRx(null);
+    
+    try {
+      // 1. First check the joined prescriptions from the visit (if any)
+      if (Array.isArray(v.prescriptions) && v.prescriptions.length > 0) {
+        setCurrentRx(v.prescriptions[0]);
+      } else {
+        // 2. Explicitly fetch from database for maximum reliability
+        const { data, error } = await supabase
+          .from('prescriptions')
+          .select('*')
+          .eq('visit_id', v.id)
+          .maybeSingle();
+          
+        if (data) setCurrentRx(data);
+      }
+    } catch (err) {
+      console.error("Error fetching prescription:", err);
+    } finally {
+      setLoadingRx(false);
+    }
   };
 
   const saveEdit = async () => {
@@ -293,7 +321,7 @@ export default function PatientList() {
                           size="sm" 
                           variant="ghost" 
                           className="h-8 text-primary hover:text-primary hover:bg-primary/5"
-                          onClick={() => setViewingRx(v)}
+                          onClick={() => handleViewPrescription(v)}
                         >
                           <Eye className="w-3.5 h-3.5 mr-1.5" />
                           Prescription
@@ -336,24 +364,28 @@ export default function PatientList() {
             </div>
           </div>
           <div className="p-4 md:p-8 overflow-y-auto max-h-[85vh] scrollbar-thin scrollbar-thumb-muted-foreground/20 min-h-[500px]">
-            {viewingRx && (() => {
-              const rx = viewingRx.prescriptions?.[0];
-              const isWritingMode = rx?.is_writing_mode ?? (!!rx?.advice_image && (rx.advice_image.startsWith('data:image') || rx.advice_image.startsWith('[')));
-              return (
-                <PrescriptionTemplate
-                  patient={selectedPatient}
-                  visit={viewingRx}
-                  handwrittenImage={rx?.advice_image}
-                  clinicalNotes={rx?.clinical_notes}
-                  diagnosis={rx?.diagnosis || viewingRx.diagnosis}
-                  medicines={rx?.medicines || []}
-                  advice={!isWritingMode ? rx?.advice_image : null}
-                  isWritingMode={isWritingMode}
-                  doctorId={rx?.doctor_id}
-                  prescriptionCreatedAt={rx?.created_at}
-                />
-              );
-            })()}
+            {viewingRx && (
+                <div className="relative min-h-[400px]">
+                  {loadingRx ? (
+                    <div className="absolute inset-0 flex items-center justify-center bg-white/50 z-50">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    </div>
+                  ) : (
+                    <PrescriptionTemplate
+                      patient={selectedPatient}
+                      visit={viewingRx}
+                      handwrittenImage={currentRx?.advice_image}
+                      clinicalNotes={currentRx?.clinical_notes}
+                      diagnosis={currentRx?.diagnosis || viewingRx.diagnosis}
+                      medicines={currentRx?.medicines}
+                      advice={currentRx?.advice_image} 
+                      isWritingMode={currentRx?.is_writing_mode ?? (!!currentRx?.advice_image && String(currentRx.advice_image).startsWith('data:image'))}
+                      doctorId={currentRx?.doctor_id || viewingRx.assigned_doctor_id}
+                      prescriptionCreatedAt={currentRx?.created_at}
+                    />
+                  )}
+                </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

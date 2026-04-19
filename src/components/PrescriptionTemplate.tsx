@@ -58,8 +58,11 @@ const PrescriptionTemplate = React.memo(({
         const fetchDoctorProfile = async () => {
             // Priority 1: Use the specific doctor_id if provided (Saved Rx)
             // Priority 2: Use current user ID ONLY if this is a fresh preview (unsaved draft)
-            let targetId = doctorId;
-            const isSavedRecord = !!prescriptionCreatedAt;
+            // Priority 1: Use the specific doctor_id if provided (Saved Rx)
+            // Priority 2: Use visit.doctor_id (Saved Visit)
+            // Priority 3: Only default to current user for NEW drafts
+            let targetId = doctorId || visit?.doctor_id;
+            const isSavedRecord = !!(prescriptionCreatedAt || visit?.created_at);
 
             if (!targetId && !isSavedRecord) {
                 targetId = authUser?.id;
@@ -75,18 +78,8 @@ const PrescriptionTemplate = React.memo(({
                         .maybeSingle();
 
                     if (profile) {
-                        // For a reliable header, verify this user is actually a doctor
-                        const { data: roleCheck } = await supabase
-                            .from('user_roles')
-                            .select('role')
-                            .eq('user_id', targetId)
-                            .eq('role', 'doctor')
-                            .maybeSingle();
-
-                        if (roleCheck || doctorId) {
-                            setDoctorProfile(profile);
-                            return;
-                        }
+                        setDoctorProfile(profile);
+                        return;
                     }
                 } catch (err) {
                     console.error("Error fetching specific doctor profile:", err);
@@ -108,8 +101,7 @@ const PrescriptionTemplate = React.memo(({
                         .in('user_id', doctorRoles.map(r => r.user_id));
 
                     if (profiles && profiles.length > 0) {
-                        const primary = profiles.find(p => p.full_name?.toLowerCase().includes('aravind'));
-                        setDoctorProfile(primary || profiles[0]);
+                        setDoctorProfile(profiles[0]);
                     }
                 }
             } catch (err) {
@@ -170,30 +162,44 @@ Follow the instructions carefully.
         { label: 'CBG', value: visit?.cbg, unit: ' mg/dL' },
     ];
 
-    const hasTyped = !!(diagnosis || clinicalNotes || (medicines && medicines.length > 0) || advice);
+    // 1. Data Normalization
+    const rawMedicines = Array.isArray(medicines) ? medicines : (() => {
+        if (typeof medicines === 'string' && medicines.trim().startsWith('[')) {
+            try { return JSON.parse(medicines); } catch (e) { return []; }
+        }
+        return [];
+    })();
+    const safeMedicines = Array.isArray(rawMedicines) ? rawMedicines : [];
 
-    // Multi-page parsing logic
+    // 2. Multi-page parsing logic for handwriting
     let rawImages: (string | null)[] = [];
     if (Array.isArray(handwrittenImage)) {
         rawImages = handwrittenImage;
     } else if (typeof handwrittenImage === 'string' && handwrittenImage.startsWith('[')) {
-        try {
-            rawImages = JSON.parse(handwrittenImage);
-        } catch (e) {
-            rawImages = [handwrittenImage];
-        }
+        try { rawImages = JSON.parse(handwrittenImage); } catch (e) { rawImages = [handwrittenImage]; }
     } else {
         rawImages = [handwrittenImage as string | null];
     }
 
     const images = rawImages.filter(isValidImage);
-    const showHandwritten = isWritingMode && images.length > 0;
+    const hasHandwritingInThisComponent = images.length > 0;
+    
+    // Normalize text content
+    const safeDiagnosis = (diagnosis || (typeof visit?.diagnosis === 'string' ? visit.diagnosis : '') || '').trim();
+    const safeNotes = (clinicalNotes || '').trim();
+    const safeAdvice = (advice || '').trim();
 
-    // Ensure medicines is an array and items are valid
-    const safeMedicines = Array.isArray(medicines) ? medicines : [];
+    // Visibility logic - be inclusive, don't hide data!
+    const hasTyped = !!(safeDiagnosis || safeNotes || (safeMedicines && safeMedicines.length > 0) || (safeAdvice && !isValidImage(safeAdvice)));
+    
+    // We only hide typed diagnosis if we are in Writing Mode AND we actually have images to show.
+    const hideTypedDiagnosis = isWritingMode && hasHandwritingInThisComponent;
 
-    // If no handwriting or not in writing mode, we still need one "page" for typed content
-    const pagesToShow = showHandwritten ? images : [null];
+    // Determine what to show
+    const showHandwritten = hasHandwritingInThisComponent;
+
+    // Use images as pages if they exist, otherwise just one page for typed content
+    const pagesToShow = (showHandwritten) ? images : [null];
 
     return (
         <div className="flex flex-col items-center gap-8 w-full print-container print:gap-0">
@@ -226,14 +232,18 @@ Follow the instructions carefully.
                             visit={visit}
                             today={today}
                             time={time}
-                            clinicalNotes={clinicalNotes}
-                            diagnosis={diagnosis}
+                            clinicalNotes={safeNotes}
+                            diagnosis={safeDiagnosis}
                             medicines={safeMedicines}
-                            advice={advice}
                             hasTyped={hasTyped}
                             vitals={vitals}
                             doctorProfile={doctorProfile}
-                            isWritingMode={isWritingMode}
+                            isWritingMode={!!isWritingMode}
+                            hideTypedDiagnosis={hideTypedDiagnosis}
+                            safeDiagnosis={safeDiagnosis}
+                            safeNotes={safeNotes}
+                            safeAdvice={safeAdvice}
+                            hasHandwritingInThisComponent={hasHandwritingInThisComponent}
                             // Props overrides
                             doctorName={doctorName}
                             doctorQualifications={doctorQualifications}
@@ -299,6 +309,11 @@ interface PageOneProps {
     doctorProfile: any;
     vitals: { label: string; value: any; unit: string }[];
     isWritingMode: boolean;
+    hideTypedDiagnosis: boolean;
+    safeDiagnosis: string;
+    safeNotes: string;
+    safeAdvice: string;
+    hasHandwritingInThisComponent: boolean;
     // Overrides
     doctorName?: string;
     doctorQualifications?: string;
@@ -311,6 +326,7 @@ interface PageOneProps {
 function PageOne({
     patient, visit, today, time, clinicalNotes, diagnosis, medicines, advice,
     hasTyped, vitals, doctorProfile, isWritingMode,
+    hideTypedDiagnosis, safeDiagnosis, safeNotes, safeAdvice, hasHandwritingInThisComponent,
     doctorName, doctorQualifications, doctorRegId,
     clinicName, clinicAddress, clinicPhone
 }: PageOneProps) {
@@ -426,18 +442,18 @@ function PageOne({
                     <div style={{ height: '0.1em', flexShrink: 0 }} />
                     {hasTyped && (
                         <div style={{ lineHeight: 1.6, fontSize: '1.1em', overflow: 'hidden', zIndex: 30, position: 'relative' }}>
-                            {clinicalNotes && (
+                            {safeNotes && (
                                 <div style={{ marginBottom: '1.2em', color: '#334155' }}>
                                     <div style={{ fontWeight: 800, fontSize: '0.8em', textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.05em', marginBottom: '0.4em' }}>Clinical Notes & History:</div>
-                                    <div style={{ whiteSpace: 'pre-wrap', fontWeight: 500, borderLeft: '3px solid #e2e8f0', paddingLeft: '0.8em', fontStyle: 'italic' }}>{clinicalNotes}</div>
+                                    <div style={{ whiteSpace: 'pre-wrap', fontWeight: 500, borderLeft: '3px solid #e2e8f0', paddingLeft: '0.8em', fontStyle: 'italic' }}>{safeNotes}</div>
                                 </div>
                             )}
 
-                            {/* Diagnosis shown only in non-writing mode or if explicitly requested */}
-                            {!isWritingMode && diagnosis && (
+                            {/* Diagnosis: Show it if it exists, hide only if redundant in writing mode */}
+                            {!hideTypedDiagnosis && safeDiagnosis && (
                                 <div style={{ marginBottom: '1.2em', color: '#1e293b' }}>
                                     <div style={{ fontWeight: 800, fontSize: '0.8em', textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.05em', marginBottom: '0.4em' }}>Diagnosis:</div>
-                                    <div style={{ fontWeight: 800, fontSize: '1.2em', color: '#0f172a' }}>{diagnosis}</div>
+                                    <div style={{ fontWeight: 800, fontSize: '1.2em', color: '#0f172a' }}>{safeDiagnosis}</div>
                                 </div>
                             )}
 
@@ -476,7 +492,26 @@ function PageOne({
                                     </tbody>
                                 </table>
                             )}
-                            {advice && !isValidImage(advice) && <div style={{ marginTop: '1em', fontStyle: 'italic', color: '#475569', fontSize: '1em', fontWeight: 500 }}>Advice: {advice}</div>}
+                            {safeAdvice && !isValidImage(safeAdvice) && (
+                                <div style={{ marginTop: '1.2em', borderTop: '1px dashed #e2e8f0', pt: '1em' }}>
+                                    <div style={{ fontWeight: 800, fontSize: '0.8em', textTransform: 'uppercase', color: '#64748b', mb: '0.4em' }}>Advice / Instructions:</div>
+                                    <div style={{ fontStyle: 'italic', color: '#475569', fontSize: '1em', fontWeight: 500 }}>{safeAdvice}</div>
+                                </div>
+                            )}
+                            
+                            {!hasTyped && !hasHandwritingInThisComponent && (
+                                <div style={{ 
+                                    marginTop: '4em', 
+                                    padding: '2em', 
+                                    border: '2px dashed #e2e8f0', 
+                                    borderRadius: '1em',
+                                    textAlign: 'center',
+                                    color: '#94a3b8'
+                                }}>
+                                    <div style={{ fontWeight: 800, fontSize: '0.8em', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.5em' }}>Prescription Information</div>
+                                    <div style={{ fontSize: '0.9em', fontWeight: 500 }}>No typed medications or handwriting found for this visit.</div>
+                                </div>
+                            )}
                         </div>
                     )}
                     {/* Watermark */}

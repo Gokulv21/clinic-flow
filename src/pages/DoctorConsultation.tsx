@@ -116,29 +116,40 @@ export default function DoctorConsultation() {
     try {
       if (!clinic?.id) return;
       
-      const { data, error } = await supabase
-        .from('prescriptions')
-        .select('diagnosis')
-        .eq('clinic_id', clinic.id)
-        .order('created_at', { ascending: false })
-        .limit(1000);
+      // Fetch from both prescriptions AND visits to be comprehensive
+      const [rxRes, visitRes] = await Promise.all([
+        supabase.from('prescriptions').select('diagnosis').eq('clinic_id', clinic.id).limit(500),
+        supabase.from('visits').select('diagnosis').eq('clinic_id', clinic.id).not('diagnosis', 'is', null).limit(500)
+      ]);
       
-      if (data) {
+      const allEntries = [
+        ...(rxRes.data || []).map(d => d.diagnosis),
+        ...(visitRes.data || []).map(d => d.diagnosis)
+      ].filter(Boolean);
+      
+      if (allEntries.length > 0) {
         // Flatten and clean up duplicates
-        // Split by standard separators: /, \, or ,
-        const allIndividualTerms = data
-          .map(d => d.diagnosis)
-          .filter(Boolean)
+        const allIndividualTerms = allEntries
           .flatMap(d => (typeof d === 'string' ? d.split(/[/,\\,]+/) : []))
           .map(d => d.trim())
-          .filter(d => d.length > 1); // Ignore single characters or empty
+          .filter(d => d.length > 1);
         
-        setDiagnosisHistory([...new Set(allIndividualTerms)]);
+        // Use a set to unique, then sort by frequency would be nice, but simple unique for now
+        setDiagnosisHistory([...new Set(allIndividualTerms)].sort());
       }
     } catch (e) {
       console.error("Error fetching diagnosis history", e);
     }
   }
+
+  const { data: myProfile } = useQuery({
+    queryKey: ['myProfile', user?.id],
+    queryFn: async () => {
+       const { data } = await supabase.from('profiles').select('*').eq('user_id', user?.id).maybeSingle();
+       return data;
+    },
+    enabled: !!user?.id
+  });
 
   async function fetchProtocols() {
     const { data } = await supabase
@@ -475,7 +486,9 @@ Follow the instructions carefully.
   const savePrescription = async () => {
     if (!selectedVisit || !patient) return;
     const isWriting = lastInputWay === 'writing';
-    const finalDiagnosis = isWriting ? diagnosis : (diagnoses.join(' / ') || diagnosis || null);
+    // If we have tags, use them. If not, use the raw diagnosis string.
+    const diagnosisStr = (diagnoses.length > 0 ? diagnoses.join(' / ') : diagnosis).trim();
+    const finalDiagnosis = diagnosisStr || null;
     const finalClinicalNotes = clinicalNotes || null;
     const finalMedicines = medicines.filter(m => m.name.trim());
     const finalAdviceImage = isWriting ? prescriptionImage : (advice || null);
@@ -1248,18 +1261,25 @@ Follow the instructions carefully.
           </DialogHeader>
           <div className="p-4 md:p-8 overflow-auto max-h-[85vh] bg-muted min-h-[500px]" id="consultation-print-preview">
             <PrescriptionTemplate
-              patient={patient}
-              visit={selectedVisit}
-              handwrittenImage={prescriptionImage}
-              clinicalNotes={clinicalNotes}
-              diagnosis={diagnoses.length > 0 ? diagnoses.join(' / ') : diagnosis}
-              medicines={medicines.filter(m => m.name.trim())}
-              advice={advice}
-              isWritingMode={lastInputWay === 'writing'}
-              isPrint={true}
-              doctorId={user?.id}
-              prescriptionCreatedAt={new Date().toISOString()}
-            />
+               patient={patient}
+               visit={selectedVisit}
+               handwrittenImage={prescriptionImage}
+               clinicalNotes={clinicalNotes}
+               diagnosis={diagnoses.length > 0 ? diagnoses.join(' / ') : diagnosis}
+               medicines={medicines.filter(m => m.name.trim())}
+               advice={advice}
+               isWritingMode={lastInputWay === 'writing'}
+               isPrint={true}
+               doctorId={user?.id}
+               prescriptionCreatedAt={new Date().toISOString()}
+               // Overrides for dynamic profile display
+               doctorName={myProfile?.full_name}
+               doctorQualifications={myProfile?.qualifications}
+               doctorRegId={myProfile?.registration_id}
+               clinicName={myProfile?.clinic_name}
+               clinicAddress={myProfile?.clinic_address}
+               clinicPhone={myProfile?.clinic_phone}
+             />
           </div>
         </DialogContent>
         </Dialog>
