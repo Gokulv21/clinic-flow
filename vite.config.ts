@@ -44,16 +44,6 @@ export default defineConfig(({ mode }) => ({
   ].filter(Boolean),
   build: {
     chunkSizeWarningLimit: 1000,
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-          'vendor-ui': ['framer-motion', 'lucide-react', 'clsx', 'tailwind-merge'],
-          'vendor-supabase': ['@supabase/supabase-js'],
-          'vendor-utils': ['date-fns', 'zod', 'sonner']
-        }
-      }
-    }
   },
   resolve: {
     alias: {
