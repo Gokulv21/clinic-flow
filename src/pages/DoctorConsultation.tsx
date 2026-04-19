@@ -884,8 +884,14 @@ Follow the instructions carefully.
                                     <PenTool className="w-10 h-10" />
                                 </div>
                                 <div className="space-y-1">
-                                    <p className="text-base font-black text-foreground">No Pen Content Yet</p>
-                                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Tap 'Open Template' above to start writing</p>
+                                    <p className="text-base font-black text-foreground">
+                                      {prescriptionPaths.flat().length > 0 ? "Handwriting Draft Available" : "No Pen Content Yet"}
+                                    </p>
+                                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+                                      {prescriptionPaths.flat().length > 0 
+                                        ? "Open Template to continue or Save to finalize" 
+                                        : "Tap 'Open Template' above to start writing"}
+                                    </p>
                                 </div>
                             </div>
                         )}
@@ -1215,6 +1221,10 @@ Follow the instructions carefully.
           visit={selectedVisit}
           initialPaths={prescriptionPaths}
           onSave={handlePrescriptionSave}
+          onPathsChange={(pages) => {
+            setPrescriptionPaths(pages);
+            setLastInputWay('writing');
+          }}
           onClose={() => setShowDigitalRx(false)}
         />
       )}

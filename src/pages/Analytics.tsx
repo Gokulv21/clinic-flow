@@ -129,12 +129,18 @@ export default function Analytics() {
     });
 
     // Age distribution
-    const ageGroups: Record<string, number> = { '0-12 (Pediatric)': 0, '13-19 (Teen)': 0, '20-45 (Adult)': 0, '46-60 (Senior)': 0, '60+ (Geriatric)': 0 };
+    const ageGroups: Record<string, number> = { 
+      '0-12 (Pediatric)': 0, 
+      '12-18 (Adolescence)': 0, 
+      '18-45 (Adult)': 0, 
+      '45-60 (Senior)': 0, 
+      '60+ (Geriatric)': 0 
+    };
     data.forEach(p => {
       if (p.age <= 12) ageGroups['0-12 (Pediatric)']++;
-      else if (p.age <= 19) ageGroups['13-19 (Teen)']++;
-      else if (p.age <= 45) ageGroups['20-45 (Adult)']++;
-      else if (p.age <= 60) ageGroups['46-60 (Senior)']++;
+      else if (p.age <= 18) ageGroups['12-18 (Adolescence)']++;
+      else if (p.age <= 45) ageGroups['18-45 (Adult)']++;
+      else if (p.age <= 60) ageGroups['45-60 (Senior)']++;
       else ageGroups['60+ (Geriatric)']++;
     });
 
@@ -462,7 +468,15 @@ export default function Analytics() {
                 <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--primary))', opacity: 0.1 }} />
                 <Area type="monotone" dataKey="patients" fill="url(#flowGradient)" stroke="none" />
                 <Bar dataKey="patients" barSize={32} radius={[10, 10, 0, 0]}>
-                    {volumeData.map((_, i) => <Cell key={i} fill="hsl(var(--primary))" fillOpacity={0.8} />)}
+                    {volumeData.map((entry, i) => {
+                        const prev = volumeData[i - 1];
+                        let color = 'hsl(var(--primary))';
+                        if (prev) {
+                            if (entry.patients > prev.patients) color = '#10b981';
+                            else if (entry.patients < prev.patients) color = '#ef4444';
+                        }
+                        return <Cell key={i} fill={color} fillOpacity={0.8} />;
+                    })}
                 </Bar>
                 <Line type="monotone" dataKey="patients" stroke="hsl(var(--primary))" strokeWidth={4} dot={{ r: 4, strokeWidth: 2, fill: '#fff' }} />
               </ComposedChart>

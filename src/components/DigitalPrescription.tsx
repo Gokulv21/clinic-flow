@@ -27,10 +27,11 @@ interface DigitalPrescriptionProps {
     initialPaths?: any[]; // For backward compatibility or if we only have one page
     initialPages?: any[][]; // Better for multi-page
     onSave: (imageData: string | string[] | null, pages: any[][]) => void;
+    onPathsChange?: (pages: any[][]) => void;
     onClose: () => void;
 }
 
-export default function DigitalPrescription({ patient, visit, initialPaths = [], initialPages, onSave, onClose }: DigitalPrescriptionProps) {
+export default function DigitalPrescription({ patient, visit, initialPaths = [], initialPages, onSave, onPathsChange, onClose }: DigitalPrescriptionProps) {
     const [mounted, setMounted] = React.useState(false);
     React.useEffect(() => {
         setMounted(true);
@@ -346,6 +347,11 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
             newHistory.push(updatedPages);
             setHistory(newHistory);
             setHistoryStep(newHistory.length - 1);
+
+            // Notify parent of changes
+            if (onPathsChange) {
+                onPathsChange(updatedPages);
+            }
         }
 
         currentPathRef.current = [];
@@ -370,6 +376,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
             setPages(history[nextStep]);
             redrawStatic(history[nextStep][currentPageIndex] || []);
             isDirtyRef.current = true;
+            if (onPathsChange) onPathsChange(history[nextStep]);
         }
     };
 
@@ -380,6 +387,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
             setPages(history[nextStep]);
             redrawStatic(history[nextStep][currentPageIndex] || []);
             isDirtyRef.current = true;
+            if (onPathsChange) onPathsChange(history[nextStep]);
         }
     };
 
@@ -397,6 +405,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                 return newHistory;
             });
 
+            if (onPathsChange) onPathsChange(updated);
             return updated;
         });
 
