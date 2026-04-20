@@ -12,12 +12,13 @@ CREATE POLICY "production_profiles_select" ON public.profiles
     (user_id = auth.uid()) OR
     (
       (clinic_id = public.get_auth_clinic_id() AND is_superadmin = false) OR
-      (EXISTS (SELECT 1 FROM public.profiles WHERE user_id = auth.uid() AND is_superadmin = true))
+      (public.is_auth_superadmin())
     )
   );
 
 -- Also ensure user_roles table is filtered
 DROP POLICY IF EXISTS "Allow read all user_roles" ON public.user_roles;
+DROP POLICY IF EXISTS "production_user_roles_select" ON public.user_roles;
 CREATE POLICY "production_user_roles_select" ON public.user_roles
   FOR SELECT TO authenticated
   USING (
@@ -28,6 +29,6 @@ CREATE POLICY "production_user_roles_select" ON public.user_roles
         WHERE p.user_id = public.user_roles.user_id 
         AND p.is_superadmin = false
       ) OR
-      (EXISTS (SELECT 1 FROM public.profiles WHERE user_id = auth.uid() AND is_superadmin = true))
+      (public.is_auth_superadmin())
     )
   );
