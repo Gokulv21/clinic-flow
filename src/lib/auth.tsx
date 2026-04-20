@@ -60,8 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       const rolesFromDB = (rolesRes.data || []).map(r => r.role as AppRole);
       const profileData = profileRes.data || null;
-      const isAdminEmail = ['doctor@clinic.com', 'gokie.v21@gmail.com'].includes(user?.email || '');
-      const isSuper = !!profileData?.is_superadmin || isAdminEmail;
+      const isSuper = !!profileData?.is_superadmin;
       const newRoles = isSuper ? [...rolesFromDB, 'superadmin' as AppRole] : rolesFromDB;
 
       console.log('[Auth] User profiles data:', profileRes.data);
@@ -95,6 +94,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await fetchUserData(user.id, true);
     }
   };
+
+  // Inactivity Timeout (1 hour)
+  useEffect(() => {
+    if (!user) return;
+
+    let timeoutId: NodeJS.Timeout;
+
+    const resetTimer = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        console.log('[Auth] Session timed out due to inactivity.');
+        signOut();
+      }, 3600000); // 1 hour
+    };
+
+    // Events to watch
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart', 'mousemove'];
+    events.forEach(e => document.addEventListener(e, resetTimer));
+
+    // Initial start
+    resetTimer();
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      events.forEach(e => document.removeEventListener(e, resetTimer));
+    };
+  }, [user]);
 
   useEffect(() => {
     let mounted = true;

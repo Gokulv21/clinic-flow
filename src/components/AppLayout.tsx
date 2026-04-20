@@ -16,6 +16,7 @@ import {
 import { useTheme } from '@/components/ThemeProvider';
 import logo from '@/assets/logo.png';
 import { motion, AnimatePresence, useScroll, useMotionValueEvent } from 'framer-motion';
+import NotificationCenter from './NotificationCenter';
 
 interface NavItem {
   label: string;
@@ -100,12 +101,12 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       >
         <div 
           className={cn(
-            "border-b border-white/10 flex h-[90px] mb-4 transition-all duration-300 overflow-hidden relative",
-            isSidebarExpanded ? "p-6 items-center" : "justify-center items-center"
+            "border-b border-white/10 flex transition-all duration-300 overflow-hidden relative px-4 py-4",
+            isSidebarExpanded ? "h-[100px] flex-row items-center justify-between" : "h-[140px] flex-col items-center justify-center gap-4"
           )}
         >
           <motion.div
-            animate={{ x: isSidebarExpanded ? 0 : 0 }}
+            animate={{ x: 0 }}
             className="flex items-center gap-4 shrink-0"
           >
             <div className="w-12 h-12 rounded-2xl bg-white shadow-2xl flex items-center justify-center border border-white/50 overflow-hidden">
@@ -124,6 +125,14 @@ export default function AppLayout({ children }: { children: ReactNode }) {
                 </motion.div>
               )}
             </AnimatePresence>
+          </motion.div>
+
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }}
+            className={cn(!isSidebarExpanded && "mt-1")}
+          >
+            <NotificationCenter />
           </motion.div>
         </div>
 
@@ -262,9 +271,12 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           </SheetTrigger>
           <SheetContent side="bottom" className="p-0 rounded-t-[rem] glass-water border-t-0 shadow-[0_-20px_80px_rgba(0,0,0,0.5)] h-[65vh] overflow-hidden flex flex-col transition-transform duration-700">
             <div className="p-6 border-b border-white/5 flex items-center justify-between shrink-0">
-              <div>
-                <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tighter">Menu</h3>
-                <p className="text-[9px] text-blue-600 font-black uppercase tracking-[0.2em]">{profile?.full_name}</p>
+              <div className="flex items-center gap-4">
+                <div>
+                  <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tighter">Menu</h3>
+                  <p className="text-[9px] text-blue-600 font-black uppercase tracking-[0.2em]">{profile?.full_name}</p>
+                </div>
+                <NotificationCenter />
               </div>
               <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(false)} className="rounded-full bg-white/5 active:scale-75 transition-all">
                 <ChevronUp className="w-4 h-4 rotate-180" />

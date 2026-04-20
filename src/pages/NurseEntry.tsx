@@ -87,8 +87,13 @@ export default function NurseEntry() {
   const { data: doctors } = useQuery({
     queryKey: ['doctors', clinic?.id],
     queryFn: async () => {
-       const { data } = await supabase.from('profiles').select('id, full_name').eq('role', 'doctor').eq('clinic_id', clinic?.id);
-       return data || [];
+        const { data } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .eq('role', 'doctor')
+          .eq('clinic_id', clinic?.id)
+          .neq('is_superadmin', true);
+        return data || [];
     },
     enabled: !!clinic?.id
   });

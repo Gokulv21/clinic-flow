@@ -93,7 +93,7 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
     if (!user) return;
     try {
       const [{ data: profData }, { data: rolesData }] = await Promise.all([
-        supabase.from('profiles').select('*'),
+        supabase.from('profiles').select('*').neq('is_superadmin', true),
         supabase.from('user_roles').select('*')
       ]);
       
@@ -305,50 +305,8 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
       console.warn("[LiveKit] Edge function fetch failed, using local JWT fallback...", e);
     }
 
-    // 2. Fallback: Generate Token entirely in the browser (Perfect for development)
-    const apiKey = import.meta.env.VITE_LIVEKIT_API_KEY || 'devkey';
-    const apiSecret = import.meta.env.VITE_LIVEKIT_API_SECRET || 'secret';
-
-    const header = { alg: 'HS256', typ: 'JWT' };
-    const payload = {
-      iss: apiKey,
-      sub: identity,
-      name: name,
-      nbf: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + 7200,
-      video: {
-        roomJoin: true,
-        room: roomName,
-        canPublish: true,
-        canSubscribe: true,
-        canPublishData: true,
-      }
-    };
-
-    const toBase64Url = (obj: any) => {
-      const str = JSON.stringify(obj);
-      // Ensure unicode characters in names are safely encoded
-      const m = encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (_, p1) => String.fromCharCode(parseInt('0x' + p1, 16)));
-      return btoa(m).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    };
-
-    const dataInfo = toBase64Url(header) + '.' + toBase64Url(payload);
-    
-    // Hash the signature using native WebCrypto API
-    const encoder = new TextEncoder();
-    const keyMap = await crypto.subtle.importKey(
-      'raw',
-      encoder.encode(apiSecret),
-      { name: 'HMAC', hash: 'SHA-256' },
-      false,
-      ['sign']
-    );
-    
-    const signature = await crypto.subtle.sign('HMAC', keyMap, encoder.encode(dataInfo));
-    const sigB64 = btoa(String.fromCharCode(...new Uint8Array(signature)))
-      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-
-    return dataInfo + '.' + sigB64;
+    // 2. Fallback: Removed for security (API Secret must not be in frontend)
+    throw new Error('Media token generation failed. Please contact admin.');
   };
 
   // --- Public API ---

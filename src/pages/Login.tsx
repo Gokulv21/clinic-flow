@@ -63,6 +63,64 @@ export default function Login() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Password</Label>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!email.trim()) {
+                      toast.error('Please enter your username/email first');
+                      return;
+                    }
+                    const loadingToast = toast.loading('Sending request to administrator...');
+                    try {
+                      // Find user to get clinic_id
+                      const { data: profile } = await supabase
+                        .from('profiles')
+                        .select('user_id, clinic_id, is_superadmin')
+                        .eq('email', email.trim())
+                        .maybeSingle();
+
+                      if (!profile) {
+                        toast.error('User not found');
+                        return;
+                      }
+
+                      // SECURITY: Block internal reset requests for Super Admins
+                      if (profile.is_superadmin) {
+                        toast.error('System administrators must use platform secure recovery.');
+                        return;
+                      }
+
+                      // Fetch roles to determine requester_role
+                      const { data: userRoles } = await supabase
+                        .from('user_roles')
+                        .select('role')
+                        .eq('user_id', profile.user_id);
+                      
+                      const isDoctor = (userRoles || []).some(r => r.role === 'doctor');
+                      const requesterRole = isDoctor ? 'doctor' : 'staff';
+
+                      const { error: reqError } = await supabase
+                        .from('password_reset_requests')
+                        .insert({
+                          user_id: profile.user_id,
+                          clinic_id: profile.clinic_id,
+                          email: email.trim(),
+                          requester_role: requesterRole,
+                          status: 'pending'
+                        });
+
+                      if (reqError) throw reqError;
+                      toast.success('Reset request sent to your clinic administrator');
+                    } catch (err: any) {
+                      toast.error(err.message || 'Failed to send request');
+                    } finally {
+                      toast.dismiss(loadingToast);
+                    }
+                  }}
+                  className="text-xs font-bold text-primary hover:underline transition-all"
+                >
+                  Forgot Password?
+                </button>
               </div>
               <Input
                 id="password"
@@ -83,9 +141,11 @@ export default function Login() {
               Sign In
             </Button>
 
-            <p className="text-center text-xs text-muted-foreground pt-2">
-              Contact administrator if you forgot your credentials
-            </p>
+            <div className="text-center pt-2">
+               <p className="text-xs text-muted-foreground">
+                 Administrative locked system. Request access if needed.
+               </p>
+            </div>
           </form>
         </CardContent>
       </Card>

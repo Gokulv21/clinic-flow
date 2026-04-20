@@ -28,7 +28,7 @@ export default function UserManagement() {
   const fetchUsers = async () => {
     try {
       const [{ data: profilesData, error: profError }] = await Promise.all([
-        supabase.from('profiles').select('*').eq('clinic_id', clinic?.id)
+        supabase.from('profiles').select('*').eq('clinic_id', clinic?.id).neq('is_superadmin', true)
       ]);
 
       if (profError) throw profError;

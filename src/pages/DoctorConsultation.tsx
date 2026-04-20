@@ -90,6 +90,8 @@ export default function DoctorConsultation() {
   const [prescriptionPaths, setPrescriptionPaths] = useState<any[]>([]);
   const [showPreview, setShowPreview] = useState(false);
   const [viewingHistoryRx, setViewingHistoryRx] = useState<any>(null);
+  const [loadingHistoryRx, setLoadingHistoryRx] = useState(false);
+  const [currentHistoryRx, setCurrentHistoryRx] = useState<any>(null);
   const [isWritingMode, setIsWritingMode] = useState(false);
   const [clinicalNotes, setClinicalNotes] = useState('');
   const [showVitalsEdit, setShowVitalsEdit] = useState(false);
@@ -803,7 +805,21 @@ Follow the instructions carefully.
                           size="sm" 
                           variant="ghost" 
                           className="h-8 w-8 p-0 text-muted-foreground hover:text-blue-600 hover:bg-blue-500/10 transition-colors shrink-0"
-                          onClick={() => setViewingHistoryRx(h)}
+                          onClick={async () => {
+                            setViewingHistoryRx(h);
+                            setLoadingHistoryRx(true);
+                            setCurrentHistoryRx(null);
+                            try {
+                              if (Array.isArray(h.prescriptions) && h.prescriptions.length > 0) {
+                                setCurrentHistoryRx(h.prescriptions[0]);
+                              } else {
+                                const { data } = await supabase.from('prescriptions').select('*').eq('visit_id', h.id).maybeSingle();
+                                if (data) setCurrentHistoryRx(data);
+                              }
+                            } finally {
+                              setLoadingHistoryRx(false);
+                            }
+                          }}
                         >
                           <Eye className="w-4 h-4" />
                         </Button>
@@ -1284,45 +1300,44 @@ Follow the instructions carefully.
         </DialogContent>
         </Dialog>
 
-      {/* History Preview Dialog */}
+      {/* 5. History Rx Preview Dialog */}
       <Dialog open={!!viewingHistoryRx} onOpenChange={open => !open && setViewingHistoryRx(null)}>
-        <DialogContent className="max-w-[800px] p-0 overflow-hidden bg-background border-none shadow-2xl">
-          <div className="bg-background/80 p-4 border-b flex items-center justify-between sticky top-0 z-[60] backdrop-blur-md pr-16">
+        <DialogContent className="max-w-[800px] p-0 overflow-hidden bg-muted elevation-2xl rounded-[2.5rem] border-none">
+          <div className="bg-card p-4 border-b border-border flex items-center justify-between sticky top-0 z-20">
+            <h3 className="font-bold text-foreground">Prescription History</h3>
             <div className="flex items-center gap-2">
-              <Button size="sm" onClick={() => printPrescription('#history-print-preview')} className="gap-2">
-                <Printer className="w-4 h-4" /> Print
+              <Button size="sm" onClick={() => printPrescription('.print-container')} className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90 font-bold px-4">
+                <Printer className="w-4 h-4" /> <span className="hidden sm:inline">Print</span>
               </Button>
-              <Button variant="outline" size="sm" onClick={() => shareToWhatsApp(viewingHistoryRx, patient)} className="gap-2 border-green-500/30 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/10">
-                <MessageCircle className="w-4 h-4" /> Share
+              <Button size="sm" variant="outline" onClick={() => setViewingHistoryRx(null)} className="gap-1 border-muted-foreground/20 text-muted-foreground hover:bg-red-50 hover:text-red-600 font-bold px-4">
+                <X className="w-4 h-4" /> <span className="hidden sm:inline">Close</span>
               </Button>
             </div>
-            <h3 className="font-bold text-foreground">
-              Prescription History
-            </h3>
-            {/* Built-in Shadcn Close button will appear here in the pr-12 space */}
           </div>
-          <div className="p-4 md:p-8 overflow-y-auto max-h-[80vh] bg-muted/30 scrollbar-thin scrollbar-thumb-muted-foreground/20 min-h-[500px]" id="history-print-preview">
-            {viewingHistoryRx && (() => {
-              const rx = viewingHistoryRx.prescriptions?.[0];
-              const isWritingMode = rx?.is_writing_mode ?? (!!rx?.advice_image && (rx.advice_image.startsWith('data:image') || rx.advice_image.startsWith('[')));
-              return (
-                <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm overflow-hidden">
-                  <PrescriptionTemplate
-                    patient={viewingHistoryRx.patients || patient}
-                    visit={viewingHistoryRx}
-                    diagnosis={rx?.diagnosis || viewingHistoryRx?.diagnosis}
-                    clinicalNotes={rx?.clinical_notes || viewingHistoryRx?.clinical_notes}
-                    medicines={rx?.medicines || viewingHistoryRx?.medicines || []}
-                    advice={rx?.advice_image || viewingHistoryRx?.advice_image}
-                    handwrittenImage={rx?.advice_image || viewingHistoryRx?.advice_image}
-                    isWritingMode={isWritingMode}
-                    isPrint={true}
-                    doctorId={rx?.doctor_id || viewingHistoryRx?.doctor_id}
-                    prescriptionCreatedAt={rx?.created_at || viewingHistoryRx?.created_at}
-                  />
+          <div className="p-4 md:p-8 overflow-y-auto max-h-[85vh] scrollbar-thin scrollbar-thumb-muted-foreground/20 min-h-[500px]">
+            {viewingHistoryRx && (
+                <div className="relative min-h-[400px]">
+                  {loadingHistoryRx ? (
+                    <div className="absolute inset-0 flex items-center justify-center bg-white/50 z-50">
+                      <Loader2 className="animate-spin h-8 w-8 text-primary" />
+                    </div>
+                  ) : (
+                    <PrescriptionTemplate
+                      patient={viewingHistoryRx.patients || patient}
+                      visit={viewingHistoryRx}
+                      diagnosis={currentHistoryRx?.diagnosis || viewingHistoryRx?.diagnosis}
+                      clinicalNotes={currentHistoryRx?.clinical_notes || viewingHistoryRx?.clinical_notes}
+                      medicines={currentHistoryRx?.medicines || viewingHistoryRx?.medicines || []}
+                      advice={currentHistoryRx?.advice_image || viewingHistoryRx?.advice_image}
+                      handwrittenImage={currentHistoryRx?.advice_image || viewingHistoryRx?.advice_image}
+                      isWritingMode={currentHistoryRx?.is_writing_mode ?? (!!currentHistoryRx?.advice_image && (String(currentHistoryRx.advice_image).startsWith('data:image') || String(currentHistoryRx.advice_image).startsWith('[')))}
+                      isPrint={true}
+                      doctorId={currentHistoryRx?.doctor_id || viewingHistoryRx?.doctor_id}
+                      prescriptionCreatedAt={currentHistoryRx?.created_at || viewingHistoryRx?.created_at}
+                    />
+                  )}
                 </div>
-              );
-            })()}
+            )}
           </div>
         </DialogContent>
       </Dialog>
