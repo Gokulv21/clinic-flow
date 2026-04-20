@@ -1,10 +1,40 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CreditCard, Activity, ShieldAlert, Wrench } from "lucide-react";
+import { CreditCard, Activity, ShieldAlert, Wrench, Shield, Clock, User, Fingerprint } from "lucide-react";
 import PageBanner from "@/components/PageBanner";
 import userMgmtBanner from "@/assets/user_mgmt_banner.png";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
 
 export default function SaaSManagement() {
+  const { data: logs, isLoading } = useQuery({
+    queryKey: ['security_logs'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('security_audit_logs')
+        .select(`
+          *,
+          actor:profiles!security_audit_logs_actor_id_fkey(full_name),
+          clinic:clinics(name)
+        `)
+        .order('created_at', { ascending: false })
+        .limit(50);
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
   return (
     <div className="max-w-[1200px] mx-auto animate-in fade-in duration-500 pb-12">
       <PageBanner
@@ -40,12 +70,102 @@ export default function SaaSManagement() {
             </TabsContent>
 
             <TabsContent value="audit" className="space-y-6">
-                <DevelopmentPlaceholder title="System Audit Trails" />
+                <Card className="border-border rounded-[2rem] overflow-hidden bg-card/30 backdrop-blur-md">
+                    <CardHeader className="border-b border-border bg-muted/20">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <CardTitle className="text-xl font-black flex items-center gap-2">
+                                    <Shield className="w-5 h-5 text-amber-500" /> Platform Security Audit
+                                </CardTitle>
+                                <CardDescription className="font-semibold">
+                                    Real-time monitoring of sensitive platform events and security anomalies.
+                                </CardDescription>
+                            </div>
+                            <Badge variant="outline" className="font-black uppercase tracking-widest text-[10px]">
+                                Live Logs
+                            </Badge>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        <Table>
+                            <TableHeader>
+                                <TableRow className="bg-muted/30 hover:bg-muted/30 border-none">
+                                    <TableHead className="font-bold py-4 pl-6 text-[10px] uppercase tracking-widest">Time</TableHead>
+                                    <TableHead className="font-bold py-4 text-[10px] uppercase tracking-widest">Event Type</TableHead>
+                                    <TableHead className="font-bold py-4 text-[10px] uppercase tracking-widest">User / Clinic</TableHead>
+                                    <TableHead className="font-bold py-4 text-[10px] uppercase tracking-widest">Details</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {isLoading ? (
+                                    <TableRow>
+                                        <TableCell colSpan={4} className="h-48 text-center">
+                                            <div className="flex flex-col items-center gap-2 text-muted-foreground font-bold">
+                                                <Fingerprint className="w-8 h-8 animate-pulse" />
+                                                Decrypting Security Logs...
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ) : logs && logs.length > 0 ? (
+                                    logs.map((log) => (
+                                        <TableRow key={log.id} className="group border-border hover:bg-muted/10 transition-colors">
+                                            <TableCell className="pl-6 font-medium text-xs">
+                                                <div className="flex items-center gap-2">
+                                                    <Clock className="w-3 h-3 text-muted-foreground" />
+                                                    {format(new Date(log.created_at), 'MMM d, HH:mm:ss')}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge className={getEventBadgeClass(log.event_type)}>
+                                                    {log.event_type}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="space-y-0.5">
+                                                    <p className="text-xs font-bold flex items-center gap-1">
+                                                        <User className="w-3 h-3" /> {log.actor?.full_name || 'System / Guest'}
+                                                    </p>
+                                                    <p className="text-[10px] text-muted-foreground font-medium flex items-center gap-1">
+                                                        <Activity className="w-2.5 h-2.5" /> {log.clinic?.name || 'Global'}
+                                                    </p>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="max-w-[400px]">
+                                                <div className="text-[10px] font-mono bg-muted/30 p-2 rounded-lg break-words text-muted-foreground group-hover:text-foreground group-hover:bg-muted/50 transition-all border border-transparent group-hover:border-border">
+                                                    {JSON.stringify(log.metadata, null, 2)}
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                ) : (
+                                    <TableRow>
+                                        <TableCell colSpan={4} className="h-24 text-center font-bold text-muted-foreground italic">
+                                            No security events recorded.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
             </TabsContent>
          </Tabs>
       </div>
     </div>
   );
+}
+
+function getEventBadgeClass(type: string) {
+    const base = "font-black uppercase tracking-widest text-[9px] px-2 py-0.5 border-none shadow-none ";
+    switch(type) {
+        case 'LOGIN_SUCCESS': return base + "bg-green-500/10 text-green-600";
+        case 'LOGIN_FAILURE': return base + "bg-red-500/10 text-red-600 animate-pulse";
+        case 'AUTH_ERROR': return base + "bg-orange-500/10 text-orange-600";
+        case 'ROLE_CHANGE': return base + "bg-blue-500/10 text-blue-600";
+        case 'DATA_DELETION': return base + "bg-purple-500/10 text-purple-600";
+        case 'SUSPICIOUS_TRAFFIC': return base + "bg-red-500/10 text-red-600 animate-bounce";
+        default: return base + "bg-muted text-muted-foreground";
+    }
 }
 
 function DevelopmentPlaceholder({ title }: { title: string }) {

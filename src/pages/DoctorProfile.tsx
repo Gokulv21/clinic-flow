@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
+import { sanitizeText, validatePhone, validateNumericRange } from '@/lib/security-sanitize';
 import { useNavigate, useParams, useOutletContext } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
@@ -200,15 +201,31 @@ export default function DoctorProfile() {
         if (!user?.id || !profile) return;
         setSaving(true);
         try {
+            // 1. Sanitize Inputs
+            const sData = {
+                full_name: sanitizeText(profile.full_name, 100),
+                qualifications: sanitizeText(profile.qualifications || '', 200),
+                registration_id: sanitizeText(profile.registration_id || '', 50),
+                clinic_name: sanitizeText(profile.clinic_name || '', 100),
+                clinic_address: sanitizeText(profile.clinic_address || '', 500),
+                clinic_phone: profile.clinic_phone ? profile.clinic_phone.trim() : '',
+            };
+
+            if (sData.clinic_phone && !validatePhone(sData.clinic_phone)) {
+                toast.error("Invalid clinic phone format");
+                setSaving(false);
+                return;
+            }
+
             const { error } = await supabase
                 .from('profiles')
                 .update({
-                    full_name: profile.full_name,
-                    qualifications: profile.qualifications,
-                    registration_id: profile.registration_id,
-                    clinic_name: profile.clinic_name,
-                    clinic_address: profile.clinic_address,
-                    clinic_phone: profile.clinic_phone,
+                    full_name: sData.full_name,
+                    qualifications: sData.qualifications,
+                    registration_id: sData.registration_id,
+                    clinic_name: sData.clinic_name,
+                    clinic_address: sData.clinic_address,
+                    clinic_phone: sData.clinic_phone,
                     signature_data: profile.signature_data,
                     // @ts-ignore
                     avatar_url: profile.avatar_url,

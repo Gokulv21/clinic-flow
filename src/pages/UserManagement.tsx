@@ -72,6 +72,18 @@ export default function UserManagement() {
     }
     setCreating(true);
     try {
+      // Abuse Protection: Rate limit registration
+      const { data: allowed } = await supabase.rpc('check_rate_limit', {
+        p_identifier: clinic?.id || 'global',
+        p_bucket: 'create-user',
+        p_max_requests: 10,
+        p_interval_seconds: 3600
+      });
+
+      if (allowed === false) {
+        throw new Error('Rate limit reached for user creation. Please try again later.');
+      }
+
       // Sign up user via the non-persistent registerClient 
       const { data, error } = await registerClient.auth.signUp({
         email: email.trim(),
@@ -139,6 +151,7 @@ export default function UserManagement() {
 
   const roleBadgeClass = (r: string) => {
     if (r === 'doctor') return 'bg-doctor/10 text-doctor';
+    if (r === 'owner') return 'bg-amber-500/10 text-amber-600 border-amber-200';
     return 'bg-secondary text-secondary-foreground';
   };
 
@@ -189,8 +202,9 @@ export default function UserManagement() {
               <Select value={role} onValueChange={setRole}>
                 <SelectTrigger className="h-11 border-primary/10 shadow-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="doctor">Doctor (Full Access)</SelectItem>
-                  <SelectItem value="staff">Clinic Staff (Entry, Print, Directory)</SelectItem>
+                  <SelectItem value="owner">Clinic Owner (Multi-Staff Access)</SelectItem>
+                  <SelectItem value="doctor">Doctor (Full Clinical Access)</SelectItem>
+                  <SelectItem value="staff">Clinic Staff (Entry & Print only)</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { Search, UserPlus, History, CheckCircle, ArrowRight, User, Phone, MapPin, X, AlertCircle, ChevronDown, Loader2 } from 'lucide-react';
+import { sanitizeText, validatePhone, validateNumericRange } from '@/lib/security-sanitize';
 
 interface PatientForm {
   title: string;
@@ -163,6 +164,29 @@ export default function NurseEntry() {
   };
 
   const submitVisit = async () => {
+    // 1. INPUT SANITIZATION & VALIDATION
+    const sanitizedName = sanitizeText(patient.name, 100);
+    const sanitizedAddress = sanitizeText(patient.address, 500);
+    const sanitizedPhone = patient.phone.trim();
+
+    if (sanitizedName.length < 2) {
+        toast.error("Valid patient name is required (min 2 chars)");
+        return;
+    }
+
+    if (patient.phone && !validatePhone(patient.phone)) {
+        toast.error("Invalid phone number format. Use standard digits and spaces.");
+        return;
+    }
+
+    // Vitals range validation (Sanity checks)
+    if (vitals.weight && !validateNumericRange(vitals.weight, 0, 500)) {
+        toast.error("Invalid weight value"); return;
+    }
+    if (vitals.pulse_rate && !validateNumericRange(vitals.pulse_rate, 0, 300)) {
+        toast.error("Invalid pulse rate"); return;
+    }
+
     setLoading(true);
     const loadingToast = toast.loading('Registering patient...');
     try {
@@ -189,11 +213,11 @@ export default function NurseEntry() {
           .from('patients')
           .insert({
             title: patient.title,
-            name: patient.name,
+            name: sanitizedName,
             age: ageInYears,
             sex: patient.sex,
-            phone: patient.phone,
-            address: patient.address || null,
+            phone: sanitizedPhone,
+            address: sanitizedAddress || null,
             registration_id: String(regId),
             last_opened_at: new Date().toISOString(),
             clinic_id: clinic?.id

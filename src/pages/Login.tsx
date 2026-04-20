@@ -12,11 +12,13 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [website, setWebsite] = useState(''); // Honeypot field
   const { signIn } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (website) return; // Silent trap
     if (!email.trim() || !password.trim()) return;
 
     setLoading(true);
@@ -48,6 +50,16 @@ export default function Login() {
         </CardHeader>
         <CardContent className="pb-10 px-8">
           <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="hidden" aria-hidden="true">
+              <Input
+                id="website"
+                type="text"
+                tabIndex={-1}
+                autoComplete="off"
+                value={website}
+                onChange={e => setWebsite(e.target.value)}
+              />
+            </div>
             <div className="space-y-2">
               <Label htmlFor="email">Username</Label>
               <Input

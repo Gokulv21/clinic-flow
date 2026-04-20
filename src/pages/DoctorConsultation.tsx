@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
+import { sanitizeText } from '@/lib/security-sanitize';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -490,10 +491,17 @@ Follow the instructions carefully.
     const isWriting = lastInputWay === 'writing';
     // If we have tags, use them. If not, use the raw diagnosis string.
     const diagnosisStr = (diagnoses.length > 0 ? diagnoses.join(' / ') : diagnosis).trim();
-    const finalDiagnosis = diagnosisStr || null;
-    const finalClinicalNotes = clinicalNotes || null;
-    const finalMedicines = medicines.filter(m => m.name.trim());
-    const finalAdviceImage = isWriting ? prescriptionImage : (advice || null);
+    const finalDiagnosis = diagnosisStr ? sanitizeText(diagnosisStr, 500) : null;
+    const finalClinicalNotes = clinicalNotes ? sanitizeText(clinicalNotes, 2000) : null;
+    const finalMedicines = medicines
+        .filter(m => m.name.trim())
+        .map(m => ({
+            ...m,
+            name: sanitizeText(m.name, 200),
+            dosage: m.dosage ? sanitizeText(m.dosage, 100) : undefined,
+            instructions: m.notes ? sanitizeText(m.notes, 500) : undefined // notes is often used for instructions
+        }));
+    const finalAdviceImage = isWriting ? prescriptionImage : (advice ? sanitizeText(advice, 1000) : null);
     const finalPaths = isWriting ? prescriptionPaths : [];
 
     if (!isWriting && !finalDiagnosis && finalMedicines.length === 0 && !advice && !finalClinicalNotes) {

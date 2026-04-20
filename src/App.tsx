@@ -131,6 +131,48 @@ function RootRouter() {
   return <Navigate to="/login" />;
 }
 
+import { logSecurityEvent } from "@/lib/security";
+
+// Monitering for suspicious behavior and API errors
+function SecuritySentinel() {
+  const { user } = useAuth();
+  
+  useEffect(() => {
+    const handleError = (event: ErrorEvent) => {
+      logSecurityEvent('API_ERROR', { 
+        message: event.message,
+        filename: event.filename,
+        lineno: event.lineno
+      });
+    };
+
+    const handleRejection = (event: PromiseRejectionEvent) => {
+      const error = event.reason;
+      if (error?.message?.includes('JWT') || error?.message?.includes('permission denied')) {
+        logSecurityEvent('SUSPICIOUS_TRAFFIC', { 
+          reason: 'Unauthorized Database Attempt',
+          details: error.message 
+        });
+      } else {
+        logSecurityEvent('API_ERROR', { 
+          message: error?.message || 'Unhandle Promise Rejection',
+          stack: error?.stack 
+        });
+      }
+    };
+
+    window.addEventListener('error', handleError);
+    window.addEventListener('unhandledrejection', handleRejection);
+    
+    return () => {
+      window.removeEventListener('error', handleError);
+      window.removeEventListener('unhandledrejection', handleRejection);
+    };
+  }, [user]);
+
+  return null;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider defaultTheme="system" storageKey="prescripto-theme">
@@ -139,6 +181,7 @@ const App = () => (
         <Sonner />
         <BrowserRouter basename="/prescripto">
           <AuthProvider>
+            <SecuritySentinel />
             <CommunicationProvider>
               <CallOverlay />
               <Routes>
@@ -153,13 +196,13 @@ const App = () => (
                 {/* 3. Multi-Clinic Scoped Routes */}
                 <Route path="/:slug" element={<ProtectedRoute><ClinicWrapper /></ProtectedRoute>}>
                   <Route path="dashboard" element={<Dashboard />} />
-                  <Route path="nurse" element={<ProtectedRoute allowedRoles={['staff', 'doctor', 'superadmin']}><NurseEntry /></ProtectedRoute>} />
-                  <Route path="consultation" element={<ProtectedRoute allowedRoles={['doctor', 'superadmin']}><DoctorConsultation /></ProtectedRoute>} />
-                  <Route path="print" element={<ProtectedRoute allowedRoles={['staff', 'doctor', 'superadmin']}><PrintQueue /></ProtectedRoute>} />
-                  <Route path="patients" element={<ProtectedRoute allowedRoles={['staff', 'doctor', 'superadmin']}><PatientList /></ProtectedRoute>} />
-                  <Route path="analytics" element={<ProtectedRoute allowedRoles={['doctor', 'superadmin']}><Analytics /></ProtectedRoute>} />
-                  <Route path="profile" element={<ProtectedRoute allowedRoles={['doctor', 'superadmin']}><DoctorProfile /></ProtectedRoute>} />
-                  <Route path="users" element={<ProtectedRoute allowedRoles={['doctor', 'superadmin']}><UserManagement /></ProtectedRoute>} />
+                  <Route path="nurse" element={<ProtectedRoute allowedRoles={['staff', 'doctor', 'superadmin', 'owner']}><NurseEntry /></ProtectedRoute>} />
+                  <Route path="consultation" element={<ProtectedRoute allowedRoles={['doctor', 'superadmin', 'owner']}><DoctorConsultation /></ProtectedRoute>} />
+                  <Route path="print" element={<ProtectedRoute allowedRoles={['staff', 'doctor', 'superadmin', 'owner']}><PrintQueue /></ProtectedRoute>} />
+                  <Route path="patients" element={<ProtectedRoute allowedRoles={['staff', 'doctor', 'superadmin', 'owner']}><PatientList /></ProtectedRoute>} />
+                  <Route path="analytics" element={<ProtectedRoute allowedRoles={['doctor', 'superadmin', 'owner']}><Analytics /></ProtectedRoute>} />
+                  <Route path="profile" element={<ProtectedRoute allowedRoles={['doctor', 'superadmin', 'owner']}><DoctorProfile /></ProtectedRoute>} />
+                  <Route path="users" element={<ProtectedRoute allowedRoles={['doctor', 'superadmin', 'owner']}><UserManagement /></ProtectedRoute>} />
                   <Route path="saas" element={<ProtectedRoute allowedRoles={['superadmin']}><SaaSManagement /></ProtectedRoute>} />
                   <Route path="calls" element={<Calls />} />
                 </Route>
