@@ -15,6 +15,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import PageBanner from '@/components/PageBanner';
 import analyticsBanner from '@/assets/analytics.jpg';
 import Lottie from "lottie-react";
@@ -43,6 +46,8 @@ export default function Analytics() {
   const [loading, setLoading] = useState(true);
   const [smartInsight, setSmartInsight] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [selectedDiagnoses, setSelectedDiagnoses] = useState<string[]>([]);
+  const [allDiagnosesSnapshot, setAllDiagnosesSnapshot] = useState<{name: string, value: number}[]>([]);
 
   useEffect(() => {
     if (clinic?.id) {
@@ -114,7 +119,9 @@ export default function Analytics() {
             });
         }
     });
-    setDiagnosisData(Object.entries(counts).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value).slice(0, 6));
+    const allSorted = Object.entries(counts).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+    setAllDiagnosesSnapshot(allSorted);
+    setDiagnosisData(allSorted.slice(0, 6)); // Default top 6
   };
 
   const fetchDemographics = async () => {
@@ -215,7 +222,9 @@ export default function Analytics() {
       .from('visits')
       .select('created_at')
       .eq('clinic_id', clinic?.id)
-      .gte('created_at', startDate.toISOString());
+      .gte('created_at', startDate.toISOString())
+      .order('created_at', { ascending: false }) // Get newest first to ensure recent days are accurate
+      .limit(10000);
 
     const resultData: any[] = [];
     const bins: Record<string, any> = {};
@@ -300,14 +309,25 @@ export default function Analytics() {
     setSeasonalityData(trendData);
   };
 
+  const filteredDiagnosisData = useMemo(() => {
+    if (selectedDiagnoses.length === 0) return diagnosisData;
+    return allDiagnosesSnapshot.filter(d => selectedDiagnoses.includes(d.name));
+  }, [selectedDiagnoses, diagnosisData, allDiagnosesSnapshot]);
+
+  const toggleDiagnosis = (name: string) => {
+    setSelectedDiagnoses(prev => 
+      prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]
+    );
+  };
+
   const generateInsight = () => {
     setIsAnalyzing(true);
     setTimeout(() => {
-      const maxVolume = [...volumeData].sort((a, b) => b.patients - a.patients)[0];
       const topDiag = diagnosisData[0]?.name || "general conditions";
       const peakHour = [...peakHoursData].sort((a,b) => b.patients - a.patients)[0];
+      const periodText = timeRange === 'today' ? 'Daily' : timeRange === 'month' ? 'Monthly' : timeRange === 'year' ? 'Yearly' : 'Weekly';
       
-      let insight = `Trend Alert: ${topDiag} represents your highest patient volume. Weekly peak typically occurs around ${peakHour?.hour}.`;
+      let insight = `Trend Alert: ${topDiag} represents your highest patient volume. ${periodText} peak typically occurs around ${peakHour?.hour || 'peak hours'}.`;
       if (stats.completionRate < 70) insight += " Note: Appointment completion rate is below optimal (70%). Consider reviewing waiting times.";
 
       setSmartInsight(insight);
@@ -485,12 +505,46 @@ export default function Analytics() {
 
           <ChartContainer 
               title="Diagnosis Mix" 
-              description="Top 6 clinical reasons"
+              description={selectedDiagnoses.length > 0 ? "Selected Clinical Reasons" : "Top 6 Clinical Reasons"}
               icon={<Stethoscope className="w-5 h-5" />}
+              extra={
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-slate-100">
+                       <Filter className="w-4 h-4 text-muted-foreground" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 p-3 rounded-2xl shadow-2xl" align="end">
+                    <div className="flex items-center justify-between mb-2 pb-2 border-b">
+                      <h4 className="text-xs font-black uppercase tracking-widest">Select Diagnosis</h4>
+                      {selectedDiagnoses.length > 0 && (
+                        <button onClick={() => setSelectedDiagnoses([])} className="text-[10px] font-black text-primary hover:underline uppercase">Clear</button>
+                      )}
+                    </div>
+                    <ScrollArea className="h-[250px] pr-3">
+                      <div className="space-y-2.5">
+                        {allDiagnosesSnapshot.map((d) => (
+                          <div key={d.name} className="flex items-center space-x-2 group">
+                            <Checkbox 
+                              id={`diag-${d.name}`} 
+                              checked={selectedDiagnoses.includes(d.name)}
+                              onCheckedChange={() => toggleDiagnosis(d.name)}
+                            />
+                            <label htmlFor={`diag-${d.name}`} className="text-xs font-bold leading-none cursor-pointer group-hover:text-primary transition-colors flex-1 flex justify-between">
+                              <span className="truncate pr-2">{d.name}</span>
+                              <span className="text-muted-foreground tabular-nums">{d.value}</span>
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </PopoverContent>
+                </Popover>
+              }
           >
             <PieChart>
               <Pie 
-                data={diagnosisData} 
+                data={filteredDiagnosisData} 
                 cx="50%" 
                 cy="50%" 
                 innerRadius={65} 
@@ -500,16 +554,16 @@ export default function Analytics() {
                 animationDuration={1500}
                 animationEasing="ease-out"
               >
-                {diagnosisData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} cornerRadius={5} />)}
+                {filteredDiagnosisData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} cornerRadius={5} />)}
               </Pie>
               <RechartsTooltip content={<CustomTooltip />} />
             </PieChart>
-            <div className="grid grid-cols-2 gap-4 mt-6">
-                {diagnosisData.map((d, i) => (
-                    <div key={d.name} className="flex flex-col gap-1">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3 mt-6">
+                {filteredDiagnosisData.map((d, i) => (
+                    <div key={d.name} className="flex flex-col gap-1 overflow-hidden">
                         <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                            <span className="text-[10px] font-black uppercase text-muted-foreground truncate tracking-tighter">{d.name}</span>
+                            <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                            <span className="text-[10px] font-black uppercase text-muted-foreground truncate tracking-tighter" title={d.name}>{d.name}</span>
                         </div>
                         <span className="text-lg font-black pl-4 leading-none">{d.value}</span>
                     </div>

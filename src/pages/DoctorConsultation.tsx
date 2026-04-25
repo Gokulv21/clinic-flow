@@ -134,7 +134,7 @@ export default function DoctorConsultation() {
         // Flatten and clean up duplicates
         const allIndividualTerms = allEntries
           .flatMap(d => (typeof d === 'string' ? d.split(/[/,\\,]+/) : []))
-          .map(d => d.trim())
+          .map(d => d.trim().toUpperCase())
           .filter(d => d.length > 1);
         
         // Use a set to unique, then sort by frequency would be nice, but simple unique for now
@@ -490,7 +490,7 @@ Follow the instructions carefully.
     if (!selectedVisit || !patient) return;
     const isWriting = lastInputWay === 'writing';
     // If we have tags, use them. If not, use the raw diagnosis string.
-    const diagnosisStr = (diagnoses.length > 0 ? diagnoses.join(' / ') : diagnosis).trim();
+    const diagnosisStr = (diagnoses.length > 0 ? diagnoses.join(' / ') : diagnosis.toUpperCase()).trim();
     const finalDiagnosis = diagnosisStr ? sanitizeText(diagnosisStr, 500) : null;
     const finalClinicalNotes = clinicalNotes ? sanitizeText(clinicalNotes, 2000) : null;
     const finalMedicines = medicines
