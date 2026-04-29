@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { UserPlus, Loader2, Shield, RefreshCw } from 'lucide-react';
+import { UserPlus, Loader2, Shield, RefreshCw, Trash2 } from 'lucide-react';
 import type { AppRole } from '@/lib/auth';
 import { createClient } from '@supabase/supabase-js';
 import { registerClient } from '@/lib/supabase-auth-admin';
@@ -149,6 +149,29 @@ export default function UserManagement() {
     }
   };
 
+  const deleteUserAccount = async (userId: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to remove ${name} from this clinic? This action will remove their access.`)) {
+      return;
+    }
+    const loadingToast = toast.loading(`Removing ${name}...`);
+    try {
+      // Deleting the profile will cascade or at least remove them from the clinic view
+      const { error: profileError } = await supabase.from('profiles').delete().eq('id', userId);
+      if (profileError) throw profileError;
+      
+      const { error: roleError } = await supabase.from('user_roles').delete().eq('user_id', userId);
+      if (roleError) throw roleError;
+      
+      toast.success(`${name} has been removed from the clinic`);
+      fetchUsers();
+    } catch (err: any) {
+      console.error("Delete user error:", err);
+      toast.error(`Failed to remove user: ${err.message}`);
+    } finally {
+      toast.dismiss(loadingToast);
+    }
+  };
+
   const roleBadgeClass = (r: string) => {
     if (r === 'doctor') return 'bg-doctor/10 text-doctor';
     if (r === 'owner') return 'bg-amber-500/10 text-amber-600 border-amber-200';
@@ -233,7 +256,7 @@ export default function UserManagement() {
                   <p className="font-bold text-slate-900">{u.full_name || 'Staff Member'}</p>
                   <p className="text-xs text-muted-foreground font-medium">{u.email || 'No email provided'}</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center">
                   {u.role ? (
                     <Badge variant="outline" className={roleBadgeClass(u.role)}>{u.role}</Badge>
                   ) : (
@@ -246,6 +269,15 @@ export default function UserManagement() {
                       Activate Account
                     </Button>
                   )}
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                    onClick={() => deleteUserAccount(u.id, u.full_name)}
+                    title="Delete Account"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
                 </div>
               </div>
             ))}

@@ -34,7 +34,7 @@ const navItems: NavItem[] = [
   { label: 'Patients', path: '/patients', icon: <Users className="w-5 h-5" />, roles: ['doctor', 'staff', 'superadmin', 'owner'] },
   { label: 'Analytics', path: '/analytics', icon: <BarChart3 className="w-5 h-5" />, roles: ['doctor', 'superadmin', 'owner'] },
   { label: 'Profile', path: '/profile', icon: <Users className="w-5 h-5" />, roles: ['doctor', 'superadmin', 'owner'] },
-  { label: 'User Mgmt', path: '/users', icon: <Users className="w-5 h-5" />, roles: ['doctor', 'superadmin', 'owner'] },
+  { label: 'User Mgmt', path: '/users', icon: <Users className="w-5 h-5" />, roles: ['superadmin', 'owner'] },
   { label: 'Help', path: '/help', icon: <HelpCircle className="w-5 h-5" />, roles: ['staff', 'doctor', 'superadmin', 'owner'] },
 ];
 

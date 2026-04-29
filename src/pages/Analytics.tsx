@@ -2,12 +2,12 @@ import { useState, useEffect, useMemo } from 'react';
 import { useOutletContext, useParams } from 'react-router-dom';
 import { startOfDay, endOfDay, isWithinInterval, startOfHour, endOfHour, setHours, format, subDays, subMonths } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, 
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   AreaChart, Area, PieChart, Pie, Cell, ReferenceLine, Label, LineChart, Line, Legend, ComposedChart
 } from 'recharts';
-import { 
-  Users, CalendarDays, Activity, Pill, Filter, Lightbulb, Sparkles, TrendingUp, X, 
+import {
+  Users, CalendarDays, Activity, Pill, Filter, Lightbulb, Sparkles, TrendingUp, X,
   Clock, CheckCircle2, AlertCircle, Calendar, ArrowUpRight, ArrowDownRight,
   Stethoscope, UserRound, LayoutDashboard, Database
 } from 'lucide-react';
@@ -28,9 +28,9 @@ type TimeRange = 'today' | 'week' | 'month' | 'year';
 
 export default function Analytics() {
   const { clinic } = useOutletContext<{ clinic: any }>();
-  const [stats, setStats] = useState({ 
-    todayPatients: 0, 
-    monthPatients: 0, 
+  const [stats, setStats] = useState({
+    todayPatients: 0,
+    monthPatients: 0,
     totalPatients: 0,
     completionRate: 0,
     avgConsultTime: '12m' // Mocked for now as we don't track start/end explicitly
@@ -47,7 +47,7 @@ export default function Analytics() {
   const [smartInsight, setSmartInsight] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [selectedDiagnoses, setSelectedDiagnoses] = useState<string[]>([]);
-  const [allDiagnosesSnapshot, setAllDiagnosesSnapshot] = useState<{name: string, value: number}[]>([]);
+  const [allDiagnosesSnapshot, setAllDiagnosesSnapshot] = useState<{ name: string, value: number }[]>([]);
 
   useEffect(() => {
     if (clinic?.id) {
@@ -85,7 +85,7 @@ export default function Analytics() {
     ]);
 
     const todayCount = todayRes.count || 0;
-    const yesterdayCount = yesterdayRes.count || 0;
+    const yesterdayCount = yesterdayRes.count || 0; z
     const monthCount = monthRes.count || 0;
     const lastMonthCount = lastMonthRes.count || 0;
 
@@ -111,13 +111,13 @@ export default function Analytics() {
     // Diagnosis distribution (top 6)
     const { data: rxData } = await supabase.from('prescriptions').select('diagnosis').eq('clinic_id', clinic?.id).not('diagnosis', 'is', null).limit(1000);
     const counts: Record<string, number> = {};
-    rxData?.forEach(r => { 
-        if (r.diagnosis) {
-            const terms = r.diagnosis.split(/[/,\\,]+/).map(t => t.trim().toUpperCase()).filter(t => t.length > 1);
-            terms.forEach(term => {
-                counts[term] = (counts[term] || 0) + 1;
-            });
-        }
+    rxData?.forEach(r => {
+      if (r.diagnosis) {
+        const terms = r.diagnosis.split(/[/,\\,]+/).map(t => t.trim().toUpperCase()).filter(t => t.length > 1);
+        terms.forEach(term => {
+          counts[term] = (counts[term] || 0) + 1;
+        });
+      }
     });
     const allSorted = Object.entries(counts).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
     setAllDiagnosesSnapshot(allSorted);
@@ -136,12 +136,12 @@ export default function Analytics() {
     });
 
     // Age distribution
-    const ageGroups: Record<string, number> = { 
-      '0-12 (Pediatric)': 0, 
-      '12-18 (Adolescence)': 0, 
-      '18-45 (Adult)': 0, 
-      '45-60 (Senior)': 0, 
-      '60+ (Geriatric)': 0 
+    const ageGroups: Record<string, number> = {
+      '0-12 (Pediatric)': 0,
+      '12-18 (Adolescence)': 0,
+      '18-45 (Adult)': 0,
+      '45-60 (Senior)': 0,
+      '60+ (Geriatric)': 0
     };
     data.forEach(p => {
       if (p.age <= 12) ageGroups['0-12 (Pediatric)']++;
@@ -284,10 +284,10 @@ export default function Analytics() {
     // Automatically detect top 5 diagnoses instead of hardcoding
     const topDetectCounts: Record<string, number> = {};
     rxData.forEach(rx => {
-       const terms = rx.diagnosis?.split(/[/,\\,]+/).map(t => t.trim()).filter(t => t.length > 2) || [];
-       terms.forEach(t => topDetectCounts[t] = (topDetectCounts[t] || 0) + 1);
+      const terms = rx.diagnosis?.split(/[/,\\,]+/).map(t => t.trim()).filter(t => t.length > 2) || [];
+      terms.forEach(t => topDetectCounts[t] = (topDetectCounts[t] || 0) + 1);
     });
-    const topDiagnoses = Object.entries(topDetectCounts).sort((a,b) => b[1] - a[1]).slice(0, 5).map(e => e[0]);
+    const topDiagnoses = Object.entries(topDetectCounts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(e => e[0]);
 
     const months = Array.from({ length: 6 }, (_, i) => format(subMonths(new Date(), 5 - i), 'MMM'));
     const trendData = months.map(m => {
@@ -315,7 +315,7 @@ export default function Analytics() {
   }, [selectedDiagnoses, diagnosisData, allDiagnosesSnapshot]);
 
   const toggleDiagnosis = (name: string) => {
-    setSelectedDiagnoses(prev => 
+    setSelectedDiagnoses(prev =>
       prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]
     );
   };
@@ -324,9 +324,9 @@ export default function Analytics() {
     setIsAnalyzing(true);
     setTimeout(() => {
       const topDiag = diagnosisData[0]?.name || "general conditions";
-      const peakHour = [...peakHoursData].sort((a,b) => b.patients - a.patients)[0];
+      const peakHour = [...peakHoursData].sort((a, b) => b.patients - a.patients)[0];
       const periodText = timeRange === 'today' ? 'Daily' : timeRange === 'month' ? 'Monthly' : timeRange === 'year' ? 'Yearly' : 'Weekly';
-      
+
       let insight = `Trend Alert: ${topDiag} represents your highest patient volume. ${periodText} peak typically occurs around ${peakHour?.hour || 'peak hours'}.`;
       if (stats.completionRate < 70) insight += " Note: Appointment completion rate is below optimal (70%). Consider reviewing waiting times.";
 
@@ -369,20 +369,20 @@ export default function Analytics() {
                   <p className="text-[10px] uppercase tracking-[0.2em] font-black text-primary/60 mb-1">AI Intelligence Insight</p>
                   <p className="text-sm font-extrabold text-foreground leading-[1.6]">{smartInsight}</p>
                 </div>
-                <button 
-                    onClick={() => setSmartInsight(null)} 
-                    className="absolute top-4 right-4 p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-all active:scale-90"
+                <button
+                  onClick={() => setSmartInsight(null)}
+                  className="absolute top-4 right-4 p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-all active:scale-90"
                 >
                   <X className="w-4 h-4 text-muted-foreground" />
                 </button>
               </motion.div>
             ) : (
-                <div className="flex-1 flex items-center gap-4 bg-white dark:bg-slate-900 px-6 py-4 rounded-[2.5rem] border border-border shadow-sm">
-                    <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-2xl">
-                        <LayoutDashboard className="w-6 h-6 text-slate-400" />
-                    </div>
-                    <p className="text-sm font-bold text-muted-foreground">Welcome to your clinical dashboard. Run intelligence check for deep insights.</p>
+              <div className="flex-1 flex items-center gap-4 bg-white dark:bg-slate-900 px-6 py-4 rounded-[2.5rem] border border-border shadow-sm">
+                <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-2xl">
+                  <LayoutDashboard className="w-6 h-6 text-slate-400" />
                 </div>
+                <p className="text-sm font-bold text-muted-foreground">Welcome to your clinical dashboard. Run intelligence check for deep insights.</p>
+              </div>
             )}
           </AnimatePresence>
 
@@ -395,161 +395,161 @@ export default function Analytics() {
               onClick={generateInsight}
               disabled={isAnalyzing}
             >
-                {isAnalyzing ? (
-                   <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }}>
-                     <TrendingUp className="w-4 h-4" />
-                   </motion.div>
-                ) : (
-                   <Sparkles className="w-4 h-4" />
-                )}
-                {isAnalyzing ? "Deep Analysis..." : "Run Intelligence Check"}
+              {isAnalyzing ? (
+                <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }}>
+                  <TrendingUp className="w-4 h-4" />
+                </motion.div>
+              ) : (
+                <Sparkles className="w-4 h-4" />
+              )}
+              {isAnalyzing ? "Deep Analysis..." : "Run Intelligence Check"}
             </Button>
             <div className="h-8 w-[1px] bg-border/50 mx-1 hidden md:block" />
             <Select value={timeRange} onValueChange={(v: TimeRange) => setTimeRange(v)}>
-                <SelectTrigger className="w-[140px] h-12 bg-transparent border-none font-black text-[11px] uppercase tracking-widest rounded-[1.5rem] hover:bg-slate-100 dark:hover:bg-slate-800 transition-all px-4">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-3.5 h-3.5 text-primary" />
-                    <SelectValue placeholder="Period" />
-                  </div>
-                </SelectTrigger>
-                <SelectContent className="rounded-2xl border-border/50 shadow-2xl">
-                  <SelectItem value="today" className="font-bold text-xs">Today</SelectItem>
-                  <SelectItem value="week" className="font-bold text-xs">Past Week</SelectItem>
-                  <SelectItem value="month" className="font-bold text-xs">Past Month</SelectItem>
-                  <SelectItem value="year" className="font-bold text-xs">Past Year</SelectItem>
-                </SelectContent>
-              </Select>
+              <SelectTrigger className="w-[140px] h-12 bg-transparent border-none font-black text-[11px] uppercase tracking-widest rounded-[1.5rem] hover:bg-slate-100 dark:hover:bg-slate-800 transition-all px-4">
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-3.5 h-3.5 text-primary" />
+                  <SelectValue placeholder="Period" />
+                </div>
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-border/50 shadow-2xl">
+                <SelectItem value="today" className="font-bold text-xs">Today</SelectItem>
+                <SelectItem value="week" className="font-bold text-xs">Past Week</SelectItem>
+                <SelectItem value="month" className="font-bold text-xs">Past Month</SelectItem>
+                <SelectItem value="year" className="font-bold text-xs">Past Year</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
         {/* Global Progress Indicators */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <MetricCard 
-            label="Today's Load" 
-            value={stats.todayPatients} 
-            icon={<Users className="w-6 h-6" />} 
-            color="bg-blue-500/10 text-blue-500" 
-            trend={trends.today} 
+          <MetricCard
+            label="Today's Load"
+            value={stats.todayPatients}
+            icon={<Users className="w-6 h-6" />}
+            color="bg-blue-500/10 text-blue-500"
+            trend={trends.today}
             delay={0.1}
           />
-          <MetricCard 
-            label="Monthly Volume" 
-            value={stats.monthPatients} 
-            icon={<Activity className="w-6 h-6" />} 
-            color="bg-emerald-500/10 text-emerald-500" 
-            trend={trends.month} 
+          <MetricCard
+            label="Monthly Volume"
+            value={stats.monthPatients}
+            icon={<Activity className="w-6 h-6" />}
+            color="bg-emerald-500/10 text-emerald-500"
+            trend={trends.month}
             delay={0.2}
           />
-          <MetricCard 
-            label="Database Size" 
-            value={stats.totalPatients} 
-            icon={<Database className="w-6 h-6" />} 
-            color="bg-purple-500/10 text-purple-500" 
-            trend="Lifetime" 
+          <MetricCard
+            label="Database Size"
+            value={stats.totalPatients}
+            icon={<Database className="w-6 h-6" />}
+            color="bg-purple-500/10 text-purple-500"
+            trend="Lifetime"
             delay={0.3}
           />
-          <MetricCard 
-            label="Case Closure" 
-            value={`${stats.completionRate}%`} 
-            icon={<CheckCircle2 className="w-6 h-6" />} 
-            color="bg-amber-500/10 text-amber-500" 
-            trend={trends.completion} 
+          <MetricCard
+            label="Case Closure"
+            value={`${stats.completionRate}%`}
+            icon={<CheckCircle2 className="w-6 h-6" />}
+            color="bg-amber-500/10 text-amber-500"
+            trend={trends.completion}
             delay={0.4}
           />
         </div>
 
         {/* Main Charts Section */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-          
+
           {/* Patient Traffic - Large Area/Bar Mixed */}
           <div className="xl:col-span-2">
-            <ChartContainer 
-                title="Patient Flow Dynamics" 
-                description={`Patient Volume · ${timeRange.toUpperCase()}`}
-                icon={<TrendingUp className="w-5 h-5" />}
-                className="h-full"
+            <ChartContainer
+              title="Patient Flow Dynamics"
+              description={`Patient Volume · ${timeRange.toUpperCase()}`}
+              icon={<TrendingUp className="w-5 h-5" />}
+              className="h-full"
             >
               <ComposedChart data={volumeData} margin={{ top: 20, right: 20, bottom: 20, left: -20 }}>
                 <defs>
-                    <linearGradient id="flowGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.2}/>
-                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
-                    </linearGradient>
+                  <linearGradient id="flowGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                  </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.3} />
-                <XAxis 
-                    dataKey="name" 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10, fontWeight: 800 }}
-                    dy={10}
+                <XAxis
+                  dataKey="name"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10, fontWeight: 800 }}
+                  dy={10}
                 />
                 <YAxis axisLine={false} tickLine={false} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10, fontWeight: 800 }} />
                 <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--primary))', opacity: 0.1 }} />
                 <Area type="monotone" dataKey="patients" fill="url(#flowGradient)" stroke="none" />
                 <Bar dataKey="patients" barSize={32} radius={[10, 10, 0, 0]}>
-                    {volumeData.map((entry, i) => {
-                        const prev = volumeData[i - 1];
-                        let color = 'hsl(var(--primary))';
-                        if (prev) {
-                            if (entry.patients > prev.patients) color = '#10b981';
-                            else if (entry.patients < prev.patients) color = '#ef4444';
-                        }
-                        return <Cell key={i} fill={color} fillOpacity={0.8} />;
-                    })}
+                  {volumeData.map((entry, i) => {
+                    const prev = volumeData[i - 1];
+                    let color = 'hsl(var(--primary))';
+                    if (prev) {
+                      if (entry.patients > prev.patients) color = '#10b981';
+                      else if (entry.patients < prev.patients) color = '#ef4444';
+                    }
+                    return <Cell key={i} fill={color} fillOpacity={0.8} />;
+                  })}
                 </Bar>
                 <Line type="monotone" dataKey="patients" stroke="hsl(var(--primary))" strokeWidth={4} dot={{ r: 4, strokeWidth: 2, fill: '#fff' }} />
               </ComposedChart>
             </ChartContainer>
           </div>
 
-          <ChartContainer 
-              title="Diagnosis Mix" 
-              description={selectedDiagnoses.length > 0 ? "Selected Clinical Reasons" : "Top 6 Clinical Reasons"}
-              icon={<Stethoscope className="w-5 h-5" />}
-              extra={
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-slate-100">
-                       <Filter className="w-4 h-4 text-muted-foreground" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-64 p-3 rounded-2xl shadow-2xl" align="end">
-                    <div className="flex items-center justify-between mb-2 pb-2 border-b">
-                      <h4 className="text-xs font-black uppercase tracking-widest">Select Diagnosis</h4>
-                      {selectedDiagnoses.length > 0 && (
-                        <button onClick={() => setSelectedDiagnoses([])} className="text-[10px] font-black text-primary hover:underline uppercase">Clear</button>
-                      )}
+          <ChartContainer
+            title="Diagnosis Mix"
+            description={selectedDiagnoses.length > 0 ? "Selected Clinical Reasons" : "Top 6 Clinical Reasons"}
+            icon={<Stethoscope className="w-5 h-5" />}
+            extra={
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-slate-100">
+                    <Filter className="w-4 h-4 text-muted-foreground" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64 p-3 rounded-2xl shadow-2xl" align="end">
+                  <div className="flex items-center justify-between mb-2 pb-2 border-b">
+                    <h4 className="text-xs font-black uppercase tracking-widest">Select Diagnosis</h4>
+                    {selectedDiagnoses.length > 0 && (
+                      <button onClick={() => setSelectedDiagnoses([])} className="text-[10px] font-black text-primary hover:underline uppercase">Clear</button>
+                    )}
+                  </div>
+                  <ScrollArea className="h-[250px] pr-3">
+                    <div className="space-y-2.5">
+                      {allDiagnosesSnapshot.map((d) => (
+                        <div key={d.name} className="flex items-center space-x-2 group">
+                          <Checkbox
+                            id={`diag-${d.name}`}
+                            checked={selectedDiagnoses.includes(d.name)}
+                            onCheckedChange={() => toggleDiagnosis(d.name)}
+                          />
+                          <label htmlFor={`diag-${d.name}`} className="text-xs font-bold leading-none cursor-pointer group-hover:text-primary transition-colors flex-1 flex justify-between">
+                            <span className="truncate pr-2">{d.name}</span>
+                            <span className="text-muted-foreground tabular-nums">{d.value}</span>
+                          </label>
+                        </div>
+                      ))}
                     </div>
-                    <ScrollArea className="h-[250px] pr-3">
-                      <div className="space-y-2.5">
-                        {allDiagnosesSnapshot.map((d) => (
-                          <div key={d.name} className="flex items-center space-x-2 group">
-                            <Checkbox 
-                              id={`diag-${d.name}`} 
-                              checked={selectedDiagnoses.includes(d.name)}
-                              onCheckedChange={() => toggleDiagnosis(d.name)}
-                            />
-                            <label htmlFor={`diag-${d.name}`} className="text-xs font-bold leading-none cursor-pointer group-hover:text-primary transition-colors flex-1 flex justify-between">
-                              <span className="truncate pr-2">{d.name}</span>
-                              <span className="text-muted-foreground tabular-nums">{d.value}</span>
-                            </label>
-                          </div>
-                        ))}
-                      </div>
-                    </ScrollArea>
-                  </PopoverContent>
-                </Popover>
-              }
+                  </ScrollArea>
+                </PopoverContent>
+              </Popover>
+            }
           >
             <PieChart>
-              <Pie 
-                data={filteredDiagnosisData} 
-                cx="50%" 
-                cy="50%" 
-                innerRadius={65} 
-                outerRadius={90} 
-                paddingAngle={8} 
+              <Pie
+                data={filteredDiagnosisData}
+                cx="50%"
+                cy="50%"
+                innerRadius={65}
+                outerRadius={90}
+                paddingAngle={8}
                 dataKey="value"
                 animationDuration={1500}
                 animationEasing="ease-out"
@@ -559,32 +559,32 @@ export default function Analytics() {
               <RechartsTooltip content={<CustomTooltip />} />
             </PieChart>
             <div className="grid grid-cols-2 gap-x-4 gap-y-3 mt-6">
-                {filteredDiagnosisData.map((d, i) => (
-                    <div key={d.name} className="flex flex-col gap-1 overflow-hidden">
-                        <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                            <span className="text-[10px] font-black uppercase text-muted-foreground truncate tracking-tighter" title={d.name}>{d.name}</span>
-                        </div>
-                        <span className="text-lg font-black pl-4 leading-none">{d.value}</span>
-                    </div>
-                ))}
+              {filteredDiagnosisData.map((d, i) => (
+                <div key={d.name} className="flex flex-col gap-1 overflow-hidden">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                    <span className="text-[10px] font-black uppercase text-muted-foreground truncate tracking-tighter" title={d.name}>{d.name}</span>
+                  </div>
+                  <span className="text-lg font-black pl-4 leading-none">{d.value}</span>
+                </div>
+              ))}
             </div>
           </ChartContainer>
 
           {/* Demographics Row */}
-          <ChartContainer 
-              title="Patient Demographics" 
-              description="Age-based categorization"
-              icon={<Users className="w-5 h-5" />}
+          <ChartContainer
+            title="Patient Demographics"
+            description="Age-based categorization"
+            icon={<Users className="w-5 h-5" />}
           >
             <BarChart data={demographics.age} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" horizontal={false} opacity={0.1} />
               <XAxis type="number" hide />
-              <YAxis 
-                type="category" 
-                dataKey="name" 
-                axisLine={false} 
-                tickLine={false} 
+              <YAxis
+                type="category"
+                dataKey="name"
+                axisLine={false}
+                tickLine={false}
                 tick={{ fill: 'hsl(var(--foreground))', fontSize: 10, fontWeight: 800 }}
                 width={120}
               />
@@ -594,16 +594,16 @@ export default function Analytics() {
           </ChartContainer>
 
           {/* Operational: Peak Hours */}
-          <ChartContainer 
-              title="Appointment Loads" 
-              description="Time-based distribution"
-              icon={<Clock className="w-5 h-5" />}
+          <ChartContainer
+            title="Appointment Loads"
+            description="Time-based distribution"
+            icon={<Clock className="w-5 h-5" />}
           >
             <AreaChart data={peakHoursData} margin={{ top: 20, right: 30, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="peakGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
+                  <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <XAxis dataKey="hour" axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 700 }} />
@@ -614,61 +614,61 @@ export default function Analytics() {
           </ChartContainer>
 
           {/* Operational: Sex Ratio */}
-          <ChartContainer 
-              title="Patient Diversity" 
-              description="Sex Ratio Breakdown"
-              icon={<UserRound className="w-5 h-5" />}
+          <ChartContainer
+            title="Patient Diversity"
+            description="Sex Ratio Breakdown"
+            icon={<UserRound className="w-5 h-5" />}
           >
             <PieChart>
-                <Pie 
-                    data={demographics.sex} 
-                    cx="50%" 
-                    cy="50%" 
-                    stroke="none" 
-                    innerRadius={50} 
-                    outerRadius={85} 
-                    dataKey="value"
-                >
-                    {demographics.sex.map((_, i) => <Cell key={i} fill={i === 0 ? '#3b82f6' : i === 1 ? '#ec4899' : '#10b981'} />)}
-                </Pie>
-                <RechartsTooltip content={<CustomTooltip />} />
-                <Legend iconType="circle" />
+              <Pie
+                data={demographics.sex}
+                cx="50%"
+                cy="50%"
+                stroke="none"
+                innerRadius={50}
+                outerRadius={85}
+                dataKey="value"
+              >
+                {demographics.sex.map((_, i) => <Cell key={i} fill={i === 0 ? '#3b82f6' : i === 1 ? '#ec4899' : '#10b981'} />)}
+              </Pie>
+              <RechartsTooltip content={<CustomTooltip />} />
+              <Legend iconType="circle" />
             </PieChart>
           </ChartContainer>
 
           {/* Medicine/Protocol Analytics - Full Width */}
           <div className="xl:col-span-3">
-             <ChartContainer 
-                title="Pharmacotherapy Insights" 
-                description="Most Frequently Prescribed Medications / Protocols"
-                icon={<Pill className="w-5 h-5" />}
-             >
-                <BarChart data={protocolData} margin={{ top: 20, right: 30, bottom: 40, left: 10 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.2} />
-                    <XAxis 
-                        dataKey="name" 
-                        axisLine={false} 
-                        tickLine={false} 
-                        tick={{ fontSize: 9, fontWeight: 900, fill: 'hsl(var(--muted-foreground))' }}
-                        angle={-45}
-                        textAnchor="end"
-                        interval={0}
-                    />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 800 }} />
-                    <RechartsTooltip content={<CustomTooltip />} />
-                    <Bar dataKey="value" fill="hsl(var(--primary))" radius={[12, 12, 0, 0]} barSize={40}>
-                        {protocolData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                    </Bar>
-                </BarChart>
-             </ChartContainer>
+            <ChartContainer
+              title="Pharmacotherapy Insights"
+              description="Most Frequently Prescribed Medications / Protocols"
+              icon={<Pill className="w-5 h-5" />}
+            >
+              <BarChart data={protocolData} margin={{ top: 20, right: 30, bottom: 40, left: 10 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.2} />
+                <XAxis
+                  dataKey="name"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 9, fontWeight: 900, fill: 'hsl(var(--muted-foreground))' }}
+                  angle={-45}
+                  textAnchor="end"
+                  interval={0}
+                />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 800 }} />
+                <RechartsTooltip content={<CustomTooltip />} />
+                <Bar dataKey="value" fill="hsl(var(--primary))" radius={[12, 12, 0, 0]} barSize={40}>
+                  {protocolData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                </Bar>
+              </BarChart>
+            </ChartContainer>
           </div>
 
           {/* Disease Seasonality Chart */}
           <div className="xl:col-span-3">
-            <ChartContainer 
-                title="Clinical Seasonality" 
-                description="6-Month Trend Analysis of Core Diagnoses"
-                icon={<Activity className="w-5 h-5" />}
+            <ChartContainer
+              title="Clinical Seasonality"
+              description="6-Month Trend Analysis of Core Diagnoses"
+              icon={<Activity className="w-5 h-5" />}
             >
               <AreaChart data={seasonalityData} margin={{ top: 20, right: 30, left: -20, bottom: 0 }}>
                 <defs>
@@ -685,15 +685,15 @@ export default function Analytics() {
                 <RechartsTooltip content={<CustomTooltip />} />
                 <Legend />
                 {seasonalityData[0] && Object.keys(seasonalityData[0]).filter(k => k !== 'month').map((key, i) => (
-                    <Area 
-                        key={key} 
-                        type="monotone" 
-                        dataKey={key} 
-                        stroke={COLORS[i % COLORS.length]} 
-                        fill={`url(#fade${i})`} 
-                        strokeWidth={4} 
-                        animationDuration={2000}
-                    />
+                  <Area
+                    key={key}
+                    type="monotone"
+                    dataKey={key}
+                    stroke={COLORS[i % COLORS.length]}
+                    fill={`url(#fade${i})`}
+                    strokeWidth={4}
+                    animationDuration={2000}
+                  />
                 ))}
               </AreaChart>
             </ChartContainer>
