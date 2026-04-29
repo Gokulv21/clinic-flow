@@ -53,7 +53,7 @@ const COMMON_FREQUENCIES = [
 
 export default function DoctorConsultation() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { user, hasRole } = useAuth();
   const { slug } = useParams();
   const navigate = useNavigate();
   const { makeCall, onlineUsers, callState, allUsers } = useCommunication();
@@ -153,6 +153,15 @@ export default function DoctorConsultation() {
     },
     enabled: !!user?.id
   });
+
+  useEffect(() => {
+    if (myProfile && hasRole('doctor')) {
+      if (!myProfile.qualifications || !myProfile.registration_id) {
+        toast.error('Please complete your professional identity to start consultations.', { duration: 5000 });
+        navigate(slug ? `/${slug}/profile?tab=settings` : '/profile?tab=settings');
+      }
+    }
+  }, [myProfile, hasRole, navigate, slug]);
 
   async function fetchProtocols() {
     const { data } = await supabase

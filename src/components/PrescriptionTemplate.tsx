@@ -53,14 +53,26 @@ const PrescriptionTemplate = React.memo(({
 
     const { user: authUser } = useAuth();
     const [doctorProfile, setDoctorProfile] = useState<any>(null);
+    const [ownerProfile, setOwnerProfile] = useState<any>(null);
 
     useEffect(() => {
-        const fetchDoctorProfile = async () => {
-            // Priority 1: Use the specific doctor_id if provided (Saved Rx)
-            // Priority 2: Use current user ID ONLY if this is a fresh preview (unsaved draft)
-            // Priority 1: Use the specific doctor_id if provided (Saved Rx)
-            // Priority 2: Use visit.doctor_id (Saved Visit)
-            // Priority 3: Only default to current user for NEW drafts
+        const fetchProfiles = async () => {
+            // 1. Fetch Clinic Owner Profile for Branding
+            if (visit?.clinic_id) {
+                try {
+                    const { data: clinicData } = await supabase.from('clinics').select('owner_id').eq('id', visit.clinic_id).maybeSingle();
+                    if (clinicData?.owner_id) {
+                        const { data: ownerProf } = await supabase.from('profiles').select('clinic_name, clinic_address, clinic_phone').eq('user_id', clinicData.owner_id).maybeSingle();
+                        if (ownerProf) {
+                            setOwnerProfile(ownerProf);
+                        }
+                    }
+                } catch (err) {
+                    console.error("Error fetching owner profile:", err);
+                }
+            }
+
+            // 2. Fetch Doctor Profile for Identity
             let targetId = doctorId || visit?.doctor_id;
             const isSavedRecord = !!(prescriptionCreatedAt || visit?.created_at);
 
@@ -108,8 +120,8 @@ const PrescriptionTemplate = React.memo(({
                 console.error("Error fetching fallback doctor profile:", err);
             }
         };
-        fetchDoctorProfile();
-    }, [authUser, doctorId, prescriptionCreatedAt]);
+        fetchProfiles();
+    }, [authUser, doctorId, prescriptionCreatedAt, visit?.clinic_id]);
 
 
     const displayDate = prescriptionCreatedAt ? new Date(prescriptionCreatedAt) : (visit?.created_at ? new Date(visit.created_at) : new Date());
@@ -128,7 +140,7 @@ const PrescriptionTemplate = React.memo(({
 
         const patientName = (patient?.title ? patient.title + ' ' : '') + (patient?.name ?? 'Patient');
         const resolvedDoctorName = doctorName || doctorProfile?.full_name || 'Dr. Gokul';
-        const resolvedClinicName = clinicName || doctorProfile?.clinic_name || 'GV Clinic';
+        const resolvedClinicName = clinicName || ownerProfile?.clinic_name || doctorProfile?.clinic_name || 'GV Clinic';
         const publicLink = visit?.id ? `${window.location.origin}/prescripto/rx/${visit.id}` : '';
         if (!publicLink) {
             toast.error("Visit data missing, cannot share.");
@@ -248,9 +260,9 @@ Follow the instructions carefully.
                             doctorName={doctorName}
                             doctorQualifications={doctorQualifications}
                             doctorRegId={doctorRegId}
-                            clinicName={clinicName}
-                            clinicAddress={clinicAddress}
-                            clinicPhone={clinicPhone}
+                            clinicName={clinicName || ownerProfile?.clinic_name}
+                            clinicAddress={clinicAddress || ownerProfile?.clinic_address}
+                            clinicPhone={clinicPhone || ownerProfile?.clinic_phone}
                         />
                     ) : (
                         <div style={{ position: 'absolute', inset: 0, background: '#fff' }}>

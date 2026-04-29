@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { toast } from 'sonner';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -77,6 +78,7 @@ export default function DoctorProfile() {
     const { clinic } = useOutletContext<{ clinic: any }>();
     const navigate = useNavigate();
     const [profile, setProfile] = useState<ProfileData | null>(null);
+    const [ownerProfile, setOwnerProfile] = useState<any>(null);
     const [activeTab, setActiveTab] = useState(() => {
         return localStorage.getItem('profileActiveTab') || 'overview';
     });
@@ -125,12 +127,24 @@ export default function DoctorProfile() {
                 });
             }
 
+            // Fetch Clinic Owner Profile for consistent branding
+            if (clinic?.owner_id) {
+                const { data: ownerData } = await supabase
+                    .from('profiles')
+                    .select('clinic_name, clinic_address, clinic_phone')
+                    .eq('user_id', clinic.owner_id)
+                    .maybeSingle();
+                if (ownerData) {
+                    setOwnerProfile(ownerData);
+                }
+            }
+
             // 2. Fetch Stats
             const todayStart = startOfDay(new Date()).toISOString();
             const { count: totalCount } = await supabase.from('patients').select('*', { count: 'exact', head: true }).eq('clinic_id', clinic?.id);
             const { count: todayCount } = await supabase.from('visits').select('*', { count: 'exact', head: true }).eq('clinic_id', clinic?.id).gte('created_at', todayStart);
 
-            // 3. Weekly Traffic (Last 7 days)
+            // 3. Weekly Traffic (Last 7 days) & Stats for specific doctor (from prescriptions)
             const last7Days = Array.from({ length: 7 }, (_, i) => {
                 const date = subDays(new Date(), 6 - i);
                 return {
@@ -140,30 +154,48 @@ export default function DoctorProfile() {
                 };
             });
 
-            const { data: weeklyVisits } = await supabase
-                .from('visits')
-                .select('created_at')
+            const { data: doctorPrescriptions } = await supabase
+                .from('prescriptions')
+                .select('created_at, patient_id')
                 .eq('clinic_id', clinic?.id)
-                .gte('created_at', subDays(startOfDay(new Date()), 6).toISOString());
+                .eq('doctor_id', user.id);
 
-            if (weeklyVisits) {
-                weeklyVisits.forEach(v => {
-                    const day = format(parseISO(v.created_at), 'yyyy-MM-dd');
+            const uniquePatients = new Set<string>();
+            let todayRxCount = 0;
+
+            if (doctorPrescriptions) {
+                doctorPrescriptions.forEach(p => {
+                    if (p.patient_id) uniquePatients.add(p.patient_id);
+                    
+                    const pDate = new Date(p.created_at);
+                    if (pDate >= startOfDay(new Date())) {
+                        todayRxCount++;
+                    }
+
+                    const day = format(pDate, 'yyyy-MM-dd');
                     const dayData = last7Days.find(d => d.fullDate === day);
                     if (dayData) dayData.count++;
                 });
             }
 
-            // 4. Demographics (Age + Gender)
-            const { data: patients } = await supabase.from('patients').select('sex, age').eq('clinic_id', clinic?.id);
-            const ageThreshold = 18;
-            const demoData = [
-                { name: 'Men (>= 18)', value: patients?.filter(p => p.sex === 'Male' && (p.age || 0) >= ageThreshold).length || 0, color: '#2563eb' },
-                { name: 'Women (>= 18)', value: patients?.filter(p => p.sex === 'Female' && (p.age || 0) >= ageThreshold).length || 0, color: '#db2777' },
-                { name: 'Boys (< 18)', value: patients?.filter(p => p.sex === 'Male' && (p.age || 0) < ageThreshold).length || 0, color: '#60a5fa' },
-                { name: 'Girls (< 18)', value: patients?.filter(p => p.sex === 'Female' && (p.age || 0) < ageThreshold).length || 0, color: '#f472b6' },
-                { name: 'Other', value: patients?.filter(p => p.sex === 'Other').length || 0, color: '#94a3b8' }
-            ].filter(d => d.value > 0);
+            // 4. Demographics (Age + Gender) - filtered for this doctor's patients
+            const patientIds = Array.from(uniquePatients);
+            let demoData: any[] = [];
+            
+            if (patientIds.length > 0) {
+                // Supabase doesn't easily support WHERE id IN (array of 1000s), so we'll just fetch all and filter client side
+                const { data: patients } = await supabase.from('patients').select('id, sex, age').eq('clinic_id', clinic?.id);
+                const docPatients = patients?.filter(p => patientIds.includes(p.id)) || [];
+                
+                const ageThreshold = 18;
+                demoData = [
+                    { name: 'Men (>= 18)', value: docPatients.filter(p => p.sex === 'Male' && (p.age || 0) >= ageThreshold).length, color: '#2563eb' },
+                    { name: 'Women (>= 18)', value: docPatients.filter(p => p.sex === 'Female' && (p.age || 0) >= ageThreshold).length, color: '#db2777' },
+                    { name: 'Boys (< 18)', value: docPatients.filter(p => p.sex === 'Male' && (p.age || 0) < ageThreshold).length, color: '#60a5fa' },
+                    { name: 'Girls (< 18)', value: docPatients.filter(p => p.sex === 'Female' && (p.age || 0) < ageThreshold).length, color: '#f472b6' },
+                    { name: 'Other', value: docPatients.filter(p => p.sex === 'Other').length, color: '#94a3b8' }
+                ].filter(d => d.value > 0);
+            }
 
             // 5. Recent Activity
             const { data: recent } = await supabase
@@ -182,8 +214,8 @@ export default function DoctorProfile() {
             setProtocols(protocolData || []);
 
             setStats({
-                totalPatients: totalCount || 0,
-                todayPatients: todayCount || 0,
+                totalPatients: uniquePatients.size,
+                todayPatients: todayRxCount,
                 weeklyData: last7Days,
                 demographics: demoData,
                 recentActivity: recent || []
@@ -567,19 +599,18 @@ export default function DoctorProfile() {
                         <Card className="border-none shadow-sm bg-blue-600 text-white overflow-hidden relative group">
                             <CardContent className="p-8 space-y-2">
                                 <Users className="w-10 h-10 opacity-20 absolute -right-2 -top-2 group-hover:scale-150 transition-transform duration-700" />
-                                <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Lifetime Reach</p>
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Total Patients Treated</p>
                                 <h3 className="text-5xl font-black tracking-tighter">{stats.totalPatients}</h3>
-                                <p className="text-xs font-bold bg-white/20 inline-block px-3 py-1 rounded-full">+12% from last month</p>
+                                <p className="text-xs font-bold bg-white/20 inline-block px-3 py-1 rounded-full">Unique Lifetime</p>
                             </CardContent>
                         </Card>
-                        <Card className="border-none shadow-sm bg-emerald-500 text-white overflow-hidden relative group">
+                        <Card className="border-none shadow-sm bg-purple-500 text-white overflow-hidden relative group">
                             <CardContent className="p-8 space-y-2">
-                                <Calendar className="w-10 h-10 opacity-20 absolute -right-2 -top-2 group-hover:scale-150 transition-transform duration-700" />
-                                <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Today's Census</p>
-                                <h3 className="text-5xl font-black tracking-tighter">{stats.todayPatients}</h3>
+                                <FileSignature className="w-10 h-10 opacity-20 absolute -right-2 -top-2 group-hover:scale-150 transition-transform duration-700" />
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Saved Protocols</p>
+                                <h3 className="text-5xl font-black tracking-tighter">{protocols.length}</h3>
                                 <div className="flex items-center gap-2 pt-2">
-                                    <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
-                                    <span className="text-[10px] font-bold">Active Consultations</span>
+                                    <span className="text-[10px] font-bold">Fast Prescription Templates</span>
                                 </div>
                             </CardContent>
                         </Card>
@@ -925,40 +956,53 @@ export default function DoctorProfile() {
                             </Card>
 
                             {/* Clinic Branding */}
-                            <Card className="border-slate-100 dark:border-slate-800 rounded-[2rem] p-8 space-y-8 bg-white dark:bg-slate-900 shadow-sm">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-3 bg-emerald-50 dark:bg-emerald-900/40 rounded-2xl">
-                                        <HeartPulse className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+                            <Card className={cn(
+                                "border-slate-100 dark:border-slate-800 rounded-[2rem] p-8 space-y-8 bg-white dark:bg-slate-900 shadow-sm transition-opacity",
+                                !(hasRole('owner') || hasRole('superadmin')) && "opacity-60 pointer-events-none"
+                            )}>
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-3 bg-emerald-50 dark:bg-emerald-900/40 rounded-2xl">
+                                            <HeartPulse className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+                                        </div>
+                                        <h3 className="text-2xl font-black tracking-tight dark:text-slate-100">Clinic Branding</h3>
                                     </div>
-                                    <h3 className="text-2xl font-black tracking-tight dark:text-slate-100">Clinic Branding</h3>
+                                    {!(hasRole('owner') || hasRole('superadmin')) && (
+                                        <Badge variant="outline" className="bg-slate-100 dark:bg-slate-800 border-none text-[10px] uppercase tracking-widest text-slate-500">View Only</Badge>
+                                    )}
                                 </div>
 
                                 <div className="space-y-6">
-                                    <div className="space-y-2">
-                                        <Label className="text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Clinic Name</Label>
-                                        <Input
-                                            value={profile?.clinic_name}
-                                            onChange={e => setProfile(p => ({ ...p!, clinic_name: e.target.value }))}
-                                            placeholder="Lifeline Diagnostic Centre"
-                                            className="h-12 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 rounded-xl px-4 font-bold"
-                                        />
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="space-y-2">
+                                            <Label className="text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Clinic Name</Label>
+                                            <Input
+                                                value={(hasRole('owner') || hasRole('superadmin') ? profile?.clinic_name : ownerProfile?.clinic_name) || ''}
+                                                onChange={e => setProfile(p => ({ ...p!, clinic_name: e.target.value }))}
+                                                placeholder="e.g. GV Clinic"
+                                                className="h-12 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 rounded-xl px-4 font-bold"
+                                                readOnly={!(hasRole('owner') || hasRole('superadmin'))}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Contact Number</Label>
+                                            <Input
+                                                value={(hasRole('owner') || hasRole('superadmin') ? profile?.clinic_phone : ownerProfile?.clinic_phone) || ''}
+                                                onChange={e => setProfile(p => ({ ...p!, clinic_phone: e.target.value }))}
+                                                placeholder="+91 00000 00000"
+                                                className="h-12 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 rounded-xl px-4 font-bold"
+                                                readOnly={!(hasRole('owner') || hasRole('superadmin'))}
+                                            />
+                                        </div>
                                     </div>
                                     <div className="space-y-2">
-                                        <Label className="text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Clinic Address</Label>
+                                        <Label className="text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Full Address</Label>
                                         <Input
-                                            value={profile?.clinic_address}
+                                            value={(hasRole('owner') || hasRole('superadmin') ? profile?.clinic_address : ownerProfile?.clinic_address) || ''}
                                             onChange={e => setProfile(p => ({ ...p!, clinic_address: e.target.value }))}
-                                            placeholder="123 Health Street, City"
+                                            placeholder="Complete street address with pincode"
                                             className="h-12 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 rounded-xl px-4 font-bold"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label className="text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Clinic Contact</Label>
-                                        <Input
-                                            value={profile?.clinic_phone}
-                                            onChange={e => setProfile(p => ({ ...p!, clinic_phone: e.target.value }))}
-                                            placeholder="+91 00000 00000"
-                                            className="h-12 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 rounded-xl px-4 font-bold"
+                                            readOnly={!(hasRole('owner') || hasRole('superadmin'))}
                                         />
                                     </div>
                                 </div>

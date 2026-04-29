@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useOutletContext, useParams } from 'react-router-dom';
-import { startOfDay, endOfDay, isWithinInterval, startOfHour, endOfHour, setHours, format, subDays, subMonths } from 'date-fns';
+import { startOfDay, endOfDay, isWithinInterval, startOfHour, endOfHour, setHours, format, subDays, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
@@ -69,23 +69,29 @@ export default function Analytics() {
   };
 
   const fetchGeneralStats = async () => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const yesterday = subDays(today, 1);
-    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-    const lastMonthStart = subMonths(monthStart, 1);
+    const now = new Date();
+    const todayStart = startOfDay(now).toISOString();
+    const todayEnd = endOfDay(now).toISOString();
+    
+    const yesterdayStart = startOfDay(subDays(now, 1)).toISOString();
+    const yesterdayEnd = endOfDay(subDays(now, 1)).toISOString();
+
+    const monthStartStr = startOfMonth(now).toISOString();
+    
+    const lastMonthStartStr = startOfMonth(subMonths(now, 1)).toISOString();
+    const lastMonthEndStr = endOfMonth(subMonths(now, 1)).toISOString();
 
     const [todayRes, yesterdayRes, monthRes, lastMonthRes, totalRes, statusRes] = await Promise.all([
-      supabase.from('visits').select('id', { count: 'exact', head: true }).eq('clinic_id', clinic?.id).gte('created_at', today.toISOString()),
-      supabase.from('visits').select('id', { count: 'exact', head: true }).eq('clinic_id', clinic?.id).gte('created_at', yesterday.toISOString()).lt('created_at', today.toISOString()),
-      supabase.from('visits').select('id', { count: 'exact', head: true }).eq('clinic_id', clinic?.id).gte('created_at', monthStart.toISOString()),
-      supabase.from('visits').select('id', { count: 'exact', head: true }).eq('clinic_id', clinic?.id).gte('created_at', lastMonthStart.toISOString()).lt('created_at', monthStart.toISOString()),
+      supabase.from('visits').select('id', { count: 'exact', head: true }).eq('clinic_id', clinic?.id).gte('created_at', todayStart).lte('created_at', todayEnd),
+      supabase.from('visits').select('id', { count: 'exact', head: true }).eq('clinic_id', clinic?.id).gte('created_at', yesterdayStart).lte('created_at', yesterdayEnd),
+      supabase.from('visits').select('id', { count: 'exact', head: true }).eq('clinic_id', clinic?.id).gte('created_at', monthStartStr),
+      supabase.from('visits').select('id', { count: 'exact', head: true }).eq('clinic_id', clinic?.id).gte('created_at', lastMonthStartStr).lte('created_at', lastMonthEndStr),
       supabase.from('patients').select('id', { count: 'exact', head: true }).eq('clinic_id', clinic?.id),
-      supabase.from('visits').select('status').eq('clinic_id', clinic?.id).gte('created_at', monthStart.toISOString())
+      supabase.from('visits').select('status').eq('clinic_id', clinic?.id).gte('created_at', monthStartStr)
     ]);
 
     const todayCount = todayRes.count || 0;
-    const yesterdayCount = yesterdayRes.count || 0; z
+    const yesterdayCount = yesterdayRes.count || 0;
     const monthCount = monthRes.count || 0;
     const lastMonthCount = lastMonthRes.count || 0;
 
@@ -109,11 +115,12 @@ export default function Analytics() {
     });
 
     // Diagnosis distribution (top 6)
-    const { data: rxData } = await supabase.from('prescriptions').select('diagnosis').eq('clinic_id', clinic?.id).not('diagnosis', 'is', null).limit(1000);
+    const { data: rxData } = await supabase.from('prescriptions').select('diagnosis').eq('clinic_id', clinic?.id).not('diagnosis', 'is', null).not('diagnosis', 'eq', '').limit(1000);
     const counts: Record<string, number> = {};
     rxData?.forEach(r => {
       if (r.diagnosis) {
-        const terms = r.diagnosis.split(/[/,\\,]+/).map(t => t.trim().toUpperCase()).filter(t => t.length > 1);
+        // Diagnosis is now stored as comma-separated string, sometimes with slashes, we'll split by both
+        const terms = r.diagnosis.split(/[,/\\|]+/).map(t => t.trim().toUpperCase()).filter(t => t.length > 1);
         terms.forEach(term => {
           counts[term] = (counts[term] || 0) + 1;
         });
@@ -284,7 +291,7 @@ export default function Analytics() {
     // Automatically detect top 5 diagnoses instead of hardcoding
     const topDetectCounts: Record<string, number> = {};
     rxData.forEach(rx => {
-      const terms = rx.diagnosis?.split(/[/,\\,]+/).map(t => t.trim()).filter(t => t.length > 2) || [];
+      const terms = rx.diagnosis?.split(/[,/\\|]+/).map(t => t.trim()).filter(t => t.length > 2) || [];
       terms.forEach(t => topDetectCounts[t] = (topDetectCounts[t] || 0) + 1);
     });
     const topDiagnoses = Object.entries(topDetectCounts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(e => e[0]);
@@ -499,6 +506,23 @@ export default function Analytics() {
                   })}
                 </Bar>
                 <Line type="monotone" dataKey="patients" stroke="hsl(var(--primary))" strokeWidth={4} dot={{ r: 4, strokeWidth: 2, fill: '#fff' }} />
+                {volumeData.length > 0 && (
+                  <ReferenceLine 
+                    y={volumeData.reduce((acc, curr) => acc + curr.patients, 0) / volumeData.length} 
+                    stroke="currentColor" 
+                    strokeDasharray="3 3" 
+                    strokeOpacity={0.5} 
+                  >
+                    <Label 
+                      value={`Avg: ${Math.round(volumeData.reduce((acc, curr) => acc + curr.patients, 0) / volumeData.length)}`} 
+                      position="top" 
+                      fill="currentColor" 
+                      fontSize={12} 
+                      fontWeight="bold" 
+                      opacity={0.7}
+                    />
+                  </ReferenceLine>
+                )}
               </ComposedChart>
             </ChartContainer>
           </div>
