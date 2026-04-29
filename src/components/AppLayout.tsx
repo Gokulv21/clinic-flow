@@ -16,7 +16,6 @@ import {
 import { useTheme } from '@/components/ThemeProvider';
 import logo from '@/assets/logo.png';
 import { motion, AnimatePresence, useScroll, useMotionValueEvent } from 'framer-motion';
-import { useDrag } from '@use-gesture/react';
 import NotificationCenter from './NotificationCenter';
 
 interface NavItem {
@@ -98,28 +97,46 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     }
   };
 
-  const bindSwipe = useDrag(({ swipe: [swipeX], event }) => {
-    if (window.innerWidth > 768) return; // Only mobile
-    
-    // Ignore swipe if the user is interacting with an input, canvas, or textarea
-    const target = event.target as HTMLElement;
+  // Native swipe implementation
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (window.innerWidth > 768) return;
+    touchStartX.current = e.targetTouches[0].clientX;
+    touchStartY.current = e.targetTouches[0].clientY;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (window.innerWidth > 768) return;
+
+    const touchEndX = e.changedTouches[0].clientX;
+    const touchEndY = e.changedTouches[0].clientY;
+
+    const target = e.target as HTMLElement;
     if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'CANVAS' || target.isContentEditable)) {
       return;
     }
 
-    if (swipeX === -1) {
-      navigateNext();
-    } else if (swipeX === 1) {
-      navigatePrev();
+    const distanceX = touchStartX.current - touchEndX;
+    const distanceY = touchStartY.current - touchEndY;
+    
+    // Must be mostly horizontal and exceed threshold
+    if (Math.abs(distanceX) > Math.abs(distanceY) && Math.abs(distanceX) > 60) {
+      if (distanceX > 0) {
+        navigateNext(); // Swiped left
+      } else {
+        navigatePrev(); // Swiped right
+      }
     }
-  }, { 
-    axis: 'x', 
-    swipe: { velocity: 0.3, distance: 40 },
-    filterTaps: true
-  });
+  };
 
   return (
-    <div className="min-h-screen flex bg-slate-50 dark:bg-[#000000] font-jakarta-sans relative overflow-hidden" {...bindSwipe()}>
+    <div 
+      className="min-h-screen flex bg-slate-50 dark:bg-[#000000] font-jakarta-sans relative overflow-hidden" 
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
       {/* Decorative Background Elements for Glass effect */}
       <div className="fixed inset-0 pointer-events-none opacity-20 dark:opacity-40">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/30 blur-[120px] rounded-full" />
