@@ -16,6 +16,7 @@ import {
 import { useTheme } from '@/components/ThemeProvider';
 import logo from '@/assets/logo.png';
 import { motion, AnimatePresence, useScroll, useMotionValueEvent } from 'framer-motion';
+import { useDrag } from '@use-gesture/react';
 import NotificationCenter from './NotificationCenter';
 
 interface NavItem {
@@ -83,8 +84,42 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     return `/${slug}${itemPath}`;
   };
 
+  const navigateNext = () => {
+    const currentIndex = visibleItems.findIndex(item => location.pathname === getFullPath(item.path) || (item.path === '/' && location.pathname.endsWith('/dashboard')));
+    if (currentIndex >= 0 && currentIndex < visibleItems.length - 1) {
+      navigate(getFullPath(visibleItems[currentIndex + 1].path));
+    }
+  };
+
+  const navigatePrev = () => {
+    const currentIndex = visibleItems.findIndex(item => location.pathname === getFullPath(item.path) || (item.path === '/' && location.pathname.endsWith('/dashboard')));
+    if (currentIndex > 0) {
+      navigate(getFullPath(visibleItems[currentIndex - 1].path));
+    }
+  };
+
+  const bindSwipe = useDrag(({ swipe: [swipeX], event }) => {
+    if (window.innerWidth > 768) return; // Only mobile
+    
+    // Ignore swipe if the user is interacting with an input, canvas, or textarea
+    const target = event.target as HTMLElement;
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'CANVAS' || target.isContentEditable)) {
+      return;
+    }
+
+    if (swipeX === -1) {
+      navigateNext();
+    } else if (swipeX === 1) {
+      navigatePrev();
+    }
+  }, { 
+    axis: 'x', 
+    swipe: { velocity: 0.3, distance: 40 },
+    filterTaps: true
+  });
+
   return (
-    <div className="min-h-screen flex bg-slate-50 dark:bg-[#000000] font-jakarta-sans relative overflow-hidden">
+    <div className="min-h-screen flex bg-slate-50 dark:bg-[#000000] font-jakarta-sans relative overflow-hidden" {...bindSwipe()}>
       {/* Decorative Background Elements for Glass effect */}
       <div className="fixed inset-0 pointer-events-none opacity-20 dark:opacity-40">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/30 blur-[120px] rounded-full" />
