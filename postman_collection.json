@@ -1,0 +1,141 @@
+{
+	"info": {
+		"_postman_id": "clinic-flow-api-tests",
+		"name": "Clinic Flow API Health",
+		"description": "Collection to test Supabase and LiveKit endpoints for the Clinic Flow project.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Supabase Health",
+			"item": [
+				{
+					"name": "Check Clinics Table",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "apikey",
+								"value": "{{SUPABASE_ANON_KEY}}",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{SUPABASE_ANON_KEY}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{SUPABASE_URL}}/rest/v1/clinics?select=count",
+							"host": [
+								"{{SUPABASE_URL}}"
+							],
+							"path": [
+								"rest",
+								"v1",
+								"clinics"
+							],
+							"query": [
+								{
+									"key": "select",
+									"value": "count"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Check Patients Table",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "apikey",
+								"value": "{{SUPABASE_ANON_KEY}}",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{SUPABASE_ANON_KEY}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{SUPABASE_URL}}/rest/v1/patients?select=count",
+							"host": [
+								"{{SUPABASE_URL}}"
+							],
+							"path": [
+								"rest",
+								"v1",
+								"patients"
+							],
+							"query": [
+								{
+									"key": "select",
+									"value": "count"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "LiveKit Health",
+			"item": [
+				{
+					"name": "LiveKit Status",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "https://prescripto-34vg9dx3.livekit.cloud",
+							"protocol": "https",
+							"host": [
+								"prescripto-34vg9dx3",
+								"livekit",
+								"cloud"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"pm.test(\"Status code is 200\", function () {",
+					"    pm.response.to.have.status(200);",
+					"});"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "SUPABASE_URL",
+			"value": "https://yyaawwmgzqymyewdmbtj.supabase.co"
+		},
+		{
+			"key": "SUPABASE_ANON_KEY",
+			"value": "REPLACE_WITH_YOUR_ANON_KEY"
+		}
+	]
+}

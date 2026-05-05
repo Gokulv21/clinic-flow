@@ -4,16 +4,16 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { registerClient } from "@/lib/supabase-auth-admin";
-import { 
-  Building2, Plus, LogOut, ArrowRight, Loader2, 
-  ShieldCheck, User, Mail, Lock, Globe, Sparkles 
+import {
+  Building2, Plus, LogOut, ArrowRight, Loader2,
+  ShieldCheck, User, Mail, Lock, Globe, Sparkles, Trash2
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { 
-  Dialog, DialogContent, DialogHeader, DialogTitle, 
-  DialogTrigger, DialogDescription, DialogFooter 
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+  DialogTrigger, DialogDescription, DialogFooter
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -41,7 +41,7 @@ export default function ClinicSelection() {
     queryKey: ['available-clinics', user?.id],
     queryFn: async () => {
       console.log("[ClinicSelection] Fetching clinics. User:", user?.id, "isSuperAdmin:", isSuperAdmin);
-      
+
       if (isSuperAdmin) {
         const { data, error } = await supabase.from('clinics').select('*').order('name');
         console.log("[ClinicSelection] SuperAdmin query results:", data, "Error:", error);
@@ -52,7 +52,7 @@ export default function ClinicSelection() {
           supabase.from('clinics').select('*').eq('owner_id', user?.id),
           supabase.from('profiles').select('clinic_id, clinics(*)').eq('user_id', user?.id)
         ]);
-        
+
         console.log("[ClinicSelection] Owned Clinics:", ownedRes.data);
         console.log("[ClinicSelection] Profile Associations:", profileRes.data);
 
@@ -60,7 +60,7 @@ export default function ClinicSelection() {
         const profileClinics = (profileRes.data || [])
           .map(p => p.clinics)
           .filter(Boolean);
-        
+
         // Merge and unique by ID
         const allClinics = [...ownedClinics, ...profileClinics];
         const uniqueIds = new Set();
@@ -98,7 +98,7 @@ export default function ClinicSelection() {
     try {
       // 1. Generate Slug
       const slug = formData.clinicName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
-      
+
       // Check if slug exists
       const { data: existing } = await supabase.from('clinics').select('id').eq('slug', slug).maybeSingle();
       if (existing) {
@@ -139,7 +139,7 @@ export default function ClinicSelection() {
           full_name: formData.ownerName,
           email: formData.ownerEmail,
           clinic_id: newClinic.id,
-          role: 'doctor'
+          role: 'owner'
         });
 
       if (profileError) throw profileError;
@@ -149,7 +149,7 @@ export default function ClinicSelection() {
         .from('user_roles')
         .insert({
           user_id: authData.user.id,
-          role: 'doctor'
+          role: 'owner'
         });
 
       if (roleError) throw roleError;
@@ -164,6 +164,43 @@ export default function ClinicSelection() {
       toast.error(err.message || "Failed to create clinic");
     } finally {
       setIsCreating(false);
+      toast.dismiss(loadingToast);
+    }
+  };
+
+  const handleDeleteClinic = async (clinicId: string, clinicName: string) => {
+    const confirmDelete = window.confirm(`⚠️ ARE YOU ABSOLUTELY SURE? This will permanently delete the clinic "${clinicName}" and ALL associated patient data, prescriptions, and visits. This cannot be undone.`);
+
+    if (!confirmDelete) return;
+
+    const loadingToast = toast.loading(`Deleting ${clinicName}...`);
+    try {
+      // 1. Delete linked data first (due to foreign keys)
+      const tables = ['prescriptions', 'visits', 'patients', 'profiles'];
+
+      for (const table of tables) {
+        const { error: delError } = await supabase
+          .from(table)
+          .delete()
+          .eq('clinic_id', clinicId);
+
+        if (delError) console.warn(`Note: Deletion from ${table} returned: ${delError.message}`);
+      }
+
+      // 2. Finally delete the clinic
+      const { error: clinicError } = await supabase
+        .from('clinics')
+        .delete()
+        .eq('id', clinicId);
+
+      if (clinicError) throw clinicError;
+
+      toast.success("Clinic and all data deleted successfully");
+      queryClient.invalidateQueries({ queryKey: ['available-clinics'] });
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to delete clinic");
+    } finally {
       toast.dismiss(loadingToast);
     }
   };
@@ -197,9 +234,9 @@ export default function ClinicSelection() {
               <p className="text-xs font-black text-slate-900 dark:text-white">{user?.email}</p>
               <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">{isSuperAdmin ? 'Global Admin' : 'Clinic Staff'}</p>
             </div>
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => signOut()}
               className="rounded-xl border-slate-200 dark:border-slate-800 gap-2 font-bold hover:bg-red-50 hover:text-red-600 transition-all"
             >
@@ -210,18 +247,18 @@ export default function ClinicSelection() {
       </header>
 
       <main className="max-w-7xl mx-auto px-6 py-12 md:py-20 space-y-12">
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="flex flex-col md:flex-row md:items-end justify-between gap-6"
         >
           <div className="space-y-2">
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.9 }}
               animate={{ scale: 1 }}
               className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[10px] font-black uppercase tracking-widest border border-blue-100 dark:border-blue-800"
             >
-               <Sparkles className="w-3 h-3" /> Welcome Back
+              <Sparkles className="w-3 h-3" /> Welcome Back
             </motion.div>
             <h2 className="text-3xl md:text-5xl font-black tracking-tighter text-slate-900 dark:text-white leading-tight">
               Select Your <span className="text-blue-600">Clinic</span>
@@ -251,11 +288,11 @@ export default function ClinicSelection() {
                       <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Clinic Name</Label>
                       <div className="relative">
                         <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <Input 
-                          placeholder="e.g. Sunrise Wellness" 
+                        <Input
+                          placeholder="e.g. Sunrise Wellness"
                           className="pl-12 h-12 rounded-xl border-slate-200"
                           value={formData.clinicName}
-                          onChange={e => setFormData({...formData, clinicName: e.target.value})}
+                          onChange={e => setFormData({ ...formData, clinicName: e.target.value })}
                         />
                       </div>
                     </div>
@@ -263,11 +300,11 @@ export default function ClinicSelection() {
                       <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Owner Name (Doctor)</Label>
                       <div className="relative">
                         <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <Input 
-                          placeholder="Dr. John Doe" 
+                        <Input
+                          placeholder="Dr. John Doe"
                           className="pl-12 h-12 rounded-xl border-slate-200"
                           value={formData.ownerName}
-                          onChange={e => setFormData({...formData, ownerName: e.target.value})}
+                          onChange={e => setFormData({ ...formData, ownerName: e.target.value })}
                         />
                       </div>
                     </div>
@@ -275,12 +312,12 @@ export default function ClinicSelection() {
                       <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Login Email (Owner ID)</Label>
                       <div className="relative">
                         <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <Input 
+                        <Input
                           type="email"
-                          placeholder="doctor@example.com" 
+                          placeholder="doctor@example.com"
                           className="pl-12 h-12 rounded-xl border-slate-200"
                           value={formData.ownerEmail}
-                          onChange={e => setFormData({...formData, ownerEmail: e.target.value})}
+                          onChange={e => setFormData({ ...formData, ownerEmail: e.target.value })}
                         />
                       </div>
                     </div>
@@ -288,18 +325,18 @@ export default function ClinicSelection() {
                       <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Owner Password</Label>
                       <div className="relative">
                         <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <Input 
+                        <Input
                           type="password"
-                          placeholder="••••••••" 
+                          placeholder="••••••••"
                           className="pl-12 h-12 rounded-xl border-slate-200"
                           value={formData.password}
-                          onChange={e => setFormData({...formData, password: e.target.value})}
+                          onChange={e => setFormData({ ...formData, password: e.target.value })}
                         />
                       </div>
                     </div>
                   </div>
-                  <Button 
-                    type="submit" 
+                  <Button
+                    type="submit"
                     disabled={isCreating}
                     className="w-full h-14 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black uppercase text-xs tracking-widest gap-2 shadow-lg shadow-blue-500/20 transition-all active:scale-[0.98]"
                   >
@@ -321,7 +358,7 @@ export default function ClinicSelection() {
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   transition={{ delay: i * 0.1 }}
                 >
-                  <Card 
+                  <Card
                     className="group relative border-none shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 bg-white dark:bg-slate-900 overflow-hidden cursor-pointer"
                     onClick={() => navigate(`/${clinic.slug}/dashboard`)}
                   >
@@ -335,20 +372,34 @@ export default function ClinicSelection() {
                       <div className="w-16 h-16 rounded-[2rem] bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center transition-transform group-hover:scale-110 group-hover:rotate-6 duration-500">
                         <Building2 className="w-8 h-8" />
                       </div>
+
                       <div className="space-y-1">
                         <h3 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">{clinic.name}</h3>
                         <div className="flex items-center gap-1.5 text-slate-400 font-bold text-xs uppercase tracking-widest">
-                           <Globe className="w-3 h-3" /> prescripto/{clinic.slug}
+                          <Globe className="w-3 h-3" /> prescripto/{clinic.slug}
                         </div>
                       </div>
                       <div className="pt-4 flex items-center justify-between border-t border-slate-50 dark:border-slate-800">
-                         <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-2">
                             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                             <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Environment Active</span>
-                         </div>
-                         <span className="text-xs font-bold text-blue-600 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                           Enter Dashboard <ArrowRight className="w-3 h-3" />
-                         </span>
+                          </div>
+
+                          {isSuperAdmin && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-slate-700 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all z-20"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteClinic(clinic.id, clinic.name);
+                              }}
+                              style={{ marginLeft: '180px' }}>
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -358,34 +409,34 @@ export default function ClinicSelection() {
           </div>
         ) : (
           <div className="py-20 text-center space-y-6 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-[3rem] bg-white/50 dark:bg-slate-900/50">
-             <div className="w-24 h-24 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto text-slate-400">
-                <Building2 className="w-12 h-12" />
-             </div>
-             <div className="space-y-2">
-                <h3 className="text-2xl font-black text-slate-900 dark:text-white">No clinics found</h3>
-                <p className="text-slate-500 font-medium max-w-xs mx-auto">
-                  {isSuperAdmin 
-                    ? "Welcome to the Clinical Network! Start by creating your first clinic environment." 
-                    : "You haven't been assigned to any clinics yet. Please contact your administrator."}
-                </p>
-             </div>
-             {isSuperAdmin && (
-                <Button 
-                  onClick={() => setIsAddClinicOpen(true)}
-                  className="rounded-2xl h-12 px-8 font-bold"
-                >
-                  Create Initial Clinic
-                </Button>
-             )}
+            <div className="w-24 h-24 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto text-slate-400">
+              <Building2 className="w-12 h-12" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-2xl font-black text-slate-900 dark:text-white">No clinics found</h3>
+              <p className="text-slate-500 font-medium max-w-xs mx-auto">
+                {isSuperAdmin
+                  ? "Welcome to the Clinical Network! Start by creating your first clinic environment."
+                  : "You haven't been assigned to any clinics yet. Please contact your administrator."}
+              </p>
+            </div>
+            {isSuperAdmin && (
+              <Button
+                onClick={() => setIsAddClinicOpen(true)}
+                className="rounded-2xl h-12 px-8 font-bold"
+              >
+                Create Initial Clinic
+              </Button>
+            )}
           </div>
         )}
       </main>
 
       {/* Footer */}
       <footer className="py-12 border-t border-slate-100 dark:border-slate-900 text-center">
-         <p className="text-[10px] font-black text-slate-300 dark:text-slate-700 uppercase tracking-[0.5em]">
-           Prescripto Multi-Tenant clinical OS
-         </p>
+        <p className="text-[10px] font-black text-slate-300 dark:text-slate-700 uppercase tracking-[0.5em]">
+          Prescripto Multi-Tenant clinical OS
+        </p>
       </footer>
     </div>
   );
