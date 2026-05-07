@@ -127,15 +127,32 @@ export default function DoctorProfile() {
                 });
             }
 
-            // Fetch Clinic Owner Profile for consistent branding
-            if (clinic?.owner_id) {
-                const { data: ownerData } = await supabase
-                    .from('profiles')
-                    .select('clinic_name, clinic_address, clinic_phone')
-                    .eq('user_id', clinic.owner_id)
-                    .maybeSingle();
-                if (ownerData) {
-                    setOwnerProfile(ownerData);
+            // Fetch Clinic branding (prioritize clinics table, fallback to owner profile)
+            if (clinic?.id) {
+                const { data: clinicData } = await supabase
+                    .from('clinics')
+                    .select('name, address, phone, owner_id')
+                    .eq('id', clinic.id)
+                    .single();
+                
+                if (clinicData) {
+                    // Update profile state with clinic specific data if needed
+                    // For owners, we want them to see/edit this specific clinic's branding
+                    if (clinicData.owner_id === user.id) {
+                        setProfile(prev => ({
+                            ...prev!,
+                            clinic_name: clinicData.name,
+                            clinic_address: clinicData.address || '',
+                            clinic_phone: clinicData.phone || ''
+                        }));
+                    } else {
+                        // For non-owners, we show the clinic branding from the clinic record
+                        setOwnerProfile({
+                            clinic_name: clinicData.name,
+                            clinic_address: clinicData.address,
+                            clinic_phone: clinicData.phone
+                        });
+                    }
                 }
             }
 
@@ -266,7 +283,26 @@ export default function DoctorProfile() {
                 .eq('user_id', user.id);
 
             if (error) throw error;
-            toast.success('Profile updated successfully');
+
+            // 2. Update Clinic Branding (if owner/admin)
+            if (hasRole('owner') || hasRole('superadmin')) {
+                const { error: clinicError } = await supabase
+                    .from('clinics')
+                    .update({
+                        name: sData.clinic_name,
+                        address: sData.clinic_address,
+                        phone: sData.clinic_phone
+                    })
+                    .eq('id', clinic?.id);
+                if (clinicError) throw clinicError;
+            }
+
+            toast.success('Profile and Clinic Branding updated');
+            
+            // 3. Navigate to Consultation Page as requested
+            setTimeout(() => {
+                navigate(slug ? `/${slug}/consultation` : '/consultation');
+            }, 1000);
         } catch (err: any) {
             toast.error(err.message);
         } finally {

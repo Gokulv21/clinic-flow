@@ -57,18 +57,24 @@ const PrescriptionTemplate = React.memo(({
 
     useEffect(() => {
         const fetchProfiles = async () => {
-            // 1. Fetch Clinic Owner Profile for Branding
+            // 1. Fetch Clinic Branding from clinics table
             if (visit?.clinic_id) {
                 try {
-                    const { data: clinicData } = await supabase.from('clinics').select('owner_id').eq('id', visit.clinic_id).maybeSingle();
-                    if (clinicData?.owner_id) {
-                        const { data: ownerProf } = await supabase.from('profiles').select('clinic_name, clinic_address, clinic_phone').eq('user_id', clinicData.owner_id).maybeSingle();
-                        if (ownerProf) {
-                            setOwnerProfile(ownerProf);
-                        }
+                    const { data: clinicData } = await supabase
+                        .from('clinics')
+                        .select('name, address, phone, owner_id')
+                        .eq('id', visit.clinic_id)
+                        .maybeSingle();
+                    
+                    if (clinicData) {
+                        setOwnerProfile({
+                            clinic_name: clinicData.name,
+                            clinic_address: clinicData.address,
+                            clinic_phone: clinicData.phone
+                        });
                     }
                 } catch (err) {
-                    console.error("Error fetching owner profile:", err);
+                    console.error("Error fetching clinic branding:", err);
                 }
             }
 
@@ -103,7 +109,7 @@ const PrescriptionTemplate = React.memo(({
                 const { data: doctorRoles } = await supabase
                     .from('user_roles')
                     .select('user_id')
-                    .eq('role', 'doctor')
+                    .in('role', ['doctor', 'owner'])
                     .order('created_at', { ascending: true });
 
                 if (doctorRoles && doctorRoles.length > 0) {

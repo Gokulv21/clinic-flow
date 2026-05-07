@@ -90,8 +90,8 @@ export default function NurseEntry() {
     queryFn: async () => {
         const { data } = await supabase
           .from('profiles')
-          .select('id, full_name')
-          .eq('role', 'doctor')
+          .select('user_id, full_name')
+          .in('role', ['doctor', 'owner'])
           .eq('clinic_id', clinic?.id)
           .neq('is_superadmin', true);
         return data || [];
@@ -198,7 +198,7 @@ export default function NurseEntry() {
         // NEW PATIENT PATH: Need to create patient first, but can get token in parallel
         const [regId, nextToken] = await Promise.all([
           getNextRegId(),
-          supabase.rpc('get_next_token')
+          supabase.rpc('get_next_token', { p_clinic_id: clinic?.id })
         ]);
         
         token = nextToken.data || 1;
@@ -233,7 +233,7 @@ export default function NurseEntry() {
         console.log('[NurseEntry] Patient created successfully:', patientId);
       } else {
         // EXISTING PATIENT PATH: Just get token
-        const { data: tokenData } = await supabase.rpc('get_next_token');
+        const { data: tokenData } = await supabase.rpc('get_next_token', { p_clinic_id: clinic?.id });
         token = tokenData || 1;
       }
 
@@ -658,7 +658,7 @@ export default function NurseEntry() {
                      <SelectContent>
                          <SelectItem value="general" className="font-bold">General Queue (Any Doctor)</SelectItem>
                          {doctors?.map(doc => (
-                             <SelectItem key={doc.id} value={doc.id}>Dr. {doc.full_name}</SelectItem>
+                             <SelectItem key={doc.user_id} value={doc.user_id}>Dr. {doc.full_name}</SelectItem>
                          ))}
                      </SelectContent>
                  </Select>
