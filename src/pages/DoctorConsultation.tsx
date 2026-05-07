@@ -64,13 +64,18 @@ export default function DoctorConsultation() {
   const { data: queue = [], isLoading: isLoadingQueue, refetch: refetchQueue } = useQuery({
     queryKey: ['visitQueue', clinic?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('visits')
         .select('*, patients(*), prescriptions(*)')
         .eq('clinic_id', clinic?.id)
-        .in('status', ['waiting', 'in_consultation'])
-        .or(`assigned_doctor_id.is.null,assigned_doctor_id.eq.${user?.id}`)
-        .order('token_number', { ascending: true });
+        .in('status', ['waiting', 'in_consultation']);
+      
+      // If NOT an owner or superadmin, only show assigned or unassigned patients
+      if (!hasRole('owner') && !hasRole('superadmin')) {
+        query = query.or(`assigned_doctor_id.is.null,assigned_doctor_id.eq.${user?.id}`);
+      }
+      
+      const { data, error } = await query.order('token_number', { ascending: true });
       if (error) throw error;
       return (data || []).filter(v => v.patients);
     },

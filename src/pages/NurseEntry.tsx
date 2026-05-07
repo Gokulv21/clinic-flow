@@ -90,7 +90,7 @@ export default function NurseEntry() {
     queryFn: async () => {
         const { data } = await supabase
           .from('profiles')
-          .select('user_id, full_name')
+          .select('user_id, full_name, role, email')
           .in('role', ['doctor', 'owner'])
           .eq('clinic_id', clinic?.id)
           .neq('is_superadmin', true);
@@ -658,7 +658,14 @@ export default function NurseEntry() {
                      <SelectContent>
                          <SelectItem value="general" className="font-bold">General Queue (Any Doctor)</SelectItem>
                          {doctors?.map(doc => (
-                             <SelectItem key={doc.user_id} value={doc.user_id}>Dr. {doc.full_name}</SelectItem>
+                             <SelectItem key={doc.user_id} value={doc.user_id}>
+                               <div className="flex flex-col">
+                                 <span className="font-bold">Dr. {doc.full_name}</span>
+                                 <span className="text-[10px] text-muted-foreground uppercase tracking-tight">
+                                   {doc.role === 'owner' ? 'Clinic Owner' : 'Doctor'} {doc.email ? `(${doc.email})` : ''}
+                                 </span>
+                               </div>
+                             </SelectItem>
                          ))}
                      </SelectContent>
                  </Select>

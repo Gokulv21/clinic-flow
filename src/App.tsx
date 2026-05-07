@@ -46,14 +46,30 @@ function ClinicWrapper() {
     queryKey: ['clinic', slug],
     queryFn: async () => {
       if (!slug) return null;
+      console.log("[ClinicWrapper] Fetching clinic for slug:", slug);
       const { data, error } = await supabase.from('clinics').select('*').eq('slug', slug).single();
-      if (error) throw error;
+      if (error) {
+        console.error("[ClinicWrapper] Fetch error:", error);
+        throw error;
+      }
+      console.log("[ClinicWrapper] Clinic found:", data);
       return data;
     }
   });
 
-  if (isLoading) return <div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin w-8 h-8"/></div>;
-  if (error || !clinic) return <div className="flex justify-center items-center h-screen">Clinic not found</div>;
+  if (isLoading) return <div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin w-8 h-8 text-blue-600"/></div>;
+  
+  if (error || !clinic) {
+    console.error("[ClinicWrapper] Access Denied or Clinic Not Found:", { slug, error, user: user?.id, roles });
+    return (
+      <div className="flex flex-col justify-center items-center h-screen space-y-4">
+        <h1 className="text-2xl font-bold">Clinic not found</h1>
+        <p className="text-muted-foreground">Slug: <span className="font-mono">{slug}</span></p>
+        {error && <p className="text-red-500 text-sm">Error: {(error as any).message}</p>}
+        <Button onClick={() => navigate('/')}>Back to Selection</Button>
+      </div>
+    );
+  }
 
   // We expose clinic to the window for older queries just in case, but robustly we should use Context
   (window as any).__ACTIVE_CLINIC_ID = clinic.id;
