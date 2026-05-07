@@ -42,6 +42,8 @@ const queryClient = new QueryClient({
 // Provides clinic logic context to nested components
 function ClinicWrapper() {
   const { slug } = useParams();
+  const navigate = useNavigate();
+  const { user, roles } = useAuth();
   const { data: clinic, isLoading, error } = useQuery({
     queryKey: ['clinic', slug],
     queryFn: async () => {

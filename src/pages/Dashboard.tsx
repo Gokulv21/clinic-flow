@@ -8,6 +8,7 @@ import { startOfDay, endOfDay } from 'date-fns';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { motion } from 'framer-motion';
+import { toast } from 'sonner';
 
 export default function Dashboard() {
   const { profile, roles, hasRole } = useAuth();
