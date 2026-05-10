@@ -195,13 +195,22 @@ export default function NurseEntry() {
 
       // Parallelize identifying the patient and getting the next token for speed
       if (!patientId) {
-        // NEW PATIENT PATH: Need to create patient first, but can get token in parallel
-        const [regId, nextToken] = await Promise.all([
+        // Parallelize identifying the patient and getting the next token for speed
+        const [regIdResult, nextTokenResult] = await Promise.allSettled([
           getNextRegId(),
           supabase.rpc('get_next_token', { p_clinic_id: clinic?.id })
         ]);
         
-        token = nextToken.data || 1;
+        const regId = regIdResult.status === 'fulfilled' ? regIdResult.value : `REG-${Date.now().toString().slice(-4)}`;
+        
+        // Robust token fallback
+        if (nextTokenResult.status === 'fulfilled' && nextTokenResult.value.data) {
+          token = nextTokenResult.value.data;
+          console.log('[NurseEntry] Token received from RPC:', token);
+        } else {
+          console.error('[NurseEntry] RPC get_next_token failed, falling back to 1:', nextTokenResult.status === 'rejected' ? nextTokenResult.reason : nextTokenResult.value?.error);
+          token = 1; // Fallback
+        }
         
         let ageInYearsRaw = parseFloat(patient.age);
         if (ageUnit === 'months') ageInYearsRaw = ageInYearsRaw / 12;
@@ -233,8 +242,13 @@ export default function NurseEntry() {
         console.log('[NurseEntry] Patient created successfully:', patientId);
       } else {
         // EXISTING PATIENT PATH: Just get token
-        const { data: tokenData } = await supabase.rpc('get_next_token', { p_clinic_id: clinic?.id });
-        token = tokenData || 1;
+        const { data: tokenData, error: tokenError } = await supabase.rpc('get_next_token', { p_clinic_id: clinic?.id });
+        if (tokenError) {
+          console.error('[NurseEntry] RPC get_next_token failed for existing patient:', tokenError);
+          token = 1;
+        } else {
+          token = tokenData || 1;
+        }
       }
 
       // Now insert the visit
