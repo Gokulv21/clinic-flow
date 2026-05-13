@@ -44,8 +44,9 @@ function ClinicWrapper() {
   const { slug } = useParams();
   const navigate = useNavigate();
   const { user, roles } = useAuth();
-  const { data: clinic, isLoading, error } = useQuery({
+  const { data: clinic, isLoading, error, refetch } = useQuery({
     queryKey: ['clinic', slug],
+    staleTime: 0, // Always fetch fresh clinic status to ensure immediate blocking
     queryFn: async () => {
       if (!slug) return null;
       console.log("[ClinicWrapper] Fetching clinic for slug:", slug);
@@ -59,8 +60,31 @@ function ClinicWrapper() {
     }
   });
 
+  // Add real-time listener for clinic status changes
+  useEffect(() => {
+    if (!slug) return;
+    
+    const channel = supabase
+      .channel(`clinic_status_${slug}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'clinics',
+        filter: `slug=eq.${slug}`
+      }, (payload) => {
+        console.log("[ClinicWrapper] Clinic status updated via Realtime:", payload.new);
+        refetch();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [slug, refetch]);
+
+
   if (isLoading) return <div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin w-8 h-8 text-blue-600"/></div>;
-  
+
   if (error || !clinic) {
     console.error("[ClinicWrapper] Access Denied or Clinic Not Found:", { slug, error, user: user?.id, roles });
     return (
@@ -72,6 +96,47 @@ function ClinicWrapper() {
       </div>
     );
   }
+
+  if (clinic.is_blocked && !roles.includes('superadmin')) {
+    return (
+      <div className="flex flex-col justify-center items-center h-screen space-y-8 p-8 text-center bg-slate-50 dark:bg-slate-950 font-jakarta-sans">
+        <div className="relative">
+           <div className="absolute inset-0 bg-red-500 blur-2xl opacity-20 animate-pulse" />
+           <div className="relative w-24 h-24 bg-white dark:bg-slate-900 border border-red-500/30 text-red-600 rounded-[2.5rem] flex items-center justify-center shadow-2xl">
+              <ShieldAlert className="w-12 h-12" />
+           </div>
+        </div>
+        <div className="space-y-3 max-w-md">
+          <h1 className="text-4xl font-black tracking-tight text-slate-900 dark:text-white">Clinic <span className="text-red-600">Suspended</span></h1>
+          <p className="text-slate-500 font-medium">
+            Access to this clinical environment has been temporarily suspended by the system administrator.
+          </p>
+          {clinic.block_reason && (
+            <div className="mt-6 p-6 rounded-[2rem] bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900/50 shadow-inner">
+               <p className="text-[10px] font-black uppercase text-red-600 tracking-widest mb-2 flex items-center justify-center gap-2">
+                  <Building2 className="w-3 h-3" /> Administrative Notice
+               </p>
+               <p className="text-sm font-bold text-red-900 dark:text-red-200 italic leading-relaxed">
+                  "{clinic.block_reason}"
+               </p>
+            </div>
+          )}
+        </div>
+        <div className="flex flex-col gap-4 w-full max-w-xs">
+           <Button 
+              onClick={() => navigate('/')} 
+              className="w-full h-14 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-black uppercase tracking-widest text-[10px] hover:scale-105 transition-all shadow-xl"
+           >
+              Back to Clinical Network
+           </Button>
+           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-4">
+              Prescripto Security Operations
+           </p>
+        </div>
+      </div>
+    );
+  }
+
 
   // We expose clinic to the window for older queries just in case, but robustly we should use Context
   (window as any).__ACTIVE_CLINIC_ID = clinic.id;
