@@ -126,8 +126,8 @@ export default function DoctorConsultation() {
       
       // Fetch from both prescriptions AND visits to be comprehensive
       const [rxRes, visitRes] = await Promise.all([
-        supabase.from('prescriptions').select('diagnosis').eq('clinic_id', clinic.id).limit(500),
-        supabase.from('visits').select('diagnosis').eq('clinic_id', clinic.id).not('diagnosis', 'is', null).limit(500)
+        supabase.from('prescriptions').select('diagnosis').eq('clinic_id', clinic.id).order('created_at', { ascending: false }).limit(500),
+        supabase.from('visits').select('diagnosis').eq('clinic_id', clinic.id).not('diagnosis', 'is', null).order('created_at', { ascending: false }).limit(500)
       ]);
       
       const allEntries = [
@@ -504,7 +504,12 @@ Follow the instructions carefully.
     if (!selectedVisit || !patient) return;
     const isWriting = lastInputWay === 'writing';
     // If we have tags, use them. If not, use the raw diagnosis string.
-    const diagnosisStr = (diagnoses.length > 0 ? diagnoses.join(' / ') : diagnosis.toUpperCase()).trim();
+    const pendingDiagnosis = diagnosis.trim().toUpperCase();
+    let allDiagnoses = [...diagnoses];
+    if (pendingDiagnosis && !allDiagnoses.includes(pendingDiagnosis)) {
+      allDiagnoses.push(pendingDiagnosis);
+    }
+    const diagnosisStr = allDiagnoses.join(' / ').trim();
     const finalDiagnosis = diagnosisStr ? sanitizeText(diagnosisStr, 500) : null;
     const finalClinicalNotes = clinicalNotes ? sanitizeText(clinicalNotes, 2000) : null;
     const finalMedicines = medicines
