@@ -126,8 +126,8 @@ export default function DoctorConsultation() {
       
       // Fetch from both prescriptions AND visits to be comprehensive
       const [rxRes, visitRes] = await Promise.all([
-        supabase.from('prescriptions').select('diagnosis').eq('clinic_id', clinic.id).order('created_at', { ascending: false }).limit(500),
-        supabase.from('visits').select('diagnosis').eq('clinic_id', clinic.id).not('diagnosis', 'is', null).order('created_at', { ascending: false }).limit(500)
+        supabase.from('prescriptions').select('diagnosis').eq('clinic_id', clinic.id).order('created_at', { ascending: false }),
+        supabase.from('visits').select('diagnosis').eq('clinic_id', clinic.id).not('diagnosis', 'is', null).order('created_at', { ascending: false })
       ]);
       
       const allEntries = [
