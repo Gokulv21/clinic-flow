@@ -460,11 +460,11 @@ export default function DoctorConsultation() {
         }
       }
       
-      selectVisit(visit, true);
+      // After notifying staff, keep the doctor on the queue without navigating to patient details.
+      // No navigation is performed here.
     } catch (err: any) {
       console.error("Error calling patient:", err);
       toast.error("Failed to notify staff, but opening consultation...");
-      selectVisit(visit, true);
     }
   };
 
