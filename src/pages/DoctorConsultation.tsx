@@ -53,27 +53,43 @@ const COMMON_FREQUENCIES = [
 
 export default function DoctorConsultation() {
   const queryClient = useQueryClient();
-  const { user, hasRole } = useAuth();
+  const { user, hasRole, profile } = useAuth();
   const { slug } = useParams();
   const navigate = useNavigate();
   const { makeCall, onlineUsers, callState, allUsers } = useCommunication();
   
   const { clinic } = useOutletContext<{ clinic: any }>();
 
+  const { data: myProfile } = useQuery({
+    queryKey: ['myProfile', user?.id],
+    queryFn: async () => {
+       const { data } = await supabase.from('profiles').select('*').eq('user_id', user?.id).maybeSingle();
+       return data;
+    },
+    enabled: !!user?.id
+  });
+
   // 1. Fetch Queue via React Query
   const { data: queue = [], isLoading: isLoadingQueue, refetch: refetchQueue } = useQuery({
-    queryKey: ['visitQueue', clinic?.id],
+    queryKey: ['visitQueue', clinic?.id, user?.id, profile?.id || myProfile?.id],
     queryFn: async () => {
+      // Enforce clinic isolation: doctor can only see visits for their assigned clinic
+      const activeProfile = profile || myProfile;
+      if (!hasRole('superadmin') && activeProfile?.clinic_id && activeProfile.clinic_id !== clinic?.id) {
+        return []; // Do not return any visits if doctor is from another clinic
+      }
+
       let query = supabase
         .from('visits')
         .select('*, patients(*), prescriptions(*)')
         .eq('clinic_id', clinic?.id)
         .in('status', ['waiting', 'in_consultation']);
       
-      // If NOT an owner or superadmin, only show assigned or unassigned patients
-      if (!hasRole('owner') && !hasRole('superadmin')) {
-        query = query.or(`assigned_doctor_id.is.null,assigned_doctor_id.eq.${user?.id}`);
-      }
+      const doctorScopes = ['assigned_doctor_id.is.null'];
+      if (user?.id) doctorScopes.push(`assigned_doctor_id.eq.${user.id}`);
+      if (profile?.id) doctorScopes.push(`assigned_doctor_id.eq.${profile.id}`);
+      if (myProfile?.id) doctorScopes.push(`assigned_doctor_id.eq.${myProfile.id}`);
+      query = query.or(doctorScopes.join(','));
       
       const { data, error } = await query.order('token_number', { ascending: true });
       if (error) throw error;
@@ -150,15 +166,6 @@ export default function DoctorConsultation() {
     }
   }
 
-  const { data: myProfile } = useQuery({
-    queryKey: ['myProfile', user?.id],
-    queryFn: async () => {
-       const { data } = await supabase.from('profiles').select('*').eq('user_id', user?.id).maybeSingle();
-       return data;
-    },
-    enabled: !!user?.id
-  });
-
   useEffect(() => {
     if (myProfile && hasRole('doctor')) {
       if (!myProfile.qualifications || !myProfile.registration_id) {
@@ -187,13 +194,45 @@ export default function DoctorConsultation() {
         event: '*', 
         schema: 'public', 
         table: 'visits'
-      }, () => {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
-          if (!document.hidden) {
-            queryClient.invalidateQueries({ queryKey: ['visitQueue', clinic.id] });
+      }, (payload: any) => {
+        // Enforce clinic isolation for realtime events
+        if (payload.new && payload.new.clinic_id !== clinic.id) {
+          return; // Ignore events from other clinics entirely
+        }
+
+        // Only trigger invalidation if the change is relevant to this doctor
+        let shouldInvalidate = false;
+
+        if (payload.eventType === 'DELETE') {
+          shouldInvalidate = true;
+        } else if (payload.new) {
+          const newDocId = payload.new.assigned_doctor_id;
+          const isGeneral = newDocId === null;
+          const isAssignedToMe = 
+            (user?.id && newDocId === user.id) || 
+            (profile?.id && newDocId === profile.id) || 
+            (myProfile?.id && newDocId === myProfile.id);
+          
+          if (isGeneral || isAssignedToMe) {
+            shouldInvalidate = true;
+          } else {
+            // Check if the visit is currently in our queue cache (so we know to remove it if it was reassigned)
+            const currentQueue = queryClient.getQueryData<any[]>(['visitQueue', clinic.id, user?.id, profile?.id || myProfile?.id]);
+            const isCurrentlyInQueue = currentQueue?.some(v => v.id === payload.new.id);
+            if (isCurrentlyInQueue) {
+              shouldInvalidate = true;
+            }
           }
-        }, 800); // Fast sync for queue
+        }
+
+        if (shouldInvalidate) {
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => {
+            if (!document.hidden) {
+              queryClient.invalidateQueries({ queryKey: ['visitQueue', clinic.id] });
+            }
+          }, 800); // Fast sync for queue
+        }
       })
       .subscribe();
 
@@ -518,6 +557,7 @@ Follow the instructions carefully.
             ...m,
             name: sanitizeText(m.name, 200),
             dosage: m.dosage ? sanitizeText(m.dosage, 100) : undefined,
+            duration: m.duration ? sanitizeText(m.duration, 100) : undefined,
             instructions: m.notes ? sanitizeText(m.notes, 500) : undefined // notes is often used for instructions
         }));
     const finalAdviceImage = isWriting ? prescriptionImage : (advice ? sanitizeText(advice, 1000) : null);
@@ -1140,7 +1180,7 @@ Follow the instructions carefully.
                                   </div>
 
                                   {/* Route (Global) */}
-                                  <div className="md:col-span-2 space-y-1">
+                                  <div className="md:col-span-1 space-y-1">
                                     <p className="text-[9px] font-bold text-blue-600 uppercase ml-1">Route</p>
                                     <Input 
                                       placeholder={med.type === 'Inj.' ? "I.M / I.V" : (med.type === 'Oin.' || med.type === 'cr.' ? "External" : "Oral")} 
@@ -1193,8 +1233,20 @@ Follow the instructions carefully.
                                     </div>
                                   </div>
 
+                                  {/* Duration */}
+                                  <div className="md:col-span-2 space-y-1">
+                                    <p className="text-[9px] font-bold text-orange-600 uppercase ml-1">Duration</p>
+                                    <Input 
+                                      placeholder="5 Days / 1 Wk" 
+                                      value={med.duration || ''} 
+                                      onChange={e => updateMedicine(i, 'duration', e.target.value)} 
+                                      onKeyDown={e => handleMedicineKeyDown(e, i, 'duration')} 
+                                      className="h-10 text-sm font-bold border-orange-500/20 bg-orange-500/5 rounded-lg text-orange-600 dark:text-orange-400 placeholder:text-orange-200/50" 
+                                    />
+                                  </div>
+
                                   {/* Remarks / Notes */}
-                                  <div className="md:col-span-3 space-y-1">
+                                  <div className="md:col-span-2 space-y-1">
                                     <p className="text-[9px] font-bold text-emerald-600 uppercase ml-1">Remarks</p>
                                     <Input 
                                       placeholder="After Food / Night" 

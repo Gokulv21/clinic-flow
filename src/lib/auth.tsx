@@ -9,7 +9,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   roles: AppRole[];
-  profile: { full_name: string; clinic_id?: string } | null;
+  profile: { id?: string; full_name: string; clinic_id?: string } | null;
   loading: boolean;
   error: string | null;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
@@ -27,7 +27,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const saved = sessionStorage.getItem('app_roles');
     return saved ? JSON.parse(saved) : [];
   });
-  const [profile, setProfile] = useState<{ full_name: string; clinic_id?: string } | null>(() => {
+  const [profile, setProfile] = useState<{ id?: string; full_name: string; clinic_id?: string } | null>(() => {
     const saved = sessionStorage.getItem('user_profile');
     return saved ? JSON.parse(saved) : null;
   });
@@ -50,7 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const [rolesRes, profileRes] = await Promise.all([
         supabase.from('user_roles').select('role').eq('user_id', userId),
-        supabase.from('profiles').select('full_name, is_superadmin, clinic_id').eq('user_id', userId).maybeSingle(),
+        supabase.from('profiles').select('id, full_name, is_superadmin, clinic_id').eq('user_id', userId).maybeSingle(),
       ]);
 
       if (rolesRes.error) throw rolesRes.error;

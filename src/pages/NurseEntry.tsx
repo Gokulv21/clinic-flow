@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { useAuth } from '@/lib/auth';
 
@@ -86,11 +86,11 @@ export default function NurseEntry() {
   }, []);
 
   const { data: doctors } = useQuery({
-    queryKey: ['doctors', clinic?.id],
+    queryKey: ['doctors_v2', clinic?.id],
     queryFn: async () => {
         const { data } = await supabase
           .from('profiles')
-          .select('user_id, full_name, role, email')
+          .select('id, user_id, full_name, role, email')
           .in('role', ['doctor', 'owner'])
           .eq('clinic_id', clinic?.id)
           .neq('is_superadmin', true);
@@ -98,6 +98,20 @@ export default function NurseEntry() {
     },
     enabled: !!clinic?.id
   });
+
+  const doctorOptions = useMemo(() => {
+    const seen = new Set<string>();
+    return (doctors || [])
+      .map((doctor: any) => {
+        const assignId = doctor?.id || doctor?.user_id || '';
+        return { ...doctor, assignId: String(assignId) };
+      })
+      .filter((doctor: any) => {
+        if (!doctor.assignId || seen.has(doctor.assignId)) return false;
+        seen.add(doctor.assignId);
+        return true;
+      });
+  }, [doctors]);
 
   const searchPatients = async (query: string = searchQuery) => {
     if (!query.trim()) {
@@ -164,6 +178,16 @@ export default function NurseEntry() {
   };
 
   const submitVisit = async () => {
+    if (!clinic?.id) {
+      toast.error('Clinic is not loaded yet. Please wait a moment and try again.');
+      return;
+    }
+
+    if (profile && (profile as any).clinic_id && (profile as any).clinic_id !== clinic.id) {
+      toast.error('Your account clinic does not match the selected clinic. Please switch clinic or contact admin.');
+      return;
+    }
+
     // 1. INPUT SANITIZATION & VALIDATION
     const sanitizedName = sanitizeText(patient.name, 100);
     const sanitizedAddress = sanitizeText(patient.address, 500);
@@ -186,6 +210,16 @@ export default function NurseEntry() {
     if (vitals.pulse_rate && !validateNumericRange(vitals.pulse_rate, 0, 300)) {
         toast.error("Invalid pulse rate"); return;
     }
+
+    const normalizedAssignedDoctorId =
+      assignedDoctorId !== "general" && assignedDoctorId
+        ? assignedDoctorId
+        : null;
+
+    console.log('[NurseEntry] Submitting visit details:', {
+      assignedDoctorId,
+      normalizedAssignedDoctorId
+    });
 
     setLoading(true);
     const loadingToast = toast.loading('Registering patient...');
@@ -262,7 +296,7 @@ export default function NurseEntry() {
         spo2: vitals.spo2 ? parseFloat(vitals.spo2) : null,
         temperature: vitals.temperature ? parseFloat(vitals.temperature) : null,
         cbg: vitals.cbg ? parseFloat(vitals.cbg) : null,
-        assigned_doctor_id: assignedDoctorId === "general" ? null : assignedDoctorId,
+        assigned_doctor_id: normalizedAssignedDoctorId,
         clinic_id: clinic?.id
       });
       console.log('[NurseEntry] Visit insert result:', visitError ? 'Error: ' + visitError.message : 'Success');
@@ -670,9 +704,9 @@ export default function NurseEntry() {
                          <SelectValue placeholder="General Queue" />
                      </SelectTrigger>
                      <SelectContent>
-                         <SelectItem value="general" className="font-bold">General Queue (Any Doctor)</SelectItem>
-                         {doctors?.map(doc => (
-                             <SelectItem key={doc.user_id} value={doc.user_id}>
+                         <SelectItem key="general" value="general" className="font-bold">General Queue (Any Doctor)</SelectItem>
+                         {doctorOptions.map(doc => (
+                             <SelectItem key={doc.assignId} value={doc.assignId}>
                                <div className="flex flex-col">
                                  <span className="font-bold">Dr. {doc.full_name}</span>
                                  <span className="text-[10px] text-muted-foreground uppercase tracking-tight">
