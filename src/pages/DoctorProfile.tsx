@@ -1279,8 +1279,8 @@ export default function DoctorProfile() {
                                                     </div>
                                                 </div>
 
-                                                <div className="col-span-12 md:col-span-5 space-y-1.5">
-                                                    <Label className="text-[10px] font-black uppercase tracking-widest text-emerald-400 dark:text-emerald-500 ml-1">Duration / Remarks</Label>
+                                                <div className="col-span-6 md:col-span-2 space-y-1.5">
+                                                    <Label className="text-[10px] font-black uppercase tracking-widest text-orange-400 dark:text-orange-500 ml-1">Duration</Label>
                                                     <Input
                                                         value={m.duration || ''}
                                                         onChange={e => {
@@ -1288,7 +1288,22 @@ export default function DoctorProfile() {
                                                             updated[idx].duration = e.target.value;
                                                             setNewProtocolMedicines(updated);
                                                         }}
-                                                        placeholder="5 Days / After Food"
+                                                        placeholder="5 Days"
+                                                        className="h-11 rounded-xl bg-orange-50/50 dark:bg-orange-900/10 border-none font-bold text-orange-700 dark:text-orange-400 shadow-sm"
+                                                    />
+                                                </div>
+
+                                                <div className="col-span-6 md:col-span-3 space-y-1.5">
+                                                    <Label className="text-[10px] font-black uppercase tracking-widest text-emerald-400 dark:text-emerald-500 ml-1">Remarks</Label>
+                                                    <Input
+                                                        value={m.instructions || m.notes || ''}
+                                                        onChange={e => {
+                                                            const updated = [...newProtocolMedicines];
+                                                            updated[idx].instructions = e.target.value;
+                                                            updated[idx].notes = e.target.value;
+                                                            setNewProtocolMedicines(updated);
+                                                        }}
+                                                        placeholder="After Food"
                                                         className="h-11 rounded-xl bg-emerald-50/50 dark:bg-emerald-900/10 border-none font-bold text-emerald-700 dark:text-emerald-400 shadow-sm"
                                                     />
                                                 </div>

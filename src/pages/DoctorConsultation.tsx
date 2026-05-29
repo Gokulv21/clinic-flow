@@ -443,7 +443,7 @@ export default function DoctorConsultation() {
       frequency: m.frequency || '',
       duration: m.duration || '',
       route: m.route || '',
-      notes: m.instructions || '' // Mapping protocol instructions to prescription notes
+      notes: m.instructions || m.notes || '' // Mapping protocol instructions to prescription notes
     }));
     
     // Filter out empty initial row if it exists
