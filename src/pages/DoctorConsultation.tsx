@@ -18,7 +18,8 @@ import {
   MapPin, Loader2, Save, X, MoreVertical, LayoutGrid, List,
   Activity, ClipboardList, Scale, Heart, Wind, Thermometer, 
   Droplet, Pencil, Calendar, RefreshCw, UserX, ChevronDown,
-  Eye, PenTool, CheckCircle, ArrowLeft, HeartPulse, MessageCircle
+  Eye, PenTool, CheckCircle, ArrowLeft, HeartPulse, MessageCircle,
+  Bell
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Textarea } from '@/components/ui/textarea';
@@ -740,15 +741,15 @@ Follow the instructions carefully.
                 {visit.status === 'waiting' ? 'Wait' : visit.status === 'in_consultation' ? 'Active' : 'Done'}
               </Badge>
               <Button
-                size="sm"
+                size="icon"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleCallPatient(visit);
                 }}
-                className="h-8 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center gap-1.5 rounded-xl shadow-sm text-xs transition-transform active:scale-95"
+                className="h-8 w-8 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-sm transition-transform active:scale-95"
+                title="Consult / Call Patient"
               >
-                <PhoneCall className="w-3.5 h-3.5" />
-                Consult
+                <Bell className="w-4 h-4 animate-bounce" />
               </Button>
             </div>
           </div>

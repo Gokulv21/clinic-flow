@@ -33,15 +33,16 @@ export default function NotificationCenter() {
       if (!AudioContext) return;
       const ctx = new AudioContext();
       
-      const playTone = (freq: number, startTime: number, duration: number, type: 'sine' | 'triangle' = 'sine') => {
+      const playTone = (freq: number, startTime: number, duration: number, type: 'sine' | 'triangle' | 'square' = 'triangle') => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         
         osc.type = type;
         osc.frequency.setValueAtTime(freq, startTime);
         
+        // Quick attack and quick decay for a sharp, loud alarm alert
         gain.gain.setValueAtTime(0, startTime);
-        gain.gain.linearRampToValueAtTime(0.6, startTime + 0.02);
+        gain.gain.linearRampToValueAtTime(0.8, startTime + 0.015);
         gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
         
         osc.connect(gain);
@@ -52,10 +53,12 @@ export default function NotificationCenter() {
       };
       
       const now = ctx.currentTime;
-      // High-quality dual-tone arpeggio chime (C5 -> E5 -> G5)
-      playTone(523.25, now, 0.4, 'sine');
-      playTone(659.25, now + 0.08, 0.5, 'sine');
-      playTone(783.99, now + 0.16, 0.6, 'sine');
+      // Loud, distinct 4-pulse medical cabin pager alarm (beep-beep ... beep-beep)
+      playTone(987.77, now, 0.15, 'triangle');        // B5 (sharp)
+      playTone(987.77, now + 0.2, 0.15, 'triangle');  // B5
+      
+      playTone(1318.51, now + 0.45, 0.15, 'triangle'); // E6 (higher pitch)
+      playTone(1318.51, now + 0.65, 0.25, 'triangle'); // E6
     } catch (e) {
       console.error("Audio playback error:", e);
     }
