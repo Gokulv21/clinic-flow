@@ -52,7 +52,7 @@ export default function NurseEntry() {
   const [tokenNumber, setTokenNumber] = useState<number | null>(null);
   const [assignedDoctorId, setAssignedDoctorId] = useState<string>("general");
   const { clinic } = useOutletContext<{ clinic: any }>();
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const [showSearch, setShowSearch] = useState(false);
   
   useEffect(() => {
@@ -297,7 +297,8 @@ export default function NurseEntry() {
         temperature: vitals.temperature ? parseFloat(vitals.temperature) : null,
         cbg: vitals.cbg ? parseFloat(vitals.cbg) : null,
         assigned_doctor_id: normalizedAssignedDoctorId,
-        clinic_id: clinic?.id
+        clinic_id: clinic?.id,
+        created_by: user?.id
       });
       console.log('[NurseEntry] Visit insert result:', visitError ? 'Error: ' + visitError.message : 'Success');
 

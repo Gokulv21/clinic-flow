@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
-import { Bell, Check, X, Loader2, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { Bell, Check, X, Loader2, Eye, EyeOff, ShieldCheck, PhoneCall } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,40 +27,79 @@ export default function NotificationCenter() {
   const [saving, setSaving] = useState(false);
   const [systemNotifications, setSystemNotifications] = useState<any[]>([]);
 
+  const playChime = () => {
+    try {
+      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContext) return;
+      const ctx = new AudioContext();
+      
+      const playTone = (freq: number, startTime: number, duration: number, type: 'sine' | 'triangle' = 'sine') => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, startTime);
+        
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(0.6, startTime + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+        
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+      };
+      
+      const now = ctx.currentTime;
+      // High-quality dual-tone arpeggio chime (C5 -> E5 -> G5)
+      playTone(523.25, now, 0.4, 'sine');
+      playTone(659.25, now + 0.08, 0.5, 'sine');
+      playTone(783.99, now + 0.16, 0.6, 'sine');
+    } catch (e) {
+      console.error("Audio playback error:", e);
+    }
+  };
+
 
   const isSuper = roles.includes('superadmin');
+  const isOwner = roles.includes('owner');
   const isDoctor = roles.includes('doctor');
   const clinicId = profile?.clinic_id;
 
   const fetchRequests = async () => {
-    if (!isSuper && !isDoctor) return;
+    if (!isSuper && !isOwner && !isDoctor) return;
     
-    let query = supabase.from('password_reset_requests').select('*').eq('status', 'pending');
+    // Fetch all pending requests and filter client-side for maximum reliability and simplicity,
+    // which aligns with Row Level Security (RLS) policies.
+    const { data, error } = await supabase
+      .from('password_reset_requests')
+      .select('*')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
 
-    if (isSuper && !isDoctor) {
-      // App Admin sees all Doctor requests
-      query = query.eq('requester_role', 'doctor');
-    } else if (isDoctor && !isSuper) {
-      // Clinic Owner sees their Staff requests
-      if (!clinicId) return;
-      query = query.eq('clinic_id', clinicId).eq('requester_role', 'staff');
-    } else if (isSuper && isDoctor) {
-      // Hybrid: (Doctor requests) OR (Staff requests for their clinic)
-      // Supabase JS doesn't support complex OR filters easily with joined conditions, 
-      // but we can just fetch all pending and filter in JS for simplicity or use two queries.
-      // Given the volume is low, we'll fetch both or use a specialized query.
-      const { data: allPending } = await query;
-      const filtered = (allPending || []).filter(req => {
-        const isTargetDoctor = req.requester_role === 'doctor';
-        const isTargetStaff = req.requester_role === 'staff' && req.clinic_id === clinicId;
-        return isTargetDoctor || isTargetStaff;
-      });
-      setRequests(filtered);
+    if (error) {
+      console.error("Error fetching password reset requests:", error);
       return;
     }
 
-    const { data } = await query.order('created_at', { ascending: false });
-    setRequests(data || []);
+    const filtered = (data || []).filter(req => {
+      if (isSuper) {
+        // Super Admin sees clinic owner requests (and doctor requests as fallback/legacy)
+        if (req.requester_role === 'owner' || req.requester_role === 'doctor') {
+          return true;
+        }
+      }
+      if (isOwner || isDoctor) {
+        // Clinic owners/doctors see staff and doctor requests for their clinic
+        if (req.clinic_id === clinicId && (req.requester_role === 'staff' || req.requester_role === 'doctor')) {
+          return true;
+        }
+      }
+      return false;
+    });
+
+    setRequests(filtered);
   };
 
   const fetchSystemNotifications = async () => {
@@ -97,14 +136,19 @@ export default function NotificationCenter() {
         schema: 'public',
         table: 'notifications',
         filter: `user_id=eq.${user?.id}`
-      }, () => fetchSystemNotifications())
+      }, (payload: any) => {
+        if (payload.eventType === 'INSERT') {
+          playChime();
+        }
+        fetchSystemNotifications();
+      })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channelResets);
       supabase.removeChannel(channelNotifs);
     };
-  }, [clinicId, isSuper, isDoctor, user?.id]);
+  }, [clinicId, isSuper, isOwner, isDoctor, user?.id]);
 
 
   const handleApprove = (req: any) => {
@@ -171,7 +215,7 @@ export default function NotificationCenter() {
 
   const totalCount = requests.length + systemNotifications.filter(n => !n.is_read).length;
 
-  if (!isSuper && !isDoctor && systemNotifications.length === 0) return null;
+  if (!isSuper && !isOwner && !isDoctor && systemNotifications.length === 0) return null;
 
 
   return (
@@ -201,24 +245,44 @@ export default function NotificationCenter() {
                     onClick={() => !notif.is_read && markAsRead(notif.id)}
                     className={cn(
                       "p-3 rounded-xl transition-all border border-transparent mb-1 cursor-pointer group relative",
-                      notif.is_read ? "opacity-60 grayscale-[0.5]" : "bg-blue-500/5 dark:bg-blue-400/5 border-blue-500/10"
+                      notif.is_read 
+                        ? "opacity-60 grayscale-[0.5]" 
+                        : notif.title === 'CALLING PATIENT'
+                          ? "bg-red-500/10 dark:bg-red-500/10 border-red-500/30 animate-pulse"
+                          : "bg-blue-500/5 dark:bg-blue-400/5 border-blue-500/10"
                     )}
                   >
                     {!notif.is_read && <div className="absolute left-1 top-1/2 -translate-y-1/2 w-1 h-6 bg-blue-600 rounded-full" />}
                     <div className="flex flex-col gap-1">
                       <p className={cn(
-                        "text-[11px] font-black uppercase tracking-tight",
+                        "text-[11px] font-black uppercase tracking-tight flex items-center gap-1.5",
+                        notif.title === 'CALLING PATIENT' ? "text-red-500" :
                         notif.type === 'error' ? "text-red-600" : 
                         notif.type === 'success' ? "text-emerald-600" : "text-blue-600"
                       )}>
+                        {notif.title === 'CALLING PATIENT' && <PhoneCall className="w-3.5 h-3.5 text-red-500 animate-pulse shrink-0" />}
                         {notif.title}
                       </p>
                       <p className="text-[11px] font-medium text-slate-900 dark:text-white leading-tight">
                         {notif.message}
                       </p>
-                      <p className="text-[8px] font-bold text-slate-400 mt-1 uppercase tracking-widest">
-                        {new Date(notif.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </p>
+                      <div className="flex items-center justify-between gap-2 mt-1">
+                        <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">
+                          {new Date(notif.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                        {!notif.is_read && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              markAsRead(notif.id);
+                            }}
+                            className="text-[9px] font-black text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 uppercase tracking-wider flex items-center gap-0.5 hover:underline"
+                          >
+                            <Check className="w-2.5 h-2.5" />
+                            Mark read
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -234,7 +298,9 @@ export default function NotificationCenter() {
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1">
                         <p className="text-[12px] font-bold text-slate-900 dark:text-white leading-tight">{req.email}</p>
-                        <p className="text-[10px] text-muted-foreground mt-1">Requested Password Reset</p>
+                        <p className="text-[10px] text-muted-foreground mt-1">
+                          Requested Password Reset <span className="font-bold text-primary uppercase text-[9px]">({req.requester_role})</span>
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -277,7 +343,9 @@ export default function NotificationCenter() {
              </div>
              <div>
                 <DialogTitle className="text-xl font-black tracking-tight">Security Review</DialogTitle>
-                <DialogDescription>Reset password for {resetModal.request?.email}</DialogDescription>
+                <DialogDescription>
+                  Reset password for {resetModal.request?.email} <span className="font-semibold uppercase text-xs">({resetModal.request?.requester_role})</span>
+                </DialogDescription>
              </div>
           </div>
           

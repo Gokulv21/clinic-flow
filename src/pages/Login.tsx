@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -108,8 +109,13 @@ export default function Login() {
                         .select('role')
                         .eq('user_id', profile.user_id);
                       
-                      const isDoctor = (userRoles || []).some(r => r.role === 'doctor');
-                      const requesterRole = isDoctor ? 'doctor' : 'staff';
+                      const rolesList = (userRoles || []).map(r => r.role);
+                      let requesterRole = 'staff';
+                      if (rolesList.includes('owner')) {
+                        requesterRole = 'owner';
+                      } else if (rolesList.includes('doctor')) {
+                        requesterRole = 'doctor';
+                      }
 
                       const { error: reqError } = await supabase
                         .from('password_reset_requests')
@@ -122,7 +128,12 @@ export default function Login() {
                         });
 
                       if (reqError) throw reqError;
-                      toast.success('Reset request sent to your clinic administrator');
+                      
+                      if (requesterRole === 'owner') {
+                        toast.success('Reset request sent to Super Administrator');
+                      } else {
+                        toast.success('Reset request sent to your clinic administrator');
+                      }
                     } catch (err: any) {
                       toast.error(err.message || 'Failed to send request');
                     } finally {

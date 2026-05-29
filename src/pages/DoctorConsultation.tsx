@@ -413,6 +413,60 @@ export default function DoctorConsultation() {
     lastLoadedVisitId.current = visit.id;
   };
 
+  const handleCallPatient = async (visit: any) => {
+    try {
+      const patientName = (visit.patients?.title ? visit.patients.title + ' ' : '') + (visit.patients?.name || 'Patient');
+      const tokenStr = visit.token_number ? ` (Token #${visit.token_number})` : '';
+      
+      if (visit.created_by) {
+        const { error: notifError } = await supabase
+          .from('notifications')
+          .insert({
+            user_id: visit.created_by,
+            clinic_id: clinic?.id,
+            title: 'CALLING PATIENT',
+            message: `Doctor is calling Patient: ${patientName}${tokenStr} to the consultation room.`,
+            type: 'info',
+            is_read: false
+          });
+          
+        if (notifError) throw notifError;
+        toast.success(`Calling patient ${patientName} (Staff notified)`);
+      } else {
+        // Fallback: Notify all staff in this clinic
+        const { data: staffProfiles } = await supabase
+          .from('profiles')
+          .select('user_id')
+          .eq('clinic_id', clinic?.id)
+          .neq('role', 'doctor')
+          .neq('is_superadmin', true);
+          
+        if (staffProfiles && staffProfiles.length > 0) {
+          const notifs = staffProfiles.map(staff => ({
+            user_id: staff.user_id,
+            clinic_id: clinic?.id,
+            title: 'CALLING PATIENT',
+            message: `Doctor is calling Patient: ${patientName}${tokenStr} to the consultation room.`,
+            type: 'info',
+            is_read: false
+          }));
+          
+          const { error: bulkError } = await supabase.from('notifications').insert(notifs);
+          if (bulkError) throw bulkError;
+          toast.success(`Calling patient ${patientName} (Clinic staff notified)`);
+        } else {
+          toast.success(`Calling patient ${patientName}`);
+        }
+      }
+      
+      selectVisit(visit, true);
+    } catch (err: any) {
+      console.error("Error calling patient:", err);
+      toast.error("Failed to notify staff, but opening consultation...");
+      selectVisit(visit, true);
+    }
+  };
+
   const addDiagnosisTag = (tag: string) => {
     // Treat the entire string as a single tag, matching user requirement to only split on Enter
     const tags = [tag.trim().toUpperCase()].filter(Boolean);
@@ -666,26 +720,38 @@ Follow the instructions carefully.
       </div>
       <div className="flex-1 overflow-auto">
         {queue.map(visit => (
-          <button
+          <div
             key={visit.id}
             onClick={() => selectVisit(visit, true)}
-            className={cn("w-full text-left p-4 border-b border-border hover:bg-secondary/50 transition-colors", selectedVisit?.id === visit.id && "bg-secondary")}
+            className={cn("w-full p-4 border-b border-border hover:bg-secondary/50 transition-colors cursor-pointer flex items-center justify-between", selectedVisit?.id === visit.id && "bg-secondary")}
           >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                  <span className="font-heading font-bold text-primary text-sm">#{visit.token_number}</span>
-                </div>
-                <div className="min-w-0">
-                  <p className="font-medium text-sm truncate">{(visit.patients?.title ? visit.patients.title + ' ' : '') + visit.patients?.name}</p>
-                  <p className="text-xs text-muted-foreground">{visit.patients?.age}y · {visit.patients?.sex}</p>
-                </div>
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <span className="font-heading font-bold text-primary text-sm">#{visit.token_number}</span>
               </div>
-              <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0 h-5 shrink-0 ml-2", getStatusColor(visit.status))}>
+              <div className="min-w-0">
+                <p className="font-medium text-sm truncate">{(visit.patients?.title ? visit.patients.title + ' ' : '') + visit.patients?.name}</p>
+                <p className="text-xs text-muted-foreground">{visit.patients?.age}y · {visit.patients?.sex}</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2 shrink-0 ml-2">
+              <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0 h-5", getStatusColor(visit.status))}>
                 {visit.status === 'waiting' ? 'Wait' : visit.status === 'in_consultation' ? 'Active' : 'Done'}
               </Badge>
+              <Button
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCallPatient(visit);
+                }}
+                className="h-8 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center gap-1.5 rounded-xl shadow-sm text-xs transition-transform active:scale-95"
+              >
+                <PhoneCall className="w-3.5 h-3.5" />
+                Consult
+              </Button>
             </div>
-          </button>
+          </div>
         ))}
       </div>
     </div>
