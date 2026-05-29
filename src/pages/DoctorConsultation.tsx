@@ -425,7 +425,7 @@ export default function DoctorConsultation() {
             user_id: visit.created_by,
             clinic_id: clinic?.id,
             title: 'CALLING PATIENT',
-            message: `Doctor is calling Patient: ${patientName}${tokenStr} to the consultation room.`,
+            message: `Please send Patient: ${patientName} (Token #${visit.token_number}) to the doctor's room immediately.`,
             type: 'info',
             is_read: false
           });
@@ -446,7 +446,7 @@ export default function DoctorConsultation() {
             user_id: staff.user_id,
             clinic_id: clinic?.id,
             title: 'CALLING PATIENT',
-            message: `Doctor is calling Patient: ${patientName}${tokenStr} to the consultation room.`,
+            message: `Please send Patient: ${patientName} (Token #${visit.token_number}) to the doctor's room immediately.`,
             type: 'info',
             is_read: false
           }));

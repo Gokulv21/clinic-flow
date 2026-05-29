@@ -215,7 +215,7 @@ export default function NotificationCenter() {
 
   const totalCount = requests.length + systemNotifications.filter(n => !n.is_read).length;
 
-  if (!isSuper && !isOwner && !isDoctor && systemNotifications.length === 0) return null;
+  if (!user) return null;
 
 
   return (
