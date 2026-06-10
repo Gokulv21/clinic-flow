@@ -232,7 +232,7 @@ export default function DoctorConsultation() {
             if (!document.hidden) {
               queryClient.invalidateQueries({ queryKey: ['visitQueue', clinic.id] });
             }
-          }, 800); // Fast sync for queue
+          }, 2000); // Increased debounce to 2000ms to reduce database load on rapid updates
         }
       })
       .subscribe();

@@ -114,7 +114,7 @@ export default function NurseEntry() {
   }, [doctors]);
 
   const searchPatients = async (query: string = searchQuery) => {
-    if (!query.trim()) {
+    if (!query.trim() || query.trim().length < 3) {
         setSearchResults([]);
         return;
     }
@@ -132,12 +132,12 @@ export default function NurseEntry() {
   // Add a dedicated effect for debounced search
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (searchQuery.trim()) {
+      if (searchQuery.trim() && searchQuery.trim().length >= 3) {
         searchPatients(searchQuery);
       } else {
         setSearchResults([]);
       }
-    }, 400); // 400ms debounce for search
+    }, 800); // 800ms debounce and 3 char minimum to reduce DB load
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
