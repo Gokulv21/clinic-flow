@@ -62,8 +62,7 @@ export default function Analytics() {
       fetchVolumeData(),
       fetchSeasonalityData(),
       fetchDemographics(),
-      fetchProtocolAnalytics(),
-      fetchOperationalInsights()
+      fetchProtocolAnalytics()
     ]);
     setLoading(false);
   };
@@ -132,12 +131,24 @@ export default function Analytics() {
   };
 
   const fetchDemographics = async () => {
-    const { data } = await supabase.from('patients').select('age, sex').eq('clinic_id', clinic?.id);
-    if (!data) return;
+    let allPatients: any[] = [];
+    let hasMore = true;
+    let offset = 0;
+    
+    while(hasMore) {
+      const { data } = await supabase.from('patients').select('age, sex').eq('clinic_id', clinic?.id).range(offset, offset + 999);
+      if (data && data.length > 0) {
+        allPatients.push(...data);
+        if (data.length < 1000) hasMore = false;
+        else offset += 1000;
+      } else {
+        hasMore = false;
+      }
+    }
 
     // Sex distribution
     const sexCounts: Record<string, number> = { Male: 0, Female: 0, Others: 0 };
-    data.forEach(p => {
+    allPatients.forEach(p => {
       const s = p.sex === 'Male' ? 'Male' : p.sex === 'Female' ? 'Female' : 'Others';
       sexCounts[s]++;
     });
@@ -150,7 +161,7 @@ export default function Analytics() {
       '45-60 (Senior)': 0,
       '60+ (Geriatric)': 0
     };
-    data.forEach(p => {
+    allPatients.forEach(p => {
       if (p.age <= 12) ageGroups['0-12 (Pediatric)']++;
       else if (p.age <= 18) ageGroups['12-18 (Adolescence)']++;
       else if (p.age <= 45) ageGroups['18-45 (Adult)']++;
@@ -183,66 +194,84 @@ export default function Analytics() {
     setProtocolData(Object.entries(medCounts).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value).slice(0, 8));
   };
 
-  const fetchOperationalInsights = async () => {
-    // Peak hours analysis
-    const { data: visits } = await supabase.from('visits').select('created_at').eq('clinic_id', clinic?.id).limit(2000);
-    if (!visits) return;
 
-    const hourBins: Record<number, number> = {};
-    for (let i = 8; i <= 22; i++) hourBins[i] = 0; // Standard clinic hours 8AM - 10PM
-
-    visits.forEach(v => {
-      const hour = new Date(v.created_at).getHours();
-      if (hour >= 8 && hour <= 22) {
-        hourBins[hour]++;
-      }
-    });
-
-    setPeakHoursData(Object.entries(hourBins).map(([hour, count]) => ({
-      hour: format(setHours(new Date(), parseInt(hour)), 'ha'),
-      patients: count,
-      _hour: parseInt(hour)
-    })));
-  };
 
   const fetchVolumeData = async () => {
     let daysCount = 7;
     let formatType: 'day' | 'month' = 'day';
 
     if (timeRange === 'today') daysCount = 1;
+    else if (timeRange === 'week') daysCount = 7;
     else if (timeRange === 'month') daysCount = 30;
     else if (timeRange === 'year') {
       daysCount = 12;
       formatType = 'month';
     }
 
-    const startDate = new Date();
+    const now = new Date();
+    let startDate: Date;
+
     if (formatType === 'day') {
-      startDate.setDate(startDate.getDate() - (daysCount - 1));
-      startDate.setHours(0, 0, 0, 0);
+      startDate = startOfDay(subDays(now, daysCount - 1));
     } else {
-      startDate.setMonth(startDate.getMonth() - 11, 1);
-      startDate.setHours(0, 0, 0, 0);
+      startDate = startOfDay(startOfMonth(subMonths(now, 11)));
     }
 
-    const { data: visits } = await supabase
-      .from('visits')
-      .select('created_at')
-      .eq('clinic_id', clinic?.id)
-      .gte('created_at', startDate.toISOString())
-      .order('created_at', { ascending: false }) // Get newest first to ensure recent days are accurate
-      .limit(10000);
+    let allVisits: any[] = [];
+    let hasMore = true;
+    let offset = 0;
+    const PAGE_SIZE = 1000;
+
+    while (hasMore) {
+      const { data } = await supabase
+        .from('visits')
+        .select('created_at')
+        .eq('clinic_id', clinic?.id)
+        .gte('created_at', startDate.toISOString())
+        .order('created_at', { ascending: false })
+        .range(offset, offset + PAGE_SIZE - 1);
+
+      if (data && data.length > 0) {
+        allVisits.push(...data);
+        if (data.length < PAGE_SIZE) {
+          hasMore = false;
+        } else {
+          offset += PAGE_SIZE;
+        }
+      } else {
+        hasMore = false;
+      }
+    }
+
+    // Compute Peak Hours for the selected time range
+    const hourBins: Record<number, number> = {};
+    for (let i = 8; i <= 22; i++) hourBins[i] = 0;
+
+    let validVisitsCount = 0;
+    allVisits.forEach(v => {
+      const hour = new Date(v.created_at).getHours();
+      if (hour >= 8 && hour <= 22) {
+        hourBins[hour]++;
+        validVisitsCount++;
+      }
+    });
+
+    setPeakHoursData(Object.entries(hourBins).map(([hour, count]) => ({
+      hour: format(setHours(startOfDay(now), parseInt(hour)), 'ha'),
+      percentage: validVisitsCount > 0 ? Math.round((count / validVisitsCount) * 100) : 0,
+      _hour: parseInt(hour)
+    })));
 
     const resultData: any[] = [];
     const bins: Record<string, any> = {};
 
     if (timeRange === 'today') {
       for (let h = 0; h < 24; h++) {
-        const d = setHours(startOfDay(new Date()), h);
+        const d = setHours(startOfDay(now), h);
         const name = format(d, 'ha');
         bins[name] = { count: 0, _order: h };
       }
-      visits?.forEach(v => {
+      allVisits.forEach(v => {
         const d = new Date(v.created_at);
         const name = format(d, 'ha');
         if (bins[name]) bins[name].count++;
@@ -250,24 +279,24 @@ export default function Analytics() {
       Object.keys(bins).forEach(key => resultData.push({ name: key, patients: bins[key].count }));
     } else if (formatType === 'day') {
       for (let i = daysCount - 1; i >= 0; i--) {
-        const d = subDays(new Date(), i);
+        const d = subDays(now, i);
         const name = format(d, i < 7 ? 'EEE, MMM d' : 'MMM d');
         const key = format(d, 'yyyy-MM-dd');
         bins[key] = { name, count: 0 };
       }
-      visits?.forEach(v => {
+      allVisits.forEach(v => {
         const key = format(new Date(v.created_at), 'yyyy-MM-dd');
         if (bins[key]) bins[key].count++;
       });
       Object.keys(bins).forEach(key => resultData.push({ name: bins[key].name, patients: bins[key].count }));
     } else {
       for (let i = 11; i >= 0; i--) {
-        const d = subMonths(new Date(), i);
+        const d = subMonths(now, i);
         const name = format(d, 'MMM yyyy');
         const key = format(d, 'yyyy-MM');
         bins[key] = { name, count: 0 };
       }
-      visits?.forEach(v => {
+      allVisits.forEach(v => {
         const key = format(new Date(v.created_at), 'yyyy-MM');
         if (bins[key]) bins[key].count++;
       });
@@ -620,7 +649,7 @@ export default function Analytics() {
           {/* Operational: Peak Hours */}
           <ChartContainer
             title="Appointment Loads"
-            description="Time-based distribution"
+            description="Time-based percentage distribution"
             icon={<Clock className="w-5 h-5" />}
           >
             <AreaChart data={peakHoursData} margin={{ top: 20, right: 30, left: -20, bottom: 0 }}>
@@ -631,9 +660,9 @@ export default function Analytics() {
                 </linearGradient>
               </defs>
               <XAxis dataKey="hour" axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 700 }} />
-              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 700 }} />
+              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 700 }} tickFormatter={(val) => `${val}%`} />
               <RechartsTooltip content={<CustomTooltip />} />
-              <Area type="stepAfter" dataKey="patients" stroke="#f59e0b" fill="url(#peakGradient)" strokeWidth={3} />
+              <Area type="stepAfter" dataKey="percentage" stroke="#f59e0b" fill="url(#peakGradient)" strokeWidth={3} />
             </AreaChart>
           </ChartContainer>
 

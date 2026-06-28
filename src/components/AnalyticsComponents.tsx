@@ -58,7 +58,10 @@ export const CustomTooltip = ({ active, payload, label }: TooltipProps<number, s
                 <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
                 <span className="text-sm font-bold text-foreground">{item.name}:</span>
               </div>
-              <span className="text-sm font-black text-primary">{item.value}</span>
+              <span className="text-sm font-black text-primary">
+                {item.value}
+                {String(item.name).toLowerCase() === 'percentage' ? '%' : ''}
+              </span>
             </div>
           ))}
         </div>
