@@ -50,3 +50,7 @@ manage-clinics.mjs
 delete-auth-user.mjs
 test-key.mjs
 check-clinics.mjs
+run_migration.mjs
+*migration*.mjs
+api-check.mjs
+testSupabase.mjs
