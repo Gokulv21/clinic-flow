@@ -36,6 +36,7 @@ interface PrescriptionTemplateProps {
     clinicName?: string;
     clinicAddress?: string;
     clinicPhone?: string;
+    hideBranding?: boolean;
 }
 
 // Filter out invalid image data to prevent broken image icons
@@ -48,7 +49,8 @@ const PrescriptionTemplate = React.memo(({
     isWritingMode = false,
     doctorId, prescriptionCreatedAt, hideShare = false,
     doctorName, doctorQualifications, doctorRegId,
-    clinicName, clinicAddress, clinicPhone
+    clinicName, clinicAddress, clinicPhone,
+    hideBranding = false
 }: PrescriptionTemplateProps) => {
 
     const { user: authUser } = useAuth();
@@ -269,6 +271,7 @@ Follow the instructions carefully.
                             clinicName={clinicName || ownerProfile?.clinic_name}
                             clinicAddress={clinicAddress || ownerProfile?.clinic_address}
                             clinicPhone={clinicPhone || ownerProfile?.clinic_phone}
+                            hideBranding={hideBranding}
                         />
                     ) : (
                         <div style={{ position: 'absolute', inset: 0, background: '#fff' }}>
@@ -276,7 +279,7 @@ Follow the instructions carefully.
                                 position: 'absolute', top: '2em', right: '3em',
                                 color: '#b0cde8', fontSize: '1.4cqw', fontWeight: 800
                             }}>
-                                GV Clinic — Continuation Page {idx + 1}
+                                {!hideBranding && "GV Clinic — "}Continuation Page {idx + 1}
                             </div>
                         </div>
                     )}
@@ -339,6 +342,7 @@ interface PageOneProps {
     clinicName?: string;
     clinicAddress?: string;
     clinicPhone?: string;
+    hideBranding?: boolean;
 }
 
 function PageOne({
@@ -346,7 +350,8 @@ function PageOne({
     hasTyped, vitals, doctorProfile, isWritingMode,
     hideTypedDiagnosis, safeDiagnosis, safeNotes, safeAdvice, hasHandwritingInThisComponent,
     doctorName, doctorQualifications, doctorRegId,
-    clinicName, clinicAddress, clinicPhone
+    clinicName, clinicAddress, clinicPhone,
+    hideBranding = false
 }: PageOneProps) {
 
     // Resolve display values with priority: Prop Override > Fetched Profile > Hardcoded Default
@@ -373,62 +378,66 @@ function PageOne({
             <div className="margin-line margin-line-right" />
 
             {/* ── HEADER ─────────────────────────────────────── */}
-            <div style={{
-                background: '#fff',
-                padding: '1.4em 2em',
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                position: 'relative', overflow: 'hidden', flexShrink: 0,
-                borderBottom: '1px solid #e2e8f0',
-            }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6em' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-                        <img
-                            src={prescriptionLogo}
-                            alt="Clinic Logo"
-                            style={{
-                                height: '5.2em', // Precisely tuned to match text block height
-                                width: 'auto',
-                                objectFit: 'contain',
-                                flexShrink: 0,
-                                display: 'block',
-                                // This filter approximates #0f172a (Slate 900) for a black logo
-                                filter: 'brightness(0) saturate(100%) invert(8%) sepia(21%) saturate(2853%) hue-rotate(191deg) brightness(91%) contrast(94%)'
-                            }}
-                        />
-                    </div>
+            {hideBranding ? (
+                <div style={{ height: '72mm', flexShrink: 0, background: '#fff', borderBottom: '1px solid #e2e8f0' }} />
+            ) : (
+                <div style={{
+                    background: '#fff',
+                    padding: '1.4em 2em',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    position: 'relative', overflow: 'hidden', flexShrink: 0,
+                    borderBottom: '1px solid #e2e8f0',
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6em' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+                            <img
+                                src={prescriptionLogo}
+                                alt="Clinic Logo"
+                                style={{
+                                    height: '5.2em', // Precisely tuned to match text block height
+                                    width: 'auto',
+                                    objectFit: 'contain',
+                                    flexShrink: 0,
+                                    display: 'block',
+                                    // This filter approximates #0f172a (Slate 900) for a black logo
+                                    filter: 'brightness(0) saturate(100%) invert(8%) sepia(21%) saturate(2853%) hue-rotate(191deg) brightness(91%) contrast(94%)'
+                                }}
+                            />
+                        </div>
 
-                    <div>
-                        <div style={{ fontWeight: 800, color: '#334155', fontSize: '2em', lineHeight: 1, letterSpacing: '0.01em' }}>
-                            {dispDoctorName}
+                        <div>
+                            <div style={{ fontWeight: 800, color: '#334155', fontSize: '2em', lineHeight: 1, letterSpacing: '0.01em' }}>
+                                {dispDoctorName}
+                            </div>
+                            <div style={{ color: '#475569', fontSize: '0.9em', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', marginTop: '0.3em' }}>
+                                {dispQualifications}
+                            </div>
+                            <div style={{ color: '#475569', fontSize: '0.85em', fontWeight: 500, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                                {dispRegId ? `Reg. No: ${dispRegId}` : 'Reg. No: 152590'}
+                            </div>
+                            <div style={{ color: '#64748b', fontSize: '0.8em', fontWeight: 600, marginTop: '0.1em' }}>
+                                பொதுநலம் மற்றும் சர்க்கரை நோய் நிபுணர்
+                            </div>
                         </div>
-                        <div style={{ color: '#475569', fontSize: '0.9em', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', marginTop: '0.3em' }}>
-                            {dispQualifications}
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontWeight: 900, color: '#7d326cff', fontSize: '3.2em', letterSpacing: '0.04em', lineHeight: 1 }}>
+                            {dispClinicName}
                         </div>
-                        <div style={{ color: '#475569', fontSize: '0.85em', fontWeight: 500, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-                            {dispRegId ? `Reg. No: ${dispRegId}` : 'Reg. No: 152590'}
+                        <div style={{ color: '#475569', fontSize: '0.8em', marginTop: '0.4em', letterSpacing: '0.2em', fontWeight: 800 }}>
+                            24/7 Emergency · ECG · Lab
                         </div>
-                        <div style={{ color: '#64748b', fontSize: '0.8em', fontWeight: 600, marginTop: '0.1em' }}>
-                            பொதுநலம் மற்றும் சர்க்கரை நோய் நிபுணர்
+                        <div style={{ color: '#64748b', fontSize: '0.75em', marginTop: '0.2em', letterSpacing: '0.02em', fontWeight: 500 }}>
+                            {dispClinicAddress}
+                        </div>
+                        <div style={{ color: '#64748b', fontSize: '0.75em', marginTop: '0.2em', letterSpacing: '0.02em', fontWeight: 500, textAlign: 'right' }}>
+                            {dispClinicPhone}
                         </div>
                     </div>
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontWeight: 900, color: '#7d326cff', fontSize: '3.2em', letterSpacing: '0.04em', lineHeight: 1 }}>
-                        {dispClinicName}
-                    </div>
-                    <div style={{ color: '#475569', fontSize: '0.8em', marginTop: '0.4em', letterSpacing: '0.2em', fontWeight: 800 }}>
-                        24/7 Emergency · ECG · Lab
-                    </div>
-                    <div style={{ color: '#64748b', fontSize: '0.75em', marginTop: '0.2em', letterSpacing: '0.02em', fontWeight: 500 }}>
-                        {dispClinicAddress}
-                    </div>
-                    <div style={{ color: '#64748b', fontSize: '0.75em', marginTop: '0.2em', letterSpacing: '0.02em', fontWeight: 500, textAlign: 'right' }}>
-                        {dispClinicPhone}
-                    </div>
-                </div>
-            </div>
+            )}
 
-            <div style={{ height: '2px', flexShrink: 0, backgroundColor: '#0f172a' }} />
+            {!hideBranding && <div style={{ height: '2px', flexShrink: 0, backgroundColor: '#0f172a' }} />}
 
             {/* ── PATIENT BAR ─────────────────────────────────── */}
             <div style={{
@@ -533,16 +542,18 @@ function PageOne({
                         </div>
                     )}
                     {/* Watermark */}
-                    <div style={{
-                        position: 'absolute', top: '50%', left: '50%',
-                        transform: 'translate(-50%, -50%) rotate(-45deg)',
-                        fontSize: '10cqw', fontWeight: 900, color: '#f8fafc',
-                        pointerEvents: 'none', zIndex: 5,
-                        whiteSpace: 'nowrap', textTransform: 'uppercase',
-                        letterSpacing: '0.2em'
-                    }}>
-                        GV CLINIC
-                    </div>
+                    {!hideBranding && (
+                        <div style={{
+                            position: 'absolute', top: '50%', left: '50%',
+                            transform: 'translate(-50%, -50%) rotate(-45deg)',
+                            fontSize: '10cqw', fontWeight: 900, color: '#f8fafc',
+                            pointerEvents: 'none', zIndex: 5,
+                            whiteSpace: 'nowrap', textTransform: 'uppercase',
+                            letterSpacing: '0.2em'
+                        }}>
+                            GV CLINIC
+                        </div>
+                    )}
 
                     {/* Writing Grid */}
                     <div className="no-print" style={{ position: 'absolute', top: '5em', left: '1.5em', right: '1.5em', bottom: 0, backgroundImage: 'radial-gradient(circle, #cbd5e1 0.8px, transparent 0.8px)', backgroundSize: '1.8em 1.8em', pointerEvents: 'none', zIndex: 0, opacity: 0.4 }} />
@@ -563,20 +574,24 @@ function PageOne({
             </div>
 
             {/* ── FOOTER ──────────────────────────────────────── */}
-            <div style={{ background: '#fff', borderTop: '2px solid #0f172a', padding: '1em 2em', display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, position: 'relative' }}>
-                {doctorProfile?.signature_data && !isWritingMode && (
-                    <div style={{ position: 'absolute', right: '3.5em', bottom: '4.5em', textAlign: 'center' }}>
-                        <img src={doctorProfile.signature_data} alt="Signature" style={{ maxHeight: '10em', width: 'auto', marginBottom: '0.3em', mixBlendMode: 'multiply' }} />
-                        <div style={{ fontSize: '0.75em', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Digital Signature</div>
-                    </div>
-                )}
-                <span style={{ color: '#475569', fontSize: '1em', fontWeight: 700, letterSpacing: '0.02em', textAlign: 'center' }}>
-                    அடுத்த முறை வரும்போது இந்த மருந்துச்சீட்டை கொண்டு வரவும்
-                </span>
-                <span style={{ color: '#94a3b8', fontSize: '0.6em', fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase', alignSelf: 'flex-end', marginTop: '0.3em' }}>
-                    Developed by Prescripto
-                </span>
-            </div>
+            {hideBranding ? (
+                <div style={{ height: '22mm', flexShrink: 0, background: '#fff' }} />
+            ) : (
+                <div style={{ background: '#fff', borderTop: '2px solid #0f172a', padding: '1em 2em', display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, position: 'relative' }}>
+                    {doctorProfile?.signature_data && !isWritingMode && (
+                        <div style={{ position: 'absolute', right: '3.5em', bottom: '4.5em', textAlign: 'center' }}>
+                            <img src={doctorProfile.signature_data} alt="Signature" style={{ maxHeight: '10em', width: 'auto', marginBottom: '0.3em', mixBlendMode: 'multiply' }} />
+                            <div style={{ fontSize: '0.75em', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Digital Signature</div>
+                        </div>
+                    )}
+                    <span style={{ color: '#475569', fontSize: '1em', fontWeight: 700, letterSpacing: '0.02em', textAlign: 'center' }}>
+                        அடுத்த முறை வரும்போது இந்த மருந்துச்சீட்டை கொண்டு வரவும்
+                    </span>
+                    <span style={{ color: '#94a3b8', fontSize: '0.6em', fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase', alignSelf: 'flex-end', marginTop: '0.3em' }}>
+                        Developed by Prescripto
+                    </span>
+                </div>
+            )}
         </div>
     );
 }

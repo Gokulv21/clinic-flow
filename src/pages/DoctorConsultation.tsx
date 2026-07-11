@@ -1,172 +1,133 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
-import { sanitizeText } from '@/lib/security-sanitize';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { cn, formatAge } from '@/lib/utils';
 import { 
-  Plus, History, Clock, Search, ChevronRight, Stethoscope, 
-  User, Users, CheckCircle2, AlertCircle, Trash2, Printer, 
-  ExternalLink, Phone, PhoneCall, Video, UserPlus, Info, 
-  MapPin, Loader2, Save, X, MoreVertical, LayoutGrid, List,
-  Activity, ClipboardList, Scale, Heart, Wind, Thermometer, 
-  Droplet, Pencil, Calendar, RefreshCw, UserX, ChevronDown,
-  Eye, PenTool, CheckCircle, ArrowLeft, HeartPulse, MessageCircle,
-  Bell
+  Plus, History, Stethoscope, User, Users, Trash2, Printer, 
+  Phone, Pencil, ArrowLeft, Activity, Scale, Wind, 
+  Thermometer, Droplet, MessageCircle, X, HeartPulse, Loader2, Sparkles, Info, GripVertical
 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { Textarea } from '@/components/ui/textarea';
 import DigitalPrescription from '@/components/DigitalPrescription';
 import PrescriptionTemplate from '@/components/PrescriptionTemplate';
-import { format } from "date-fns";
-import prescriptionLogo from '@/assets/prescriptionLogo.png';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { printPrescription } from '@/lib/printPrescription';
 import PageBanner from '@/components/PageBanner';
 import consultationBanner from '@/assets/consultation_banner.png';
 import { useCommunication } from '@/lib/communication';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
-
-interface Medicine {
-  type: string;
-  name: string;
-  dosage?: string;
-  frequency?: string;
-  duration?: string;
-  route?: string;
-  notes?: string;
-  count?: string;
-}
-
-const COMMON_FREQUENCIES = [
-  '1-0-1', '1-1-1', '0-0-1', '1-0-0', '0-1-0', '1-1-0', '0-1-1', 
-  'Stat', 'SOS', 'Twice daily', 'Thrice daily', 'Four times daily', 'Before food', 'After food'
-];
+import { useConsultation } from '@/hooks/useConsultation';
+import QueuePanel from '@/components/consultation/QueuePanel';
+import HistoryViewer from '@/components/consultation/HistoryViewer';
+import ConsultationForm from '@/components/consultation/ConsultationForm';
 
 export default function DoctorConsultation() {
   const queryClient = useQueryClient();
   const { user, hasRole, profile } = useAuth();
   const { slug } = useParams();
   const navigate = useNavigate();
-  const { makeCall, onlineUsers, callState, allUsers } = useCommunication();
-  
+  const { makeCall, onlineUsers, allUsers } = useCommunication();
   const { clinic } = useOutletContext<{ clinic: any }>();
 
-  const { data: myProfile } = useQuery({
-    queryKey: ['myProfile', user?.id],
-    queryFn: async () => {
-       const { data } = await supabase.from('profiles').select('*').eq('user_id', user?.id).maybeSingle();
-       return data;
-    },
-    enabled: !!user?.id
-  });
+  // 1. Hook Extraction
+  const {
+    queue,
+    isLoadingQueue,
+    refetchQueue,
+    selectedVisit,
+    setSelectedVisit,
+    selectVisit,
+    patient,
+    history,
+    setHistory,
+    diagnosis,
+    setDiagnosis,
+    diagnoses,
+    setDiagnoses,
+    clinicalNotes,
+    setClinicalNotes,
+    medicines,
+    setMedicines,
+    advice,
+    setAdvice,
+    saving,
+    prescriptionImage,
+    setPrescriptionImage,
+    prescriptionPaths,
+    setPrescriptionPaths,
+    isWritingMode,
+    setIsWritingMode,
+    lastInputWay,
+    setLastInputWay,
+    saveError,
+    protocols,
+    diagnosisHistory,
+    isDraftRestored,
+    syncStatus,
+    savePrescription,
+    markAsNoShow,
+    fetchDiagnosisHistory,
+    addMedicine,
+    removeMedicine,
+    updateMedicine,
+    handleMedicineKeyDown,
+    addDiagnosisTag,
+    removeDiagnosisTag,
+    applyProtocol,
+    handleCallPatient,
+    myProfile,
+  } = useConsultation(clinic, allUsers, onlineUsers, makeCall);
 
-  // 1. Fetch Queue via React Query
-  const { data: queue = [], isLoading: isLoadingQueue, refetch: refetchQueue } = useQuery({
-    queryKey: ['visitQueue', clinic?.id, user?.id, profile?.id || myProfile?.id],
-    queryFn: async () => {
-      // Enforce clinic isolation: doctor can only see visits for their assigned clinic
-      const activeProfile = profile || myProfile;
-      if (!hasRole('superadmin') && activeProfile?.clinic_id && activeProfile.clinic_id !== clinic?.id) {
-        return []; // Do not return any visits if doctor is from another clinic
-      }
+  // Vitals Edit Modal State
+  const [showVitalsEdit, setShowVitalsEdit] = useState(false);
+  const [vitalsWeight, setVitalsWeight] = useState('');
+  const [vitalsBP, setVitalsBP] = useState('');
+  const [vitalsPulse, setVitalsPulse] = useState('');
+  const [vitalsSpO2, setVitalsSpO2] = useState('');
+  const [vitalsTemp, setVitalsTemp] = useState('');
+  const [vitalsCBG, setVitalsCBG] = useState('');
 
-      let query = supabase
-        .from('visits')
-        .select('*, patients(*), prescriptions(*)')
-        .eq('clinic_id', clinic?.id)
-        .in('status', ['waiting', 'in_consultation']);
-      
-      const doctorScopes = ['assigned_doctor_id.is.null'];
-      if (user?.id) doctorScopes.push(`assigned_doctor_id.eq.${user.id}`);
-      if (profile?.id) doctorScopes.push(`assigned_doctor_id.eq.${profile.id}`);
-      if (myProfile?.id) doctorScopes.push(`assigned_doctor_id.eq.${myProfile.id}`);
-      query = query.or(doctorScopes.join(','));
-      
-      const { data, error } = await query.order('token_number', { ascending: true });
-      if (error) throw error;
-      return (data || []).filter(v => v.patients);
-    },
-    enabled: !!clinic?.id,
-    staleTime: 5000, // Reduced from 30s
-    refetchOnWindowFocus: true,
-  });
-
-  const [selectedVisit, setSelectedVisit] = useState<any>(null);
-  const [patient, setPatient] = useState<any>(null);
-  const [history, setHistory] = useState<any[]>([]);
-  const [diagnosis, setDiagnosis] = useState('');
-  const [medicines, setMedicines] = useState<Medicine[]>([{ type: 'Tab.', name: '', dosage: '', frequency: '', duration: '', route: '' }]);
-  const [advice, setAdvice] = useState('');
-  const [saving, setSaving] = useState(false);
+  // Overlays / Preview States
   const [showDigitalRx, setShowDigitalRx] = useState(false);
-  const [prescriptionImage, setPrescriptionImage] = useState<string | null>(null);
-  const [prescriptionPaths, setPrescriptionPaths] = useState<any[]>([]);
   const [showPreview, setShowPreview] = useState(false);
   const [viewingHistoryRx, setViewingHistoryRx] = useState<any>(null);
   const [loadingHistoryRx, setLoadingHistoryRx] = useState(false);
   const [currentHistoryRx, setCurrentHistoryRx] = useState<any>(null);
-  const [isWritingMode, setIsWritingMode] = useState(false);
-  const [clinicalNotes, setClinicalNotes] = useState('');
-  const [showVitalsEdit, setShowVitalsEdit] = useState(false);
-  const [lastInputWay, setLastInputWay] = useState<'typing' | 'writing'>('typing');
-  const [saveError, setSaveError] = useState<{ step: 'prescription' | 'visit', message: string } | null>(null);
-  const [protocols, setProtocols] = useState<any[]>([]);
-  const [showProtocolDialog, setShowProtocolDialog] = useState(false);
-  const [isDraftRestored, setIsDraftRestored] = useState(false);
-  const [diagnoses, setDiagnoses] = useState<string[]>([]);
-  const [diagnosisHistory, setDiagnosisHistory] = useState<string[]>([]);
-  const [showDiagnosisSuggestions, setShowDiagnosisSuggestions] = useState(false);
-  const [suggestionIndex, setSuggestionIndex] = useState(-1);
-  const [openFreqPopoverIndex, setOpenFreqPopoverIndex] = useState<number | null>(null);
-  const lastLoadedVisitId = useRef<string | null>(null);
+  const [printOnStationery, setPrintOnStationery] = useState(false);
+  const [showChangelog, setShowChangelog] = useState(false);
+
+  // Initialize Vitals Edit values when modal opens
+  useEffect(() => {
+    if (selectedVisit && showVitalsEdit) {
+      setVitalsWeight(selectedVisit.weight || '');
+      setVitalsBP(selectedVisit.blood_pressure || '');
+      setVitalsPulse(selectedVisit.pulse_rate || '');
+      setVitalsSpO2(selectedVisit.spo2 || '');
+      setVitalsTemp(selectedVisit.temperature || '');
+      setVitalsCBG(selectedVisit.cbg || '');
+    }
+  }, [selectedVisit, showVitalsEdit]);
 
   useEffect(() => {
-    if (clinic?.id) {
-      fetchProtocols();
-      fetchDiagnosisHistory();
+    const acknowledged = localStorage.getItem('prescripto_version_2_1_acknowledged');
+    if (!acknowledged) {
+      setShowChangelog(true);
     }
-  }, [clinic?.id]);
+  }, []);
 
-  async function fetchDiagnosisHistory() {
-    try {
-      if (!clinic?.id) return;
-      
-      // Fetch from both prescriptions AND visits to be comprehensive
-      const [rxRes, visitRes] = await Promise.all([
-        supabase.from('prescriptions').select('diagnosis').eq('clinic_id', clinic.id).order('created_at', { ascending: false }),
-        supabase.from('visits').select('diagnosis').eq('clinic_id', clinic.id).not('diagnosis', 'is', null).order('created_at', { ascending: false })
-      ]);
-      
-      const allEntries = [
-        ...(rxRes.data || []).map(d => d.diagnosis),
-        ...(visitRes.data || []).map(d => d.diagnosis)
-      ].filter(Boolean);
-      
-      if (allEntries.length > 0) {
-        // Flatten and clean up duplicates
-        const allIndividualTerms = allEntries
-          .flatMap(d => (typeof d === 'string' ? d.split(/[/,\\,]+/) : []))
-          .map(d => d.trim().toUpperCase())
-          .filter(d => d.length > 1);
-        
-        // Use a set to unique, then sort by frequency would be nice, but simple unique for now
-        setDiagnosisHistory([...new Set(allIndividualTerms)].sort());
-      }
-    } catch (e) {
-      console.error("Error fetching diagnosis history", e);
-    }
-  }
+  const handleAcknowledgeChangelog = () => {
+    localStorage.setItem('prescripto_version_2_1_acknowledged', 'true');
+    setShowChangelog(false);
+  };
 
+  // Doctor Qualification Enforcement Redirect
   useEffect(() => {
     if (myProfile && hasRole('doctor')) {
       if (!myProfile.qualifications || !myProfile.registration_id) {
@@ -176,394 +137,13 @@ export default function DoctorConsultation() {
     }
   }, [myProfile, hasRole, navigate, slug]);
 
-  async function fetchProtocols() {
-    const { data } = await supabase
-      .from('medicine_protocols')
-      .select('*')
-      .eq('clinic_id', clinic?.id)
-      .order('name');
-    setProtocols(data || []);
-  }
-
-  useEffect(() => {
-    if (!clinic?.id) return;
-
-    let debounceTimer: any;
-    const channel = supabase
-      .channel(`visits-realtime-doctor-${clinic.id}`)
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'visits'
-      }, (payload: any) => {
-        // Enforce clinic isolation for realtime events
-        if (payload.new && payload.new.clinic_id !== clinic.id) {
-          return; // Ignore events from other clinics entirely
-        }
-
-        // Only trigger invalidation if the change is relevant to this doctor
-        let shouldInvalidate = false;
-
-        if (payload.eventType === 'DELETE') {
-          shouldInvalidate = true;
-        } else if (payload.new) {
-          const newDocId = payload.new.assigned_doctor_id;
-          const isGeneral = newDocId === null;
-          const isAssignedToMe = 
-            (user?.id && newDocId === user.id) || 
-            (profile?.id && newDocId === profile.id) || 
-            (myProfile?.id && newDocId === myProfile.id);
-          
-          if (isGeneral || isAssignedToMe) {
-            shouldInvalidate = true;
-          } else {
-            // Check if the visit is currently in our queue cache (so we know to remove it if it was reassigned)
-            const currentQueue = queryClient.getQueryData<any[]>(['visitQueue', clinic.id, user?.id, profile?.id || myProfile?.id]);
-            const isCurrentlyInQueue = currentQueue?.some(v => v.id === payload.new.id);
-            if (isCurrentlyInQueue) {
-              shouldInvalidate = true;
-            }
-          }
-        }
-
-        if (shouldInvalidate) {
-          clearTimeout(debounceTimer);
-          debounceTimer = setTimeout(() => {
-            if (!document.hidden) {
-              queryClient.invalidateQueries({ queryKey: ['visitQueue', clinic.id] });
-            }
-          }, 2000); // Increased debounce to 2000ms to reduce database load on rapid updates
-        }
-      })
-      .subscribe();
-
-    const restoreState = async () => {
-      const savedVisitId = localStorage.getItem('active_consultation_id');
-      if (savedVisitId) {
-        // Fetch full visit data including prescriptions for the saved ID
-        const { data } = await supabase
-          .from('visits')
-          .select('*, patients(*), prescriptions(*)')
-          .eq('id', savedVisitId)
-          .single();
-        
-        if (data && (data.status === 'waiting' || data.status === 'in_consultation')) {
-          selectVisit(data, true);
-        } else {
-          localStorage.removeItem('active_consultation_id');
-          trackActiveVisit(null);
-        }
-      }
-    };
-    restoreState();
-
-    return () => { 
-      clearTimeout(debounceTimer);
-      supabase.removeChannel(channel); 
-    };
-  }, [queryClient, clinic?.id]);
-
-  // Helper to save current form state as a draft for a specific visit
-  const saveCurrentToDraft = (visitId: string | null) => {
-    if (!visitId) return;
-    
-    // Don't save if we hasn't actually loaded any patient data yet
-    if (visitId !== lastLoadedVisitId.current) return;
-
-    const draft = {
-      diagnosis,
-      clinicalNotes,
-      medicines,
-      advice,
-      prescriptionImage,
-      prescriptionPaths,
-      isWritingMode,
-      lastInputWay,
-      timestamp: Date.now()
-    };
-    
-    // Only save if there's actual content to save
-    const hasContent = diagnosis || clinicalNotes || medicines.some(m => m.name) || advice || prescriptionImage;
-    if (hasContent) {
-      localStorage.setItem(`draft_${visitId}`, JSON.stringify(draft));
-      localStorage.setItem('active_consultation_id', visitId);
-    }
-  };
-
-  const trackActiveVisit = (visit: any) => {
-    setSelectedVisit(visit);
-    setPatient(visit?.patients || null);
-    if (visit?.id) {
-       localStorage.setItem('active_consultation_id', visit.id);
-    } else {
-       localStorage.removeItem('active_consultation_id');
-    }
-  };
-
-  // Auto-save useEffect
-  useEffect(() => {
-    if (selectedVisit?.id && selectedVisit.id === lastLoadedVisitId.current) {
-      const timer = setTimeout(() => {
-        saveCurrentToDraft(selectedVisit.id);
-      }, 1500); // Save every 1.5s of inactivity
-      
-      return () => clearTimeout(timer);
-    }
-  }, [selectedVisit?.id, diagnosis, clinicalNotes, medicines, advice, prescriptionImage, prescriptionPaths, isWritingMode, lastInputWay]);
-
-  // Tab close / App switch protection
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      if (selectedVisit?.id) {
-        saveCurrentToDraft(selectedVisit.id);
-      }
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [selectedVisit?.id, diagnosis, clinicalNotes, medicines, advice, prescriptionImage, prescriptionPaths, isWritingMode, lastInputWay]);
-
-  const selectVisit = async (visit: any, checkForDrafts = false) => {
-    // 1. SAVE PREVIOUS PATIENT'S WORK before switching
-    if (lastLoadedVisitId.current && lastLoadedVisitId.current !== visit.id) {
-      saveCurrentToDraft(lastLoadedVisitId.current);
-    }
-
-    trackActiveVisit(visit);
-    
-    if (visit.patients?.id) {
-      supabase.from('patients').update({ last_opened_at: new Date().toISOString() }).eq('id', visit.patients.id).then();
-    }
-    
-    // 2. CHECK FOR DRAFTS
-    const savedDraft = localStorage.getItem(`draft_${visit.id}`);
-    if (checkForDrafts && savedDraft) {
-      try {
-        const draft = JSON.parse(savedDraft);
-        if (Date.now() - draft.timestamp < 24 * 60 * 60 * 1000) {
-          setDiagnosis(''); // Clear input, tags will hold data
-          setDiagnoses(draft.diagnoses || (draft.diagnosis ? draft.diagnosis.split(' / ') : []));
-          setClinicalNotes(draft.clinicalNotes || '');
-          setMedicines(draft.medicines || [{ type: 'Tab.', name: '', dosage: '', frequency: '', duration: '' }]);
-          setAdvice(draft.advice || '');
-          setPrescriptionImage(draft.prescriptionImage);
-          setPrescriptionPaths(draft.prescriptionPaths || []);
-          setIsWritingMode(draft.isWritingMode ?? false);
-          setLastInputWay(draft.lastInputWay || (draft.isWritingMode ? 'writing' : 'typing'));
-          lastLoadedVisitId.current = visit.id;
-          setIsDraftRestored(true);
-          toast.info(`Draft restored for ${visit.patients?.name || 'patient'}`, { 
-            description: "Work recovered from your last session.",
-            position: 'top-center',
-            duration: 3000
-          });
-          return;
-        }
-      } catch (e) {
-        console.error("Error restoring draft", e);
-      }
-    }
-
-    setIsDraftRestored(false);
-
-    const rxData = visit.prescriptions?.[0];
-    let rxImage = rxData?.advice_image;
-    const rxPaths = rxData?.raw_paths || [];
-    
-    setDiagnosis(''); // Clear input
-    setDiagnoses(rxData?.diagnosis ? rxData.diagnosis.split(' / ') : []);
-    setClinicalNotes(rxData?.clinical_notes || '');
-    setMedicines(rxData?.medicines || [{ type: 'Tab.', name: '', dosage: '', frequency: '', duration: '' }]);
-    
-    if (rxImage && rxImage.startsWith('data:image')) {
-      setPrescriptionImage(rxImage);
-      setAdvice('');
-    } else if (rxImage && rxImage.startsWith('[')) {
-      try {
-        const parsed = JSON.parse(rxImage);
-        setPrescriptionImage(parsed);
-        setAdvice('');
-      } catch (e) {
-        setPrescriptionImage(rxImage);
-      }
-    } else {
-      setPrescriptionImage(null);
-      setAdvice(rxImage || '');
-    }
-
-    setIsWritingMode(rxData?.is_writing_mode ?? (!!rxImage && (rxImage.startsWith('data:image') || rxImage.startsWith('['))));
-    setLastInputWay(rxData?.is_writing_mode ? 'writing' : 'typing');
-    setPrescriptionPaths(rxPaths);
-    
-    if (rxPaths && rxPaths.length > 0 && rxPaths[0].length > 0) {
-      setIsWritingMode(true);
-      setLastInputWay('writing');
-    }
-
-    if (visit.status === 'waiting') {
-      await supabase.from('visits').update({ status: 'in_consultation' }).eq('id', visit.id);
-    }
-
-    const { data } = await supabase
-      .from('visits')
-      .select('*, prescriptions(*)')
-      .eq('patient_id', visit.patient_id)
-      .neq('id', visit.id)
-      .order('created_at', { ascending: false })
-      .limit(10);
-    setHistory(data || []);
-    lastLoadedVisitId.current = visit.id;
-  };
-
-  const handleCallPatient = async (visit: any) => {
-    try {
-      const patientName = (visit.patients?.title ? visit.patients.title + ' ' : '') + (visit.patients?.name || 'Patient');
-      const tokenStr = visit.token_number ? ` (Token #${visit.token_number})` : '';
-      
-      if (visit.created_by) {
-        const { error: notifError } = await supabase
-          .from('notifications')
-          .insert({
-            user_id: visit.created_by,
-            clinic_id: clinic?.id,
-            title: 'CALLING PATIENT',
-            message: `Please send Patient: ${patientName} (Token #${visit.token_number}) to the doctor's room immediately.`,
-            type: 'info',
-            is_read: false
-          });
-          
-        if (notifError) throw notifError;
-        toast.success(`Calling patient ${patientName} (Staff notified)`);
-      } else {
-        // Fallback: Notify all staff in this clinic
-        const { data: staffProfiles } = await supabase
-          .from('profiles')
-          .select('user_id')
-          .eq('clinic_id', clinic?.id)
-          .neq('role', 'doctor')
-          .neq('is_superadmin', true);
-          
-        if (staffProfiles && staffProfiles.length > 0) {
-          const notifs = staffProfiles.map(staff => ({
-            user_id: staff.user_id,
-            clinic_id: clinic?.id,
-            title: 'CALLING PATIENT',
-            message: `Please send Patient: ${patientName} (Token #${visit.token_number}) to the doctor's room immediately.`,
-            type: 'info',
-            is_read: false
-          }));
-          
-          const { error: bulkError } = await supabase.from('notifications').insert(notifs);
-          if (bulkError) throw bulkError;
-          toast.success(`Calling patient ${patientName} (Clinic staff notified)`);
-        } else {
-          toast.success(`Calling patient ${patientName}`);
-        }
-      }
-      
-      // After notifying staff, keep the doctor on the queue without navigating to patient details.
-      // No navigation is performed here.
-    } catch (err: any) {
-      console.error("Error calling patient:", err);
-      toast.error("Failed to notify staff, but opening consultation...");
-    }
-  };
-
-  const addDiagnosisTag = (tag: string) => {
-    // Treat the entire string as a single tag, matching user requirement to only split on Enter
-    const tags = [tag.trim().toUpperCase()].filter(Boolean);
-    
-    if (tags.length > 0) {
-      const newDiagnoses = [...diagnoses];
-      tags.forEach(t => {
-        if (!newDiagnoses.includes(t)) {
-          newDiagnoses.push(t);
-        }
-      });
-      setDiagnoses(newDiagnoses);
-    }
-    setDiagnosis('');
-    setShowDiagnosisSuggestions(false);
-    setSuggestionIndex(-1);
-  };
-
-  const removeDiagnosisTag = (index: number) => {
-    setDiagnoses(diagnoses.filter((_, i) => i !== index));
-  };
-
-  const applyProtocol = (protocol: any) => {
-    const newMedicines = protocol.medicines.map((m: any) => ({
-      type: m.type || 'Tab.',
-      name: m.name,
-      dosage: m.dosage || '',
-      frequency: m.frequency || '',
-      duration: m.duration || '',
-      route: m.route || '',
-      notes: m.instructions || m.notes || '' // Mapping protocol instructions to prescription notes
-    }));
-    
-    // Filter out empty initial row if it exists
-    const currentMedicines = medicines.length === 1 && !medicines[0].name ? [] : medicines;
-    setMedicines([...currentMedicines, ...newMedicines]);
-    setLastInputWay('typing');
-    setShowProtocolDialog(false);
-    toast.success(`Applied ${protocol.name} protocol`, { position: 'top-center' });
-  };
-
-  const markAsNoShow = async () => {
-    if (!selectedVisit) return;
-    setSaving(true);
-    try {
-      const patientId = selectedVisit.patient_id;
-      await supabase.from('visits').update({ status: 'no_show' }).eq('id', selectedVisit.id);
-      await supabase.from('prescriptions').delete().eq('visit_id', selectedVisit.id);
-      await supabase.from('visits').delete().eq('id', selectedVisit.id);
-      
-      const { data: otherVisits } = await supabase.from('visits').select('id').eq('patient_id', patientId).limit(1);
-      if (!otherVisits || otherVisits.length === 0) {
-        await supabase.from('patients').delete().eq('id', patientId);
-      }
-
-      toast.success('Visit cancelled');
-      localStorage.removeItem(`draft_${selectedVisit.id}`);
-      localStorage.removeItem('active_consultation_id');
-      setSelectedVisit(null);
-      setPatient(null);
-      queryClient.invalidateQueries({ queryKey: ['visitQueue'] });
-    } catch (err: any) {
-      toast.error(err.message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const addMedicine = () => setMedicines(m => [...m, { type: 'Tab.', name: '', dosage: '', frequency: '', duration: '', route: '' }]);
-  const removeMedicine = (i: number) => setMedicines(m => m.filter((_, idx) => idx !== i));
-  const updateMedicine = (i: number, field: keyof Medicine, value: string) =>
-    setMedicines(m => m.map((med, idx) => idx === i ? { ...med, [field]: value } : med));
-
-  const handleMedicineKeyDown = (e: React.KeyboardEvent, index: number, fieldName: string) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      const form = (e.target as HTMLElement).closest('.medicine-row');
-      if (!form) return;
-      const inputs = Array.from(form.querySelectorAll('input, select')) as HTMLElement[];
-      const currentIndex = inputs.indexOf(e.target as HTMLElement);
-      if (currentIndex < inputs.length - 1) {
-        inputs[currentIndex + 1].focus();
-      } else if (index === medicines.length - 1) {
-        addMedicine();
-        setTimeout(() => {
-          const nextRow = form.parentElement?.lastElementChild?.querySelector('input');
-          if (nextRow) nextRow.focus();
-        }, 0);
-      }
-    }
-  };
-
-  const getStatusColor = (s: string) => {
-    if (s === 'waiting') return 'bg-warning/10 text-warning border-warning/30';
-    if (s === 'in_consultation') return 'bg-info/10 text-info border-info/30';
-    return 'bg-success/10 text-success border-success/30';
+  const handlePrescriptionSave = (data: string | string[] | null, pages: any[][]) => {
+    setPrescriptionImage(Array.isArray(data) ? JSON.stringify(data) : data);
+    setPrescriptionPaths(pages as any);
+    setShowDigitalRx(false);
+    setIsWritingMode(true);
+    setLastInputWay('writing');
+    setAdvice('');
   };
 
   const shareToWhatsApp = (visitData: any, patientData: any) => {
@@ -580,207 +160,121 @@ export default function DoctorConsultation() {
     const message = `Hello ${patientName},  
 
 Your prescription 📝 from ${resolvedDoctorName} (${resolvedClinicName}) is ready.  
-Access it here:  👇🏻 
-
+Access it here:  👇
+ 
 🔗 ${publicLink}  
 
-Follow the instructions carefully.  
-💖 Wishing you a quick recovery!  
+Wishing you a quick recovery!  
 
 — ${resolvedClinicName}`;
 
-    const encodedMsg = encodeURIComponent(message);
-    const whatsappUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedMsg}`;
-    window.open(whatsappUrl, '_blank');
+    window.open(`https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(message)}`, '_blank');
   };
 
-  const savePrescription = async () => {
-    if (!selectedVisit || !patient) return;
-    const isWriting = lastInputWay === 'writing';
-    // If we have tags, use them. If not, use the raw diagnosis string.
-    const pendingDiagnosis = diagnosis.trim().toUpperCase();
-    let allDiagnoses = [...diagnoses];
-    if (pendingDiagnosis && !allDiagnoses.includes(pendingDiagnosis)) {
-      allDiagnoses.push(pendingDiagnosis);
-    }
-    const diagnosisStr = allDiagnoses.join(' / ').trim();
-    const finalDiagnosis = diagnosisStr ? sanitizeText(diagnosisStr, 500) : null;
-    const finalClinicalNotes = clinicalNotes ? sanitizeText(clinicalNotes, 2000) : null;
-    const finalMedicines = medicines
-        .filter(m => m.name.trim())
-        .map(m => ({
-            ...m,
-            name: sanitizeText(m.name, 200),
-            dosage: m.dosage ? sanitizeText(m.dosage, 100) : undefined,
-            duration: m.duration ? sanitizeText(m.duration, 100) : undefined,
-            instructions: m.notes ? sanitizeText(m.notes, 500) : undefined // notes is often used for instructions
-        }));
-    const finalAdviceImage = isWriting ? prescriptionImage : (advice ? sanitizeText(advice, 1000) : null);
-    const finalPaths = isWriting ? prescriptionPaths : [];
-
-    if (!isWriting && !finalDiagnosis && finalMedicines.length === 0 && !advice && !finalClinicalNotes) {
-      toast.error('Please add diagnosis, notes, medicines or advice');
-      return;
+  const getVitalsTrendData = (key: string): number[] => {
+    if (!history || history.length === 0) return [];
+    
+    const sortedHistory = [...history].sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+    
+    const allVisits = [...sortedHistory];
+    if (selectedVisit && !allVisits.some(v => v.id === selectedVisit.id)) {
+      allVisits.push(selectedVisit);
     }
     
-    if (isWriting && !prescriptionImage) {
-      toast.error('Please add handwriting using the template');
-      return;
-    }
-
-    setSaving(true);
-    setSaveError(null);
-
-    try {
-      if (!saveError || saveError.step === 'prescription') {
-        const { error: rxError } = await supabase.from('prescriptions').upsert({
-          visit_id: selectedVisit.id,
-          patient_id: patient.id,
-          diagnosis: finalDiagnosis,
-          clinical_notes: finalClinicalNotes,
-          medicines: finalMedicines as any,
-          advice_image: finalAdviceImage,
-          raw_paths: finalPaths as any,
-          is_writing_mode: isWritingMode,
-          doctor_id: user?.id,
-          clinic_id: clinic?.id
-        }, { onConflict: 'visit_id' });
-        
-        if (rxError) {
-          setSaveError({ step: 'prescription', message: rxError.message });
-          throw rxError;
+    const values: number[] = [];
+    allVisits.forEach(v => {
+      let val: number | null = null;
+      if (key === 'blood_pressure') {
+        if (v.blood_pressure) {
+          const sys = parseInt(v.blood_pressure.split('/')[0]);
+          if (!isNaN(sys)) val = sys;
         }
+      } else {
+        const num = parseFloat(v[key]);
+        if (!isNaN(num) && num > 0) val = num;
       }
-
-      const { error: visitError } = await supabase.from('visits').update({ 
-        status: 'completed', 
-        diagnosis: finalDiagnosis
-      }).eq('id', selectedVisit.id);
-
-      if (visitError) {
-        setSaveError({ step: 'visit', message: visitError.message });
-        throw visitError;
+      if (val !== null) {
+        values.push(val);
       }
+    });
+    return values;
+  };
 
-      toast.success('Prescription saved & sent to print queue', { position: 'top-center' });
-      localStorage.removeItem(`draft_${selectedVisit.id}`);
-      localStorage.removeItem('active_consultation_id');
-      setAdvice('');
-      setSelectedVisit(null);
-      setPatient(null);
-      setHistory([]);
-      setPrescriptionImage(null);
-      setPrescriptionPaths([]);
-      setDiagnosis('');
-      setDiagnoses([]);
-      setClinicalNotes('');
-      setMedicines([{ type: 'Tab.', name: '', dosage: '', frequency: '', duration: '' }]);
-      setSaveError(null);
-      queryClient.invalidateQueries({ queryKey: ['visitQueue'] });
-      fetchDiagnosisHistory();
-    } catch (err: any) {
-      toast.error(`Save Failed: ${err.message || 'Unknown error'}`, { position: 'top-center' });
-    } finally {
-      setSaving(false);
+  const renderSparkline = (key: string, strokeColorClass: string) => {
+    // Guard: don't render sparklines from a previous patient's history
+    if (history.length > 0 && history[0]?.patient_id !== selectedVisit?.patient_id) return null;
+    const trend = getVitalsTrendData(key);
+    if (trend.length < 2) return null;
+
+    const width = 45;
+    const height = 14;
+    const padding = 2;
+
+    const min = Math.min(...trend);
+    const max = Math.max(...trend);
+    const range = max - min === 0 ? 1 : max - min;
+
+    const points = trend.map((val, idx) => {
+      const x = padding + (idx / (trend.length - 1)) * (width - padding * 2);
+      const y = padding + (1 - (val - min) / range) * (height - padding * 2);
+      return { x, y };
+    });
+
+    let pathD = `M ${points[0].x} ${points[0].y}`;
+    for (let i = 1; i < points.length; i++) {
+      pathD += ` L ${points[i].x} ${points[i].y}`;
     }
-  };
 
-  const handlePrescriptionSave = (data: string | string[] | null, pages: any[][]) => {
-    setPrescriptionImage(Array.isArray(data) ? JSON.stringify(data) : data);
-    setPrescriptionPaths(pages as any);
-    setShowDigitalRx(false);
-    setIsWritingMode(true);
-    setLastInputWay('writing');
-    setAdvice('');
-  };
+    const lastPoint = points[points.length - 1];
 
-  const queuePanel = (
-    <div className="h-full flex flex-col bg-card">
-      <div className="p-4 border-b border-border bg-card sticky top-0 z-10 flex items-center justify-between">
-        <div>
-          <h2 className="font-heading font-bold text-lg">Patient Queue</h2>
-          {queue.length > 0 ? (
-            <p className="text-sm text-muted-foreground">{queue.length} patients today</p>
-          ) : (
-            <p className="text-xs text-muted-foreground/60 uppercase tracking-widest font-bold">Queue is Empty</p>
-          )}
-        </div>
-        <Button variant="ghost" size="icon" onClick={() => refetchQueue()} disabled={isLoadingQueue} className="h-8 w-8 btn-liquid-pop overflow-hidden" asChild>
-          <motion.button
-            whileTap={{ scale: 0.7 }}
-            transition={{ type: "spring", stiffness: 600, damping: 25 }}
-          >
-            <motion.div
-                animate={isLoadingQueue ? { rotate: 360 } : { rotate: 0 }}
-                transition={isLoadingQueue ? { repeat: Infinity, duration: 1, ease: "linear" } : { type: "spring", stiffness: 500, damping: 30 }}
-            >
-                {isLoadingQueue ? <Loader2 className="w-4 h-4 animate-spin-liquid" /> : <RefreshCw className="w-4 h-4" />}
-            </motion.div>
-          </motion.button>
-        </Button>
+    return (
+      <div className="flex items-center justify-center w-full mt-1.5 opacity-80" title={`Historical trend (Min: ${min}, Max: ${max})`}>
+        <svg width={width} height={height} className={strokeColorClass}>
+          <path
+            d={pathD}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <circle
+            cx={lastPoint.x}
+            cy={lastPoint.y}
+            r="1.5"
+            fill="currentColor"
+          />
+        </svg>
       </div>
-      <div className="flex-1 overflow-auto">
-        {queue.map(visit => (
-          <div
-            key={visit.id}
-            onClick={() => selectVisit(visit, true)}
-            className={cn("w-full p-4 border-b border-border hover:bg-secondary/50 transition-colors cursor-pointer flex items-center justify-between", selectedVisit?.id === visit.id && "bg-secondary")}
-          >
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                <span className="font-heading font-bold text-primary text-sm">#{visit.token_number}</span>
-              </div>
-              <div className="min-w-0">
-                <p className="font-medium text-sm truncate">{(visit.patients?.title ? visit.patients.title + ' ' : '') + visit.patients?.name}</p>
-                <p className="text-xs text-muted-foreground">{visit.patients?.age}y · {visit.patients?.sex}</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-2 shrink-0 ml-2">
-              <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0 h-5", getStatusColor(visit.status))}>
-                {visit.status === 'waiting' ? 'Wait' : visit.status === 'in_consultation' ? 'Active' : 'Done'}
-              </Badge>
-              <Button
-                size="icon"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleCallPatient(visit);
-                }}
-                className="h-8 w-8 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-sm transition-transform active:scale-95"
-                title="Consult / Call Patient"
-              >
-                <Bell className="w-4 h-4 animate-bounce" />
-              </Button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+    );
+  };
 
   return (
-    <div className="flex flex-col md:flex-row h-[calc(100vh-64px)] md:h-[calc(100vh-0px)] overflow-hidden">
-      {/* ── Token Switcher Rail (Shows when patient selected) ── */}
+    <div className="flex flex-col md:flex-row h-[calc(100vh-64px)] md:h-[calc(100vh-0px)] overflow-hidden bg-slate-50 dark:bg-slate-950">
+      
+      {/* ── Token Switcher Rail (Shows when patient is active) ── */}
       {selectedVisit && (
         <div className="hidden md:flex w-20 border-r border-border flex-col items-center py-6 gap-6 bg-muted/20 shrink-0">
           <div className="w-12 h-12 rounded-2xl bg-blue-600/10 flex items-center justify-center mb-2 shadow-inner border border-blue-600/5">
             <Users className="w-6 h-6 text-blue-600" />
           </div>
           <div className="flex-1 flex flex-col gap-4 overflow-y-auto no-scrollbar pb-24 px-2">
-            {queue.map(visit => (
+            {queue.map(v => (
               <Button
-                key={visit.id}
-                variant={selectedVisit.id === visit.id ? "default" : "ghost"}
+                key={v.id}
+                variant={selectedVisit.id === v.id ? "default" : "ghost"}
                 size="icon"
-                onClick={() => selectVisit(visit, true)}
+                onClick={() => selectVisit(v, true)}
                 className={cn(
                   "w-12 h-12 rounded-2xl font-black text-sm transition-all",
-                  selectedVisit.id === visit.id 
+                  selectedVisit.id === v.id 
                     ? "bg-blue-600 text-white shadow-lg scale-110" 
                     : "text-muted-foreground hover:bg-white hover:text-blue-600 border border-transparent hover:border-blue-200"
                 )}
               >
-                {visit.token_number}
+                {v.token_number}
               </Button>
             ))}
           </div>
@@ -788,7 +282,7 @@ Follow the instructions carefully.
             variant="ghost"
             size="icon"
             onClick={() => setSelectedVisit(null)}
-            className="w-12 h-12 rounded-2xl text-muted-foreground hover:text-red-500 hover:bg-red-50 border border-transparent hover:border-red-100"
+            className="w-12 h-12 rounded-2xl text-muted-foreground hover:text-red-500 hover:bg-red-50"
             title="Exit Consultation"
           >
             <X className="w-5 h-5" />
@@ -796,21 +290,32 @@ Follow the instructions carefully.
         </div>
       )}
 
+      {/* ── Queue Panel (Left Sidebar) ── */}
       <div className={cn("w-full md:w-80 border-r border-border shrink-0 h-full", selectedVisit ? "hidden" : "block")}>
-        {queuePanel}
+        <QueuePanel
+          queue={queue}
+          isLoadingQueue={isLoadingQueue}
+          refetchQueue={refetchQueue}
+          selectedVisit={selectedVisit}
+          selectVisit={selectVisit}
+          onCallPatient={handleCallPatient}
+        />
       </div>
 
-      <div className={cn("flex-1 overflow-auto bg-muted/30 h-full", !selectedVisit ? "hidden md:block" : "block")}>
+      {/* ── Active Consultation Area ── */}
+      <div className={cn("flex-1 overflow-auto bg-muted/10 h-full", !selectedVisit ? "hidden md:block" : "block")}>
         {!selectedVisit ? (
           <div className="flex items-center justify-center h-full text-muted-foreground">
-            <div className="text-center p-6">
-              <User className="w-16 h-16 mx-auto mb-4 opacity-10" />
-              <p className="text-lg font-medium opacity-50">Select a patient for consultation</p>
+            <div className="text-center p-6 space-y-4">
+              <Stethoscope className="w-16 h-16 mx-auto mb-4 opacity-10 animate-pulse text-primary" />
+              <p className="text-lg font-medium opacity-50">Select a patient from the queue to start consultation</p>
             </div>
           </div>
         ) : (
-          <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-6 animate-slide-in pb-80 font-jakarta-sans">
-            <Card className="border-none shadow-sm bg-card">
+          <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-6 animate-in fade-in slide-in-from-bottom-6 duration-300 pb-40">
+            
+            {/* Patient Header Card */}
+            <Card className="border-none shadow-sm bg-card rounded-2xl">
               <CardHeader className="pb-3 px-6">
                 <CardTitle className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
@@ -838,8 +343,8 @@ Follow the instructions carefully.
                   </div>
                   <div className="flex items-center gap-2">
                     <Button variant="ghost" size="sm" onClick={markAsNoShow} disabled={saving} className="h-8 px-2 text-red-500 hover:text-red-700 hover:bg-red-50 gap-1 rounded-lg">
-                      <UserX className="w-3.5 h-3.5" />
-                      <span className="text-[11px] font-bold">No Show</span>
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span className="text-[11px] font-bold">No Show / Remove</span>
                     </Button>
                     <Badge variant="outline" className="text-[10px] font-bold px-2 py-0.5 border-slate-200">
                       TOKEN #{selectedVisit.token_number}
@@ -848,71 +353,48 @@ Follow the instructions carefully.
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-6 pb-6">
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 text-sm">
-                  <div className="bg-muted/50 p-3 rounded-xl border border-border">
-                    <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Age / Sex</p>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                  <div className="bg-muted/30 p-3 rounded-xl border border-border">
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Age / Sex</p>
                     <p className="text-base font-bold text-foreground">{formatAge(patient?.age)}/{patient?.sex?.charAt(0) ?? '—'}</p>
                   </div>
-                  <div className="bg-muted/50 p-3 rounded-xl border border-border">
-                    <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Phone</p>
+                  <div className="bg-muted/30 p-3 rounded-xl border border-border">
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Phone</p>
                     <p className="text-base font-bold text-foreground">{patient?.phone}</p>
                   </div>
                 </div>
 
-                <div className="mt-8">
-                  <div className="flex items-center justify-between mb-4">
+                {/* Vitals Section */}
+                <div className="mt-6 space-y-4">
+                  <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Activity className="w-4 h-4 text-blue-500" />
-                      <h4 className="text-[12px] font-extrabold text-muted-foreground uppercase tracking-widest">Clinical Vitals</h4>
+                      <h4 className="text-[11px] font-extrabold text-muted-foreground uppercase tracking-widest">Clinical Vitals</h4>
                     </div>
-                    <div className="flex items-center gap-1.5 ml-2 mr-2 border-l border-r px-2">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-8 w-8 p-0 rounded-full hover:bg-blue-500/10 text-blue-500"
-                        onClick={() => {
-                          const firstStaff = allUsers.find(u => u.role === 'staff' && !!onlineUsers[u.id]);
-                          if (firstStaff) makeCall(firstStaff.id, firstStaff.full_name, 'video');
-                          else navigate(slug ? `/${slug}/calls` : '/calls');
-                        }}
-                        title="Video Consult Staff"
-                      >
-                        <Video className="w-4 h-4" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-8 w-8 p-0 rounded-full hover:bg-primary/10 text-primary"
-                        onClick={() => {
-                          const firstStaff = allUsers.find(u => u.role === 'staff' && !!onlineUsers[u.id]);
-                          if (firstStaff) makeCall(firstStaff.id, firstStaff.full_name, 'audio');
-                          else navigate(slug ? `/${slug}/calls` : '/calls');
-                        }}
-                        title="Audio Call Staff"
-                      >
-                        <Phone className="w-4 h-4" />
+                    <div className="flex items-center gap-1.5 ml-2 border-l pl-2">
+                      <Button variant="ghost" size="sm" onClick={() => setShowVitalsEdit(true)} className="h-8 px-2 text-blue-600 hover:bg-blue-50 gap-1 rounded-lg">
+                        <Pencil className="w-3.5 h-3.5" />
+                        <span className="text-[11px] font-bold">Edit Vitals</span>
                       </Button>
                     </div>
-                    <Button variant="ghost" size="sm" onClick={() => setShowVitalsEdit(true)} className="h-8 px-2 text-blue-600 hover:bg-blue-50 gap-1 rounded-lg">
-                      <Pencil className="w-3.5 h-3.5" />
-                      <span className="text-[11px] font-bold">Edit</span>
-                    </Button>
                   </div>
+
                   <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                     {[
-                      { label: 'Weight', value: selectedVisit.weight, unit: 'kg', icon: Scale, color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-500/10' },
-                      { label: 'BP', value: selectedVisit.blood_pressure, unit: 'mmHg', icon: Heart, color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-500/10' },
-                      { label: 'Pulse', value: selectedVisit.pulse_rate, unit: 'bpm', icon: Activity, color: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-500/10' },
-                      { label: 'SpO2', value: selectedVisit.spo2, unit: '%', icon: Wind, color: 'text-sky-500', bg: 'bg-sky-50 dark:bg-sky-500/10' },
-                      { label: 'Temp', value: selectedVisit.temperature, unit: '°F', icon: Thermometer, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-500/10' },
-                      { label: 'CBG', value: selectedVisit.cbg, unit: 'mg/dL', icon: Droplet, color: 'text-rose-500', bg: 'bg-rose-50 dark:bg-rose-500/10' },
+                      { label: 'Weight', value: selectedVisit.weight, unit: 'kg', icon: Scale, color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-500/10', dbKey: 'weight' },
+                      { label: 'BP', value: selectedVisit.blood_pressure, unit: 'mmHg', icon: HeartPulse, color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-500/10', dbKey: 'blood_pressure' },
+                      { label: 'Pulse', value: selectedVisit.pulse_rate, unit: 'bpm', icon: Activity, color: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-500/10', dbKey: 'pulse_rate' },
+                      { label: 'SpO2', value: selectedVisit.spo2, unit: '%', icon: Wind, color: 'text-sky-500', bg: 'bg-sky-50 dark:bg-sky-500/10', dbKey: 'spo2' },
+                      { label: 'Temp', value: selectedVisit.temperature, unit: '°F', icon: Thermometer, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-500/10', dbKey: 'temperature' },
+                      { label: 'CBG', value: selectedVisit.cbg, unit: 'mg/dL', icon: Droplet, color: 'text-rose-500', bg: 'bg-rose-50 dark:bg-rose-500/10', dbKey: 'cbg' },
                     ].map(v => (
-                      <div key={v.label} className="text-center p-3 rounded-2xl bg-card border border-border shadow-sm hover:border-blue-500/50 transition-all group flex flex-col items-center gap-1.5">
-                        <div className={cn("p-2 rounded-xl transition-colors", v.bg)}>
+                      <div key={v.label} className="text-center p-3 rounded-2xl bg-card border border-border shadow-sm flex flex-col items-center gap-1.5 hover:border-blue-500/30 transition-all">
+                        <div className={cn("p-2 rounded-xl", v.bg)}>
                           <v.icon className={cn("w-4 h-4", v.color)} />
                         </div>
-                        <p className="text-[10px] font-extrabold text-muted-foreground group-hover:text-blue-500 transition-colors uppercase">{v.label}</p>
-                        <p className="font-extrabold text-sm text-foreground leading-none">{v.value ?? '—'}<span className="text-[10px] font-medium ml-0.5 opacity-60 font-sans">{v.value ? ` ${v.unit}` : ''}</span></p>
+                        <p className="text-[10px] font-extrabold text-muted-foreground uppercase">{v.label}</p>
+                        <p className="font-extrabold text-sm text-foreground leading-none">{v.value ?? '—'}<span className="text-[10px] font-medium ml-0.5 opacity-60">{v.value ? ` ${v.unit}` : ''}</span></p>
+                        {renderSparkline(v.dbKey, v.color)}
                       </div>
                     ))}
                   </div>
@@ -920,476 +402,74 @@ Follow the instructions carefully.
               </CardContent>
             </Card>
 
-            {/* History */}
-            {history.length > 0 && (
-              <Card>
-                <CardHeader><CardTitle className="text-base">Visit History</CardTitle></CardHeader>
-                <CardContent>
-                  <div className="space-y-3 max-h-40 overflow-auto">
-                    {history.map(h => (
-                      <div key={h.id} className="text-sm p-3 rounded-xl bg-muted border border-border flex items-center justify-between group">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                             <span className="font-bold text-foreground">{new Date(h.created_at).toLocaleDateString()}</span>
-                             <span className="text-[10px] font-bold text-muted-foreground">TOKEN #{h.token_number}</span>
-                          </div>
-                          {h.diagnosis && <p className="text-xs text-muted-foreground mt-0.5 truncate italic">Dx: {h.diagnosis}</p>}
-                        </div>
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          className="h-8 w-8 p-0 text-muted-foreground hover:text-blue-600 hover:bg-blue-500/10 transition-colors shrink-0"
-                          onClick={async () => {
-                            setViewingHistoryRx(h);
-                            setLoadingHistoryRx(true);
-                            setCurrentHistoryRx(null);
-                            try {
-                              if (Array.isArray(h.prescriptions) && h.prescriptions.length > 0) {
-                                setCurrentHistoryRx(h.prescriptions[0]);
-                              } else {
-                                const { data } = await supabase.from('prescriptions').select('*').eq('visit_id', h.id).maybeSingle();
-                                if (data) setCurrentHistoryRx(data);
-                              }
-                            } finally {
-                              setLoadingHistoryRx(false);
-                            }
-                          }}
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+            {/* Visit History Sub-component */}
+            <HistoryViewer
+              history={history}
+              onViewRx={async (h) => {
+                setViewingHistoryRx(h);
+                setLoadingHistoryRx(true);
+                setCurrentHistoryRx(null);
+                try {
+                  if (Array.isArray(h.prescriptions) && h.prescriptions.length > 0) {
+                    setCurrentHistoryRx(h.prescriptions[0]);
+                  } else {
+                    const { data } = await supabase.from('prescriptions').select('*').eq('visit_id', h.id).maybeSingle();
+                    if (data) setCurrentHistoryRx(data);
+                  }
+                } finally {
+                  setLoadingHistoryRx(false);
+                }
+              }}
+            />
 
-            {/* Prescription */}
-            <Card className="border-none shadow-sm overflow-hidden bg-card">
-              <CardHeader className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 pb-4 px-6 bg-muted/50">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 bg-blue-500/10 rounded-md">
-                    <ClipboardList className="w-4 h-4 text-blue-600" />
-                  </div>
-                  <CardTitle className="text-lg font-bold text-foreground">Prescription Details</CardTitle>
-                </div>
-                
-                <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex items-center gap-1 bg-muted p-1 rounded-lg shrink-0 border border-border">
-                    <Button
-                      variant={!isWritingMode ? "secondary" : "ghost"}
-                      size="sm"
-                      onClick={() => {
-                        setIsWritingMode(false);
-                        setLastInputWay('typing');
-                      }}
-                      className={cn("h-8 px-3 text-[11px] font-bold", !isWritingMode && "bg-background shadow-sm")}
-                    >
-                      Typing Mode
-                    </Button>
-                    <Button
-                      variant={isWritingMode ? "secondary" : "ghost"}
-                      size="sm"
-                      onClick={() => {
-                        setIsWritingMode(true);
-                        setLastInputWay('writing');
-                      }}
-                      className={cn("h-8 px-3 text-[11px] font-bold", isWritingMode && "bg-background shadow-sm")}
-                    >
-                      Writing Mode
-                    </Button>
-                  </div>
+            {/* Consultation Main Form Sub-component */}
+            <ConsultationForm
+              selectedVisit={selectedVisit}
+              patient={patient}
+              diagnosis={diagnosis}
+              setDiagnosis={setDiagnosis}
+              diagnoses={diagnoses}
+              setDiagnoses={setDiagnoses}
+              clinicalNotes={clinicalNotes}
+              setClinicalNotes={setClinicalNotes}
+              medicines={medicines}
+              setMedicines={setMedicines}
+              advice={advice}
+              setAdvice={setAdvice}
+              saving={saving}
+              prescriptionImage={prescriptionImage}
+              setPrescriptionImage={setPrescriptionImage}
+              prescriptionPaths={prescriptionPaths}
+              setPrescriptionPaths={setPrescriptionPaths}
+              isWritingMode={isWritingMode}
+              setIsWritingMode={setIsWritingMode}
+              lastInputWay={lastInputWay}
+              setLastInputWay={setLastInputWay}
+              saveError={saveError}
+              protocols={protocols}
+              diagnosisHistory={diagnosisHistory}
+              isDraftRestored={isDraftRestored}
+              savePrescription={savePrescription}
+              markAsNoShow={markAsNoShow}
+              addMedicine={addMedicine}
+              removeMedicine={removeMedicine}
+              updateMedicine={updateMedicine}
+              handleMedicineKeyDown={handleMedicineKeyDown}
+              addDiagnosisTag={addDiagnosisTag}
+              removeDiagnosisTag={removeDiagnosisTag}
+              applyProtocol={applyProtocol}
+              onOpenDigitalRx={() => setShowDigitalRx(true)}
+              onOpenPreview={() => setShowPreview(true)}
+              syncStatus={syncStatus}
+            />
 
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      if (!isWritingMode) {
-                        toast.error("Please switch to Writing Mode first", {
-                          description: "The Pen template is only available in Writing Mode.",
-                          duration: 3000
-                        });
-                        return;
-                      }
-                      setShowDigitalRx(true);
-                    }}
-                    className={cn(
-                      "h-10 px-6 bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-lg rounded-xl border-none",
-                      !isWritingMode && "opacity-40"
-                    )}
-                  >
-                    <PenTool className="w-4 h-4 mr-2" />
-                    <span className="text-xs font-black uppercase tracking-widest">Open Signature & Pen Template</span>
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {isWritingMode && (
-                    <div className={cn(
-                        "flex flex-col items-center justify-center p-8 rounded-[2rem] border-2 border-dashed transition-all",
-                        prescriptionImage ? "border-emerald-500/30 bg-emerald-500/5" : "border-border bg-muted/50"
-                    )}>
-                        {prescriptionImage ? (
-                            <div className="relative group w-full max-w-md aspect-[1/1.414] bg-white rounded-2xl shadow-xl border overflow-hidden">
-                                <img 
-                                    src={Array.isArray(prescriptionImage) ? prescriptionImage[0] : (prescriptionImage?.startsWith('[') ? JSON.parse(prescriptionImage)[0] : prescriptionImage)} 
-                                    alt="Handwritten Rx" 
-                                    className="w-full h-full object-contain" 
-                                />
-                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                                    <Button size="sm" onClick={() => setShowDigitalRx(true)} className="bg-white text-slate-900 hover:bg-slate-100 font-bold">Edit</Button>
-                                    <Button variant="destructive" size="sm" onClick={() => setPrescriptionImage(null)} className="font-bold">Clear</Button>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="text-center space-y-4">
-                                <div className="w-20 h-20 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto text-blue-600">
-                                    <PenTool className="w-10 h-10" />
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="text-base font-black text-foreground">
-                                      {prescriptionPaths.flat().length > 0 ? "Handwriting Draft Available" : "No Pen Content Yet"}
-                                    </p>
-                                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
-                                      {prescriptionPaths.flat().length > 0 
-                                        ? "Open Template to continue or Save to finalize" 
-                                        : "Tap 'Open Template' above to start writing"}
-                                    </p>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-
-                <div className="space-y-3 relative">
-                  <div className="flex items-center justify-between ml-1">
-                    <Label className="text-[12px] font-extrabold text-muted-foreground uppercase tracking-widest">Diagnosis</Label>
-                    {isWritingMode && (
-                      <Badge variant="outline" className="text-[9px] font-bold text-blue-600 bg-blue-50 border-blue-200 uppercase tracking-tighter">
-                        Required for Analytics
-                      </Badge>
-                    )}
-                  </div>
-                  
-                  <div className="min-h-[56px] p-2 bg-muted/50 border border-border rounded-xl focus-within:ring-2 focus-within:ring-blue-500 transition-all flex flex-wrap gap-2 items-center">
-                    {diagnoses.map((tag, idx) => (
-                      <Badge key={idx} variant="secondary" className="pl-3 pr-1 py-1 h-8 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold flex items-center gap-1 border border-slate-200 dark:border-slate-700 shadow-sm animate-in zoom-in-50">
-                        {tag}
-                        <button 
-                          onClick={() => removeDiagnosisTag(idx)}
-                          className="w-5 h-5 rounded-md hover:bg-red-50 hover:text-red-500 transition-colors flex items-center justify-center"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </Badge>
-                    ))}
-                    <Input 
-                      value={diagnosis} 
-                      onChange={e => {
-                        const val = e.target.value.toUpperCase();
-                        setDiagnosis(val);
-                        setShowDiagnosisSuggestions(true);
-                        setSuggestionIndex(-1);
-                        if (!isWritingMode) setLastInputWay('typing');
-                      }} 
-                      onKeyDown={e => {
-                        const filteredSuggestions = diagnosisHistory
-                          .filter(h => h.toLowerCase().includes(diagnosis.toLowerCase()) && !diagnoses.includes(h))
-                          .slice(0, 10);
-
-                        if (e.key === 'ArrowDown') {
-                          e.preventDefault();
-                          setSuggestionIndex(prev => (prev < filteredSuggestions.length - 1 ? prev + 1 : prev));
-                        } else if (e.key === 'ArrowUp') {
-                          e.preventDefault();
-                          setSuggestionIndex(prev => (prev > 0 ? prev - 1 : -1));
-                        } else if (e.key === 'Enter') {
-                          e.preventDefault();
-                          if (suggestionIndex >= 0 && suggestionIndex < filteredSuggestions.length) {
-                            addDiagnosisTag(filteredSuggestions[suggestionIndex]);
-                          } else if (diagnosis.trim()) {
-                            addDiagnosisTag(diagnosis);
-                          }
-                        } else if (e.key === 'Backspace' && !diagnosis && diagnoses.length > 0) {
-                          removeDiagnosisTag(diagnoses.length - 1);
-                        } else if (e.key === 'Escape') {
-                          setShowDiagnosisSuggestions(false);
-                          setSuggestionIndex(-1);
-                        }
-                      }}
-                      onFocus={() => {
-                        setShowDiagnosisSuggestions(true);
-                        setSuggestionIndex(-1);
-                      }}
-                      placeholder={diagnoses.length === 0 ? "Type diagnosis & press Enter..." : ""} 
-                      className="flex-1 border-none shadow-none bg-transparent h-9 focus-visible:ring-0 text-base font-bold min-w-[120px]"
-                    />
-                  </div>
-
-                  {showDiagnosisSuggestions && diagnosis.trim() && (
-                    <div className="absolute top-full left-0 w-full mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
-                       <div className="max-h-60 overflow-y-auto p-1">
-                          {diagnosisHistory
-                            .filter(h => h.toLowerCase().includes(diagnosis.toLowerCase()) && !diagnoses.includes(h))
-                            .slice(0, 10)
-                            .map((h, i) => (
-                              <button 
-                                key={i}
-                                onClick={() => addDiagnosisTag(h)}
-                                onMouseEnter={() => setSuggestionIndex(i)}
-                                className={cn(
-                                  "w-full text-left px-4 py-2.5 text-sm font-bold rounded-lg transition-colors flex items-center gap-2",
-                                  suggestionIndex === i 
-                                    ? "bg-blue-600 text-white" 
-                                    : "hover:bg-blue-50 dark:hover:bg-blue-500/10 text-slate-700 dark:text-slate-300"
-                                )}
-                              >
-                                <Search className={cn("w-3.5 h-3.5", suggestionIndex === i ? "text-white/70" : "text-slate-400")} />
-                                {h}
-                              </button>
-                            ))
-                          }
-                          {diagnosisHistory.filter(h => h.toLowerCase().includes(diagnosis.toLowerCase()) && !diagnoses.includes(h)).length === 0 && (
-                            <div className="px-4 py-3 text-xs font-bold text-muted-foreground uppercase tracking-widest text-center">
-                               New Diagnosis
-                            </div>
-                          )}
-                       </div>
-                    </div>
-                  )}
-                </div>
-
-                {!isWritingMode && (
-                  <div className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-500">
-                    <div className="space-y-3">
-                      <Label className="text-[12px] font-extrabold text-muted-foreground uppercase tracking-widest ml-1">Clinical Notes</Label>
-                      <Textarea 
-                        value={clinicalNotes} 
-                        onChange={e => {
-                          setClinicalNotes(e.target.value);
-                          setLastInputWay('typing');
-                        }} 
-                        placeholder="Enter clinical examination notes, symptoms, etc." 
-                        className="min-h-[120px] text-base font-bold bg-muted/50 border-border focus:bg-card focus:ring-blue-500 transition-all rounded-xl resize-none shadow-inner"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {!isWritingMode && (
-                  <div className="space-y-6 animate-in fade-in slide-in-from-top-6 duration-700">
-                    <div className="space-y-4 pt-2">
-                      <div className="flex items-center justify-between ml-1">
-                        <Label className="text-[12px] font-extrabold text-muted-foreground uppercase tracking-widest">Medicines</Label>
-                        <div className="flex items-center gap-2">
-                          <Button size="sm" variant="outline" onClick={() => setShowProtocolDialog(true)} className="h-8 pr-3 pl-2 text-[11px] font-bold border-amber-500/20 text-amber-600 hover:bg-amber-500/10 bg-card rounded-lg">
-                            <HeartPulse className="w-3.5 h-3.5 mr-1" /> Protocol List
-                          </Button>
-                        </div>
-                      </div>
-                      <div className="space-y-3">
-                        {medicines.map((med, i) => (
-                          <div key={i} className="medicine-row flex gap-2 items-start bg-muted/30 p-3 rounded-2xl border border-border group relative">
-                            <div className="flex flex-col md:flex-row gap-3 flex-1">
-                              {/* Type Selector */}
-                              <div className="md:w-32 shrink-0">
-                                <p className="text-[9px] font-bold text-muted-foreground uppercase ml-1 mb-1">Type</p>
-                                <select 
-                                  value={med.type} 
-                                  onChange={e => updateMedicine(i, 'type', e.target.value)}
-                                  onKeyDown={e => handleMedicineKeyDown(e, i, 'type')}
-                                  className="w-full h-10 text-sm font-bold border border-border bg-card rounded-lg px-2 focus:ring-2 focus:ring-blue-500 outline-none text-foreground"
-                                >
-                                  <option value="Inj.">Inj.</option>
-                                  <option value="Supp.">Supp.</option>
-                                  <option value="Syp.">Syp.</option>
-                                  <option value="Tab.">Tab.</option>
-                                  <option value="Cap.">Cap.</option>
-                                  <option value="Oin.">Oin.</option>
-                                  <option value="cr.">cr.</option>
-                                  <option value="drops.">drops.</option>
-                                  <option value="Sac">Sac</option>
-                                </select>
-                              </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-12 gap-3 flex-1">
-                                  {/* Name */}
-                                  <div className="md:col-span-3 space-y-1">
-                                    <p className="text-[9px] font-bold text-muted-foreground uppercase ml-1">Name</p>
-                                    <Input 
-                                      placeholder="Medicine Name" 
-                                      value={med.name} 
-                                      onChange={e => {
-                                        updateMedicine(i, 'name', e.target.value);
-                                        setLastInputWay('typing');
-                                      }}
-                                      onKeyDown={e => handleMedicineKeyDown(e, i, 'name')}
-                                      className="h-10 text-sm font-bold border-border bg-card rounded-lg" 
-                                    />
-                                  </div>
-
-                                  {/* Dosage / Count */}
-                                  <div className="md:col-span-2 space-y-1">
-                                    <p className="text-[9px] font-bold text-muted-foreground uppercase ml-1">
-                                      {(med.type === 'Oin.' || med.type === 'cr.' || med.type === 'drops.' || med.type === 'Sac') ? 'Count' : 'Dosage'}
-                                    </p>
-                                    <Input 
-                                      placeholder={(med.type === 'Oin.' || med.type === 'cr.' || med.type === 'drops.' || med.type === 'Sac') ? "1 Tube / 1 Unit" : "500mg / 5ml"} 
-                                      value={med.dosage || med.count || ''} 
-                                      onChange={e => {
-                                        const key = (med.type === 'Oin.' || med.type === 'cr.' || med.type === 'drops.' || med.type === 'Sac') ? 'count' : 'dosage';
-                                        updateMedicine(i, key, e.target.value);
-                                      }} 
-                                      onKeyDown={e => handleMedicineKeyDown(e, i, 'dosage')} 
-                                      className="h-10 text-sm font-bold border-border bg-card rounded-lg placeholder:opacity-50" 
-                                    />
-                                  </div>
-
-                                  {/* Route (Global) */}
-                                  <div className="md:col-span-1 space-y-1">
-                                    <p className="text-[9px] font-bold text-blue-600 uppercase ml-1">Route</p>
-                                    <Input 
-                                      placeholder={med.type === 'Inj.' ? "I.M / I.V" : (med.type === 'Oin.' || med.type === 'cr.' ? "External" : "Oral")} 
-                                      value={med.route || ''} 
-                                      onChange={e => updateMedicine(i, 'route', e.target.value)} 
-                                      onKeyDown={e => handleMedicineKeyDown(e, i, 'route')} 
-                                      className="h-10 text-sm font-bold border-blue-500/20 bg-blue-500/5 rounded-lg text-blue-600 dark:text-blue-400 placeholder:text-blue-200/50" 
-                                    />
-                                  </div>
-
-                                  {/* Frequency */}
-                                  <div className="md:col-span-2 space-y-1">
-                                    <p className="text-[9px] font-bold text-purple-600 uppercase ml-1">Frequency</p>
-                                    <div className="relative medicine-freq-container">
-                                      <Input 
-                                        placeholder={med.type === 'Inj.' ? "Stat / SOS" : "1-0-1"} 
-                                        value={med.frequency || ''} 
-                                        onChange={e => updateMedicine(i, 'frequency', e.target.value)} 
-                                        onKeyDown={e => handleMedicineKeyDown(e, i, 'frequency')} 
-                                        className="h-10 pr-9 text-sm font-bold border-purple-500/20 bg-purple-500/5 rounded-lg text-purple-600 dark:text-purple-400 placeholder:text-purple-200/50" 
-                                      />
-                                      <Popover open={openFreqPopoverIndex === i} onOpenChange={(open) => setOpenFreqPopoverIndex(open ? i : null)}>
-                                        <PopoverTrigger asChild>
-                                          <Button 
-                                            variant="ghost" 
-                                            size="icon" 
-                                            className="absolute right-0 top-0 h-10 w-9 hover:bg-purple-500/10 rounded-r-lg"
-                                            title="Select Frequency"
-                                          >
-                                            <ChevronDown className="h-4 w-4 text-purple-500" />
-                                          </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-[180px] p-0 shadow-xl border-purple-500/20" align="end">
-                                          <div className="max-h-60 overflow-auto p-1 bg-card rounded-lg touch-pan-y">
-                                            {(med.type === 'Inj.' ? ['Stat', 'SOS', 'Once daily', 'Twice daily'] : COMMON_FREQUENCIES).map(freq => (
-                                              <button
-                                                key={freq}
-                                                className="w-full text-left px-3 py-2 text-[13px] font-bold hover:bg-purple-500/10 text-foreground rounded-md transition-colors"
-                                                onClick={() => {
-                                                  updateMedicine(i, 'frequency', freq);
-                                                  setOpenFreqPopoverIndex(null);
-                                                }}
-                                              >
-                                                {freq}
-                                              </button>
-                                            ))}
-                                          </div>
-                                        </PopoverContent>
-                                      </Popover>
-                                    </div>
-                                  </div>
-
-                                  {/* Duration */}
-                                  <div className="md:col-span-2 space-y-1">
-                                    <p className="text-[9px] font-bold text-orange-600 uppercase ml-1">Duration</p>
-                                    <Input 
-                                      placeholder="5 Days / 1 Wk" 
-                                      value={med.duration || ''} 
-                                      onChange={e => updateMedicine(i, 'duration', e.target.value)} 
-                                      onKeyDown={e => handleMedicineKeyDown(e, i, 'duration')} 
-                                      className="h-10 text-sm font-bold border-orange-500/20 bg-orange-500/5 rounded-lg text-orange-600 dark:text-orange-400 placeholder:text-orange-200/50" 
-                                    />
-                                  </div>
-
-                                  {/* Remarks / Notes */}
-                                  <div className="md:col-span-2 space-y-1">
-                                    <p className="text-[9px] font-bold text-emerald-600 uppercase ml-1">Remarks</p>
-                                    <Input 
-                                      placeholder="After Food / Night" 
-                                      value={med.notes || ''} 
-                                      onChange={e => updateMedicine(i, 'notes', e.target.value)} 
-                                      onKeyDown={e => handleMedicineKeyDown(e, i, 'notes')} 
-                                      className="h-10 text-sm font-bold border-emerald-500/20 bg-emerald-500/5 rounded-lg text-emerald-600 dark:text-emerald-400 placeholder:text-emerald-200/50" 
-                                    />
-                                  </div>
-                                </div>
-                            </div>
-                            <Button size="icon" variant="ghost" onClick={() => removeMedicine(i)} className="text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-lg h-10 w-10 mt-1 transition-colors self-end md:self-center">
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        ))}
-                        <div className="pt-4 flex justify-center">
-                          <Button 
-                            variant="outline" 
-                            onClick={addMedicine} 
-                            className="h-11 px-8 text-sm font-bold border-dashed border-2 border-blue-500/30 text-blue-600 hover:bg-blue-500/5 bg-transparent rounded-2xl transition-all hover:scale-105 active:scale-95 group"
-                          >
-                            <Plus className="w-4 h-4 mr-2 group-hover:rotate-90 transition-transform" /> Add Another Medicine
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-3 pt-2">
-                      <Label className="text-[12px] font-extrabold text-muted-foreground uppercase tracking-widest ml-1">Advice</Label>
-                      <Input 
-                        value={advice} 
-                        onChange={e => setAdvice(e.target.value)} 
-                        placeholder="Drink plenty of water..." 
-                        className="h-12 text-base font-bold bg-muted/50 border-border focus:bg-card focus:ring-blue-500 transition-all rounded-xl shadow-inner"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-11"
-                    onClick={() => setShowPreview(true)}
-                  >
-                    <Eye className="w-4 h-4 mr-2" />
-                    Preview
-                  </Button>
-                  <Button 
-                    onClick={savePrescription} 
-                    disabled={saving} 
-                    className={cn(
-                      "h-11 shadow-lg transition-all",
-                      saveError ? "bg-red-600 hover:bg-red-700 animate-pulse" : "bg-primary hover:bg-primary/90"
-                    )}
-                  >
-                    {saving ? (
-                      <span key="saving" className="flex items-center"><Loader2 className="w-4 h-4 animate-spin mr-2" /> Saving...</span>
-                    ) : (
-                      saveError ? (
-                        <span key="error" className="flex items-center"><RefreshCw className="w-4 h-4 mr-2" /> Retry Save</span>
-                      ) : (
-                        <span key="idle" className="flex items-center"><Save className="w-4 h-4 mr-2" /> Save & Complete</span>
-                      )
-                    )}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
           </div>
         )}
       </div>
 
-      {/* Overlays */}
+      {/* ── OVERLAYS & MODALS ── */}
+
+      {/* 1. Digital Prescription Pen Canvas */}
       {showDigitalRx && (
         <DigitalPrescription
           patient={patient}
@@ -1404,22 +484,31 @@ Follow the instructions carefully.
         />
       )}
 
-      {/* Preview Dialog */}
+      {/* 2. Prescription Preview Dialogue */}
       <Dialog open={showPreview} onOpenChange={setShowPreview}>
         <DialogContent className="max-w-[900px] w-[95vw] p-0 overflow-hidden bg-background">
-          <DialogHeader className="bg-muted/50 p-4 pr-12 border-b relative">
-              <div className="flex items-center gap-2 z-10">
-                <Button variant="outline" size="sm" onClick={() => printPrescription('#consultation-print-preview')} className="gap-2">
-                  <Printer className="w-4 h-4" /> Print
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => shareToWhatsApp(selectedVisit, patient)} className="gap-2 border-green-500/30 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/10">
-                  <MessageCircle className="w-4 h-4" /> Share
-                </Button>
-              </div>
-              <DialogTitle className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap text-sm font-black uppercase tracking-widest text-slate-400">
-                Prescription Preview
-              </DialogTitle>
-              <div className="w-40" /> {/* Spacer for symmetry */}
+          <DialogHeader className="bg-muted/50 p-4 pr-12 border-b relative flex flex-row items-center justify-between">
+            <div className="flex items-center gap-2 z-10">
+              <Button variant="outline" size="sm" onClick={() => printPrescription('#consultation-print-preview')} className="gap-2">
+                <Printer className="w-4 h-4" /> Print PDF
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => shareToWhatsApp(selectedVisit, patient)} className="gap-2 border-green-500/30 text-green-600 hover:bg-green-50">
+                <MessageCircle className="w-4 h-4" /> WhatsApp
+              </Button>
+              
+              <label className="text-xs font-bold text-slate-500 cursor-pointer select-none flex items-center gap-1.5 bg-background border border-border px-2.5 py-1.5 rounded-lg shadow-sm">
+                <input
+                  type="checkbox"
+                  checked={printOnStationery}
+                  onChange={(e) => setPrintOnStationery(e.target.checked)}
+                  className="h-3.5 w-3.5 text-blue-600 rounded cursor-pointer animate-none"
+                />
+                Print on letterhead
+              </label>
+            </div>
+            <DialogTitle className="hidden sm:block absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap text-sm font-black uppercase tracking-widest text-slate-400">
+              Prescription Preview
+            </DialogTitle>
           </DialogHeader>
           <div className="p-4 md:p-8 overflow-auto max-h-[85vh] bg-muted min-h-[500px]" id="consultation-print-preview">
             <PrescriptionTemplate
@@ -1434,61 +523,60 @@ Follow the instructions carefully.
                isPrint={true}
                doctorId={user?.id}
                prescriptionCreatedAt={new Date().toISOString()}
-               // Overrides for dynamic profile display
                doctorName={myProfile?.full_name}
                doctorQualifications={myProfile?.qualifications}
                doctorRegId={myProfile?.registration_id}
                clinicName={myProfile?.clinic_name}
                clinicAddress={myProfile?.clinic_address}
                clinicPhone={myProfile?.clinic_phone}
+               hideBranding={printOnStationery}
              />
           </div>
         </DialogContent>
-        </Dialog>
+      </Dialog>
 
-      {/* 5. History Rx Preview Dialog */}
+      {/* 3. Past Visit Rx Preview Dialogue */}
       <Dialog open={!!viewingHistoryRx} onOpenChange={open => !open && setViewingHistoryRx(null)}>
-        <DialogContent className="max-w-[800px] p-0 overflow-hidden bg-muted elevation-2xl rounded-[2.5rem] border-none">
-          <div className="bg-card p-4 border-b border-border flex items-center justify-between sticky top-0 z-20">
-            <h3 className="font-bold text-foreground">Prescription History</h3>
-            <div className="flex items-center gap-2">
-              <Button size="sm" onClick={() => printPrescription('.print-container')} className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90 font-bold px-4">
-                <Printer className="w-4 h-4" /> <span className="hidden sm:inline">Print</span>
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => setViewingHistoryRx(null)} className="gap-1 border-muted-foreground/20 text-muted-foreground hover:bg-red-50 hover:text-red-600 font-bold px-4">
-                <X className="w-4 h-4" /> <span className="hidden sm:inline">Close</span>
-              </Button>
-            </div>
-          </div>
-          <div className="p-4 md:p-8 overflow-y-auto max-h-[85vh] scrollbar-thin scrollbar-thumb-muted-foreground/20 min-h-[500px]">
-            {viewingHistoryRx && (
-                <div className="relative min-h-[400px]">
-                  {loadingHistoryRx ? (
-                    <div className="absolute inset-0 flex items-center justify-center bg-white/50 z-50">
-                      <Loader2 className="animate-spin h-8 w-8 text-primary" />
-                    </div>
-                  ) : (
-                    <PrescriptionTemplate
-                      patient={viewingHistoryRx.patients || patient}
-                      visit={viewingHistoryRx}
-                      diagnosis={currentHistoryRx?.diagnosis || viewingHistoryRx?.diagnosis}
-                      clinicalNotes={currentHistoryRx?.clinical_notes || viewingHistoryRx?.clinical_notes}
-                      medicines={currentHistoryRx?.medicines || viewingHistoryRx?.medicines || []}
-                      advice={currentHistoryRx?.advice_image || viewingHistoryRx?.advice_image}
-                      handwrittenImage={currentHistoryRx?.advice_image || viewingHistoryRx?.advice_image}
-                      isWritingMode={currentHistoryRx?.is_writing_mode ?? (!!currentHistoryRx?.advice_image && (String(currentHistoryRx.advice_image).startsWith('data:image') || String(currentHistoryRx.advice_image).startsWith('[')))}
-                      isPrint={true}
-                      doctorId={currentHistoryRx?.doctor_id || viewingHistoryRx?.doctor_id}
-                      prescriptionCreatedAt={currentHistoryRx?.created_at || viewingHistoryRx?.created_at}
-                    />
-                  )}
-                </div>
+        <DialogContent className="max-w-[800px] w-[95vw] p-0 overflow-hidden bg-background">
+          <DialogHeader className="p-4 border-b bg-muted/30">
+            <DialogTitle className="text-sm font-bold text-center">
+              Visit Details — {viewingHistoryRx && new Date(viewingHistoryRx.created_at).toLocaleDateString()}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="p-4 md:p-8 overflow-auto max-h-[75vh] bg-slate-100">
+            {loadingHistoryRx ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : (
+              currentHistoryRx && (
+                <PrescriptionTemplate
+                  patient={patient}
+                  visit={viewingHistoryRx}
+                  handwrittenImage={currentHistoryRx.advice_image}
+                  clinicalNotes={currentHistoryRx.clinical_notes}
+                  diagnosis={currentHistoryRx.diagnosis}
+                  medicines={currentHistoryRx.medicines || []}
+                  advice={currentHistoryRx.advice_image && !currentHistoryRx.advice_image.startsWith('data:image') && !currentHistoryRx.advice_image.startsWith('[') ? currentHistoryRx.advice_image : ''}
+                  isWritingMode={currentHistoryRx.is_writing_mode}
+                  isPrint={true}
+                  doctorId={currentHistoryRx.doctor_id}
+                  prescriptionCreatedAt={currentHistoryRx.created_at}
+                  doctorName={myProfile?.full_name}
+                  doctorQualifications={myProfile?.qualifications}
+                  doctorRegId={myProfile?.registration_id}
+                  clinicName={myProfile?.clinic_name}
+                  clinicAddress={myProfile?.clinic_address}
+                  clinicPhone={myProfile?.clinic_phone}
+                  hideBranding={printOnStationery}
+                />
+              )
             )}
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Vitals Edit Dialog */}
+      {/* 4. Vitals Edit Dialogue */}
       <Dialog open={showVitalsEdit} onOpenChange={setShowVitalsEdit}>
         <DialogContent className="max-w-[400px]">
           <DialogHeader>
@@ -1502,23 +590,21 @@ Follow the instructions carefully.
                 step="0.1"
                 min="0"
                 max="300"
-                value={selectedVisit?.weight || ''} 
+                value={vitalsWeight} 
                 onChange={e => {
                   const val = parseFloat(e.target.value);
                   if (val > 300) return;
-                  setSelectedVisit({...selectedVisit, weight: e.target.value});
+                  setVitalsWeight(e.target.value);
                 }}
               />
             </div>
             <div className="space-y-2">
               <Label>BP (mmHg)</Label>
               <Input 
-                value={selectedVisit?.blood_pressure || ''} 
+                value={vitalsBP} 
                 onChange={e => {
-                  const val = e.target.value;
-                  // Basic validation: max length or pattern if needed
-                  if (val.length > 7) return; 
-                  setSelectedVisit({...selectedVisit, blood_pressure: val});
+                  if (e.target.value.length > 7) return; 
+                  setVitalsBP(e.target.value);
                 }}
                 placeholder="120/80"
               />
@@ -1529,11 +615,11 @@ Follow the instructions carefully.
                 type="number" 
                 min="0"
                 max="250"
-                value={selectedVisit?.pulse_rate || ''} 
+                value={vitalsPulse} 
                 onChange={e => {
                   const val = parseInt(e.target.value);
                   if (val > 250) return;
-                  setSelectedVisit({...selectedVisit, pulse_rate: e.target.value});
+                  setVitalsPulse(e.target.value);
                 }}
               />
             </div>
@@ -1544,11 +630,11 @@ Follow the instructions carefully.
                 step="0.1"
                 min="0"
                 max="100"
-                value={selectedVisit?.spo2 || ''} 
+                value={vitalsSpO2} 
                 onChange={e => {
                   const val = parseFloat(e.target.value);
                   if (val > 100) return;
-                  setSelectedVisit({...selectedVisit, spo2: e.target.value});
+                  setVitalsSpO2(e.target.value);
                 }}
               />
             </div>
@@ -1559,11 +645,11 @@ Follow the instructions carefully.
                 step="0.1"
                 min="90"
                 max="115"
-                value={selectedVisit?.temperature || ''} 
+                value={vitalsTemp} 
                 onChange={e => {
                   const val = parseFloat(e.target.value);
                   if (val > 115) return;
-                  setSelectedVisit({...selectedVisit, temperature: e.target.value});
+                  setVitalsTemp(e.target.value);
                 }}
               />
             </div>
@@ -1573,11 +659,11 @@ Follow the instructions carefully.
                 type="number" 
                 min="0"
                 max="800"
-                value={selectedVisit?.cbg || ''} 
+                value={vitalsCBG} 
                 onChange={e => {
                   const val = parseInt(e.target.value);
                   if (val > 800) return;
-                  setSelectedVisit({...selectedVisit, cbg: e.target.value});
+                  setVitalsCBG(e.target.value);
                 }}
               />
             </div>
@@ -1587,15 +673,41 @@ Follow the instructions carefully.
             <Button onClick={async () => {
               try {
                 const { error } = await supabase.from('visits').update({
-                  weight: selectedVisit.weight,
-                  blood_pressure: selectedVisit.blood_pressure,
-                  pulse_rate: selectedVisit.pulse_rate,
-                  spo2: selectedVisit.spo2,
-                  temperature: selectedVisit.temperature,
-                  cbg: selectedVisit.cbg
+                  weight: vitalsWeight ? parseFloat(vitalsWeight) : null,
+                  blood_pressure: vitalsBP || null,
+                  pulse_rate: vitalsPulse ? parseInt(vitalsPulse) : null,
+                  spo2: vitalsSpO2 ? parseFloat(vitalsSpO2) : null,
+                  temperature: vitalsTemp ? parseFloat(vitalsTemp) : null,
+                  cbg: vitalsCBG ? parseInt(vitalsCBG) : null
                 }).eq('id', selectedVisit.id);
+                
                 if (error) throw error;
-                toast.success('Vitals updated');
+                
+                // Update queue cache local state as well
+                queryClient.setQueryData(['visitQueue', clinic?.id, user?.id, profile?.id || myProfile?.id], (oldQueue: any[]) => {
+                  return (oldQueue || []).map(v => v.id === selectedVisit.id ? { 
+                    ...v, 
+                    weight: vitalsWeight ? parseFloat(vitalsWeight) : null,
+                    blood_pressure: vitalsBP || null,
+                    pulse_rate: vitalsPulse ? parseInt(vitalsPulse) : null,
+                    spo2: vitalsSpO2 ? parseFloat(vitalsSpO2) : null,
+                    temperature: vitalsTemp ? parseFloat(vitalsTemp) : null,
+                    cbg: vitalsCBG ? parseInt(vitalsCBG) : null
+                  } : v);
+                });
+
+                // Update selectedVisit
+                setSelectedVisit(prev => ({
+                  ...prev,
+                  weight: vitalsWeight ? parseFloat(vitalsWeight) : null,
+                  blood_pressure: vitalsBP || null,
+                  pulse_rate: vitalsPulse ? parseInt(vitalsPulse) : null,
+                  spo2: vitalsSpO2 ? parseFloat(vitalsSpO2) : null,
+                  temperature: vitalsTemp ? parseFloat(vitalsTemp) : null,
+                  cbg: vitalsCBG ? parseInt(vitalsCBG) : null
+                }));
+
+                toast.success('Clinical vitals updated successfully');
                 setShowVitalsEdit(false);
               } catch (e: any) {
                 toast.error(e.message);
@@ -1604,60 +716,109 @@ Follow the instructions carefully.
           </div>
         </DialogContent>
       </Dialog>
-      {/* Protocol Selection Dialog */}
-      <Dialog open={showProtocolDialog} onOpenChange={setShowProtocolDialog}>
-        <DialogContent className="max-w-2xl w-[95vw] p-0 overflow-hidden border-none bg-slate-50 dark:bg-slate-900 rounded-[2.5rem] shadow-2xl">
-          <DialogHeader className="p-8 bg-white dark:bg-slate-800 border-b dark:border-slate-700">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-amber-50 dark:bg-amber-900/40 rounded-2xl">
-                <HeartPulse className="w-6 h-6 text-amber-600 dark:text-amber-400" />
-              </div>
-              <div>
-                <DialogTitle className="text-2xl font-black tracking-tight text-slate-900 dark:text-slate-100">Apply Medicine Protocol</DialogTitle>
-                <DialogDescription className="font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest text-[10px] mt-1">Instantly fill prescription with your saved favorites</DialogDescription>
-              </div>
-            </div>
+
+      {/* What's New Floating Trigger Button */}
+      <div className="fixed bottom-4 left-4 z-[40]">
+        <Button
+          onClick={() => setShowChangelog(true)}
+          className="bg-indigo-650 hover:bg-indigo-700 text-white font-extrabold text-[10px] rounded-full shadow-lg h-9 px-4 flex items-center gap-1.5 uppercase tracking-wider transition-all hover:scale-105 active:scale-95"
+        >
+          <Sparkles className="w-3.5 h-3.5 text-yellow-300 animate-pulse" /> What's New (v2.2)
+        </Button>
+      </div>
+
+      {/* 5. What's New / Changelog Dialogue */}
+      <Dialog open={showChangelog} onOpenChange={setShowChangelog}>
+        <DialogContent className="max-w-[600px] w-[95vw] rounded-[2rem] p-0 overflow-hidden border-none shadow-2xl bg-card">
+          <DialogHeader className="p-6 bg-gradient-to-r from-blue-650 to-indigo-650 text-white relative">
+            <DialogTitle className="text-xl font-black flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-yellow-300 animate-pulse" />
+              IN THIS VERSION (v2.2)
+            </DialogTitle>
+            <DialogDescription className="text-blue-100 font-bold text-xs mt-1">
+              Key updates and workflow enhancements requested by our clinics.
+            </DialogDescription>
           </DialogHeader>
-
-          <div className="p-6 space-y-4 max-h-[50vh] overflow-y-auto">
-            {protocols.map(p => (
-              <button
-                key={p.id}
-                onClick={() => applyProtocol(p)}
-                className="w-full flex items-center justify-between p-5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 group hover:border-blue-200 dark:hover:border-blue-700 transition-all shadow-sm text-left hover:-translate-y-1"
-              >
-                <div className="flex flex-col gap-1">
-                  <div className="font-black text-slate-900 dark:text-slate-100 leading-tight flex items-center gap-2">
-                    {p.name}
-                    <span className="text-[10px] bg-blue-100 dark:bg-blue-900/40 text-blue-600 px-2 py-0.5 rounded-full uppercase tracking-tighter">
-                      {p.medicines.length} Items
-                    </span>
+          
+          <div className="p-6 overflow-y-auto max-h-[60vh] space-y-4">
+            <div className="space-y-3.5">
+              {[
+                {
+                  icon: GripVertical,
+                  color: 'text-blue-500 bg-blue-50 dark:bg-blue-950/30',
+                  title: 'Draggable Floating Canvas Toolbar',
+                  desc: 'Handwriting canvas toolbar is now a draggable floating card with large touch targets, designed for tablets and styluses.'
+                },
+                {
+                  icon: Sparkles,
+                  color: 'text-pink-500 bg-pink-50 dark:bg-pink-950/30',
+                  title: 'Marching Ants Bounding Box',
+                  desc: 'Selected handwriting drawings now feature animated dashed outlines to clearly represent active selection.'
+                },
+                {
+                  icon: Stethoscope,
+                  color: 'text-indigo-500 bg-indigo-50 dark:bg-indigo-950/30',
+                  title: 'Patient Queue Wait Times',
+                  desc: 'Shows real-time waiting timers (e.g. "15m wait") directly in the patient queue sidebar.'
+                },
+                {
+                  icon: Info,
+                  color: 'text-red-500 bg-red-50 dark:bg-red-950/30',
+                  title: 'Abnormal Vitals Warning Flags',
+                  desc: 'Flags high/low SpO2 (<95%), high Temperature (>100.4°F), or abnormal BP in the queue for rapid triage support.'
+                },
+                {
+                  icon: Activity,
+                  color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10',
+                  title: 'Patient Vitals Trend Sparklines',
+                  desc: 'Shows inline SVG line charts inside vitals cells to visualize patient vital history trends over previous visits.'
+                },
+                {
+                  icon: Droplet,
+                  color: 'text-purple-500 bg-purple-50 dark:bg-purple-500/10',
+                  title: 'Visual Frequency Toggles',
+                  desc: 'Tap visual Morning/Afternoon/Night pill buttons below frequency inputs to quickly fill standard medical shorthand (e.g. 1-0-1).'
+                },
+                {
+                  icon: Printer,
+                  color: 'text-slate-500 bg-slate-50 dark:bg-slate-900/30',
+                  title: 'Pre-printed Stationery Switcher',
+                  desc: 'Toggle branding headers off to print digital prescriptions directly onto physical letterhead pads.'
+                }
+              ].map((item, index) => (
+                <div key={index} className="flex gap-3.5 items-start p-3 bg-muted/30 dark:bg-slate-900/10 border border-border/50 rounded-2xl">
+                  <div className={cn("p-2 rounded-xl shrink-0 mt-0.5", item.color)}>
+                    <item.icon className="w-4 h-4" />
                   </div>
-                  <div className="text-[11px] font-bold text-slate-400 line-clamp-1">
-                    {p.medicines.map((m: any) => m.name).join(', ')}
+                  <div>
+                    <h5 className="font-extrabold text-[13px] text-slate-800 dark:text-slate-200">{item.title}</h5>
+                    <p className="text-[11px] font-bold text-muted-foreground mt-0.5 leading-relaxed">{item.desc}</p>
                   </div>
                 </div>
-                <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-blue-500 group-hover:translate-x-1 transition-all" />
-              </button>
-            ))}
-            {protocols.length === 0 && (
-              <div className="text-center py-12 space-y-4 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl">
-                <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto">
-                  <HeartPulse className="w-8 h-8 text-muted-foreground/30" />
-                </div>
-                <p className="text-muted-foreground font-bold uppercase tracking-widest text-[10px]">No protocols saved yet</p>
-                <Button variant="outline" size="sm" className="rounded-full" onClick={() => navigate(slug ? `/${slug}/profile` : '/profile')}>
-                  Create Protocols in Profile
-                </Button>
-              </div>
-            )}
+              ))}
+            </div>
           </div>
-
-          <DialogFooter className="p-6 bg-slate-50 dark:bg-slate-800 border-t dark:border-slate-700 flex items-center justify-end">
-            <Button variant="ghost" onClick={() => setShowProtocolDialog(false)} className="rounded-full font-bold h-11 px-8 uppercase text-[10px] tracking-widest dark:text-slate-300">Close</Button>
+          
+          <DialogFooter className="p-4 border-t bg-muted/10 flex justify-end">
+            <div className="flex gap-3">
+              <Button 
+                variant="outline"
+                onClick={() => { setShowChangelog(false); navigate(slug ? `/${slug}/about` : '/about'); }}
+                className="font-extrabold text-xs uppercase tracking-widest px-5 py-4 rounded-xl"
+              >
+                Full Version History
+              </Button>
+              <Button 
+                onClick={handleAcknowledgeChangelog} 
+                className="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs uppercase tracking-widest px-8 py-4 rounded-xl shadow-lg"
+              >
+                Got It!
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
     </div>
   );
 }

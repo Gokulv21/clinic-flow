@@ -4,10 +4,11 @@ import { Button } from '@/components/ui/button';
 import { 
     Maximize2, Minimize2, Trash2, Save, Undo, Redo, X, 
     Eraser, PenTool, Circle, Plus, ChevronLeft, ChevronRight, 
-    Tablet, Settings2, AlertTriangle 
+    Tablet, Settings2, AlertTriangle, Scissors, Copy, ClipboardPaste, BookOpen, GripVertical 
 } from 'lucide-react';
 import PrescriptionTemplate from './PrescriptionTemplate';
 import { getStroke } from 'perfect-freehand';
+import { polygonContains } from 'd3-polygon';
 import { useGesture } from '@use-gesture/react';
 import {
   AlertDialog,
@@ -51,6 +52,67 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
     const [isEraser, setIsEraser] = useState(false);
     const [pointerPos, setPointerPos] = useState({ x: 0, y: 0 });
     const [isPointerInCanvas, setIsPointerInCanvas] = useState(false);
+
+    // Draggable Floating Toolbar State
+    const [toolbarPos, setToolbarPos] = useState({ x: 0, y: 15 });
+    const isDraggingToolbarRef = useRef(false);
+    const dragStartRef = useRef({ x: 0, y: 0 });
+    const dashOffsetRef = useRef(0);
+
+    const handleToolbarPointerDown = (e: React.PointerEvent) => {
+        const target = e.target as HTMLElement;
+        const dragHandle = target.closest('.drag-handle');
+        if (!dragHandle) return;
+        
+        isDraggingToolbarRef.current = true;
+        dragStartRef.current = { x: e.clientX - toolbarPos.x, y: e.clientY - toolbarPos.y };
+        dragHandle.setPointerCapture(e.pointerId);
+    };
+
+    const handleToolbarPointerMove = (e: React.PointerEvent) => {
+        if (!isDraggingToolbarRef.current) return;
+        setToolbarPos({
+            x: e.clientX - dragStartRef.current.x,
+            y: e.clientY - dragStartRef.current.y
+        });
+    };
+
+    const handleToolbarPointerUp = (e: React.PointerEvent) => {
+        if (!isDraggingToolbarRef.current) return;
+        isDraggingToolbarRef.current = false;
+        const target = e.target as HTMLElement;
+        const dragHandle = target.closest('.drag-handle');
+        if (dragHandle) {
+            try { dragHandle.releasePointerCapture(e.pointerId); } catch {}
+        }
+    };
+
+    // Lasso and Selection State
+    const [toolMode, setToolMode] = useState<'pen' | 'eraser' | 'lasso' | 'select'>('pen');
+    const [lassoPath, setLassoPath] = useState<{x: number, y: number}[]>([]);
+    const [selectedPathIndices, setSelectedPathIndices] = useState<number[]>([]);
+    const [isDraggingSelection, setIsDraggingSelection] = useState(false);
+    const [dragStartPos, setDragStartPos] = useState({x: 0, y: 0});
+    const [dragOffset, setDragOffset] = useState({x: 0, y: 0});
+    const [savedProtocols, setSavedProtocols] = useState<{name: string, paths: any[]}[]>(() => {
+        try {
+            return JSON.parse(localStorage.getItem('handwritten_protocols') || '[]');
+        } catch {
+            return [];
+        }
+    });
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const dropdownRef = React.useRef(null);
+
+    React.useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+                setIsDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
 
 
@@ -170,12 +232,81 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
 
         // Draw current path in progress
         if (isDrawingRef.current && currentPathRef.current.length > 0) {
-            renderPath(ctx, {
-                points: currentPathRef.current,
-                color: penColor,
-                size: penSize,
-                isEraser: isEraser
-            }, canvas.width, canvas.height);
+            if (toolMode === 'lasso') {
+                ctx.strokeStyle = '#3b82f6';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(currentPathRef.current[0].x * canvas.width, currentPathRef.current[0].y * canvas.height);
+                for(let i=1; i<currentPathRef.current.length; i++) {
+                    ctx.lineTo(currentPathRef.current[i].x * canvas.width, currentPathRef.current[i].y * canvas.height);
+                }
+                ctx.stroke();
+                ctx.setLineDash([]);
+            } else if (toolMode === 'pen' || toolMode === 'eraser') {
+                renderPath(ctx, {
+                    points: currentPathRef.current,
+                    color: penColor,
+                    size: toolMode === 'eraser' ? eraserSize : penSize,
+                    isEraser: toolMode === 'eraser'
+                }, canvas.width, canvas.height);
+            }
+        }
+        
+        // Draw selection highlight and dragged paths
+        if (selectedPathIndices.length > 0) {
+            // Draw dragged paths
+            if (isDraggingSelection) {
+               ctx.clearRect(0,0, canvas.width, canvas.height);
+               if (staticCanvasRef.current) ctx.drawImage(staticCanvasRef.current, 0, 0);
+               
+               // Re-clear selected original paths by using globalCompositeOperation
+               ctx.globalCompositeOperation = 'destination-out';
+               selectedPathIndices.forEach(idx => {
+                   const path = pages[currentPageIndex][idx];
+                   if(path) renderPath(ctx, {...path, isEraser: false, size: path.size + 2}, canvas.width, canvas.height);
+               });
+               ctx.globalCompositeOperation = 'source-over';
+               
+               // Draw them at offset
+               selectedPathIndices.forEach(idx => {
+                   const path = pages[currentPageIndex][idx];
+                   if(path) {
+                       const offsetPath = {
+                           ...path,
+                           points: path.points.map(p => ({x: p.x + dragOffset.x, y: p.y + dragOffset.y}))
+                       };
+                       renderPath(ctx, offsetPath, canvas.width, canvas.height);
+                   }
+               });
+            }
+            
+            // Draw Bounding Box
+            let minX=1, minY=1, maxX=0, maxY=0;
+            let hasPoints = false;
+            selectedPathIndices.forEach(idx => {
+               const path = pages[currentPageIndex][idx];
+               if(path) {
+                   path.points.forEach(p => {
+                       const x = p.x + (isDraggingSelection ? dragOffset.x : 0);
+                       const y = p.y + (isDraggingSelection ? dragOffset.y : 0);
+                       if(!hasPoints) { minX=x; maxX=x; minY=y; maxY=y; hasPoints=true; }
+                       if(x < minX) minX = x;
+                       if(x > maxX) maxX = x;
+                       if(y < minY) minY = y;
+                       if(y > maxY) maxY = y;
+                   });
+               }
+            });
+            if (hasPoints) {
+                ctx.strokeStyle = '#ec4899'; // pink
+                ctx.lineWidth = 2;
+                ctx.setLineDash([6, 4]);
+                ctx.lineDashOffset = -dashOffsetRef.current;
+                ctx.strokeRect(minX*canvas.width - 5, minY*canvas.height - 5, (maxX-minX)*canvas.width + 10, (maxY-minY)*canvas.height + 10);
+                ctx.setLineDash([]);
+                ctx.lineDashOffset = 0;
+            }
         }
 
         ctx.globalCompositeOperation = 'source-over';
@@ -184,11 +315,15 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
 
     // ── Animation Loop
     const animate = useCallback((time: number) => {
+        if (selectedPathIndices.length > 0) {
+            dashOffsetRef.current = (dashOffsetRef.current + 0.3) % 10;
+            isDirtyRef.current = true;
+        }
         if (isDirtyRef.current) {
             redrawPage();
         }
         requestRef.current = requestAnimationFrame(animate);
-    }, [redrawPage]);
+    }, [redrawPage, selectedPathIndices]);
 
     useEffect(() => {
         requestRef.current = requestAnimationFrame(animate);
@@ -276,10 +411,17 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
         // This ensures fingers can still be used for Pinch-to-zoom gestures.
         if (e.pointerType !== 'pen') return;
 
+        const pos = getCanvasPos(e.clientX, e.clientY);
+        
+        if (toolMode === 'select' && selectedPathIndices.length > 0) {
+            setDragStartPos(pos);
+            setIsDraggingSelection(true);
+            isDrawingRef.current = false;
+            return;
+        }
+
         // If another pen stroke is already active, ignore
         if (isDrawingRef.current) return;
-
-        const pos = getCanvasPos(e.clientX, e.clientY);
         if (!isInWritingArea(pos)) return;
 
         // Capture all future events for this pointer (critical for iPad Chrome)
@@ -297,11 +439,21 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
 
         // Restore palm rejection: Only track the active pen
         if (e.pointerType !== 'pen') return;
+        
+        const pos = getCanvasPos(e.clientX, e.clientY);
+        setPointerPos({ x: e.clientX, y: e.clientY });
+        
+        if (toolMode === 'select' && isDraggingSelection) {
+            setDragOffset({
+                x: pos.x - dragStartPos.x,
+                y: pos.y - dragStartPos.y
+            });
+            isDirtyRef.current = true;
+            return;
+        }
+
         if (!isDrawingRef.current) return;
         if (e.pointerId !== activePointerIdRef.current) return;
-
-        // Track pointer for Eraser Cursor
-        setPointerPos({ x: e.clientX, y: e.clientY });
 
         // Process all coalesced (high-frequency) events for smooth strokes
         const coalescedEvents = (e.nativeEvent as any).getCoalescedEvents
@@ -312,8 +464,6 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
             const cPos = getCanvasPos(ce.clientX, ce.clientY);
             currentPathRef.current.push({ ...cPos, pressure: ce.pressure || 0.5 });
         }
-
-        setPointerPos({ x: e.clientX, y: e.clientY });
         isDirtyRef.current = true;
     };
 
@@ -325,37 +475,122 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
     const commitStroke = (e?: React.PointerEvent) => {
         if (e && e.pointerType !== 'pen') return;
 
-        // Always reset drawing state immediately (critical for pointercancel)
+        if (toolMode === 'select' && isDraggingSelection) {
+            setIsDraggingSelection(false);
+            if (dragOffset.x !== 0 || dragOffset.y !== 0) {
+                const updatedPages = [...pages];
+                const page = [...updatedPages[currentPageIndex]];
+                selectedPathIndices.forEach(idx => {
+                    page[idx] = {
+                        ...page[idx],
+                        points: page[idx].points.map((p) => ({
+                            ...p,
+                            x: p.x + dragOffset.x,
+                            y: p.y + dragOffset.y
+                        }))
+                    };
+                });
+                updatedPages[currentPageIndex] = page;
+                setPages(updatedPages);
+                
+                const newHistory = history.slice(0, historyStep + 1);
+                newHistory.push(updatedPages);
+                setHistory(newHistory);
+                setHistoryStep(newHistory.length - 1);
+                
+                if (onPathsChange) onPathsChange(updatedPages);
+                redrawStatic(page);
+            }
+            setDragOffset({x: 0, y: 0});
+            isDirtyRef.current = true;
+            return;
+        }
+
         const wasDrawing = isDrawingRef.current;
         isDrawingRef.current = false;
         activePointerIdRef.current = null;
 
         if (wasDrawing && currentPathRef.current.length > 0) {
-            const newPath = {
-                points: [...currentPathRef.current],
-                color: penColor,
-                size: isEraser ? eraserSize : penSize,
-                isEraser: isEraser,
-            };
-            const updatedPages = [...pages];
-            updatedPages[currentPageIndex] = [...(updatedPages[currentPageIndex] || []), newPath];
+            if (toolMode === 'lasso') {
+                const poly = currentPathRef.current.map(p => [p.x, p.y]);
+                if (poly.length > 2) {
+                    const newSelected = [];
+                    (pages[currentPageIndex] || []).forEach((path, idx) => {
+                        const isInside = path.points.some(p => polygonContains(poly, [p.x, p.y]));
+                        if (isInside) newSelected.push(idx);
+                    });
+                    setSelectedPathIndices(newSelected);
+                    if (newSelected.length > 0) setToolMode('select');
+                }
+            } else if (toolMode === 'pen' || toolMode === 'eraser') {
+                const newPath = {
+                    points: [...currentPathRef.current],
+                    color: penColor,
+                    size: toolMode === 'eraser' ? eraserSize : penSize,
+                    isEraser: toolMode === 'eraser',
+                };
+                const updatedPages = [...pages];
+                updatedPages[currentPageIndex] = [...(updatedPages[currentPageIndex] || []), newPath];
 
-            appendToStatic(newPath);
-            setPages(updatedPages);
+                appendToStatic(newPath);
+                setPages(updatedPages);
 
-            const newHistory = history.slice(0, historyStep + 1);
-            newHistory.push(updatedPages);
-            setHistory(newHistory);
-            setHistoryStep(newHistory.length - 1);
+                const newHistory = history.slice(0, historyStep + 1);
+                newHistory.push(updatedPages);
+                setHistory(newHistory);
+                setHistoryStep(newHistory.length - 1);
 
-            // Notify parent of changes
-            if (onPathsChange) {
-                onPathsChange(updatedPages);
+                if (onPathsChange) {
+                    onPathsChange(updatedPages);
+                }
             }
         }
 
         currentPathRef.current = [];
         lastTouchDistanceRef.current = null;
+        isDirtyRef.current = true;
+    };
+
+    const copySelection = () => {
+        if (selectedPathIndices.length === 0) return;
+        const selectedPaths = selectedPathIndices.map(idx => pages[currentPageIndex][idx]);
+        
+        const name = prompt("Name this handwritten protocol:");
+        if (name) {
+            const newProtocol = { name, paths: selectedPaths };
+            const updated = [...savedProtocols, newProtocol];
+            setSavedProtocols(updated);
+            localStorage.setItem('handwritten_protocols', JSON.stringify(updated));
+            setToolMode('pen');
+            setSelectedPathIndices([]);
+            isDirtyRef.current = true;
+        }
+    };
+
+    const pasteProtocol = (protocolPaths = []) => {
+        const updatedPages = [...pages];
+        const startIdx = (updatedPages[currentPageIndex] || []).length;
+        updatedPages[currentPageIndex] = [...(updatedPages[currentPageIndex] || []), ...protocolPaths];
+        setPages(updatedPages);
+        
+        const newSelected = protocolPaths.map((_, i) => startIdx + i);
+        setSelectedPathIndices(newSelected);
+        setToolMode('select');
+        
+        const newHistory = history.slice(0, historyStep + 1);
+        newHistory.push(updatedPages);
+        setHistory(newHistory);
+        setHistoryStep(newHistory.length - 1);
+        
+        redrawStatic(updatedPages[currentPageIndex]);
+        isDirtyRef.current = true;
+        
+        if (onPathsChange) onPathsChange(updatedPages);
+    };
+    
+    const unselect = () => {
+        setSelectedPathIndices([]);
+        setToolMode('pen');
         isDirtyRef.current = true;
     };
 
@@ -486,22 +721,38 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                     }}
                 />
             )}
-            {/* ── Toolbar (Hidden on Mobile) */}
-            <div className="hidden md:flex bg-white border-b border-border px-4 py-3 items-center justify-between gap-y-2 shrink-0 shadow-sm sticky top-0 z-50 rounded-t-xl">
-                <div className="flex items-center gap-1 md:gap-2 min-w-0 flex-wrap">
-                    <Button variant="ghost" size="icon" onClick={onClose} className="shrink-0 h-8 w-8 md:h-10 md:w-10 text-foreground hover:bg-muted"><X className="w-5 h-5" /></Button>
+            {/* ── Floating Draggable Canvas Toolbar (Hidden on Mobile, premium glassmorphism card on Desktop) */}
+            <div 
+                className="hidden md:flex fixed bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-border px-3 py-2 rounded-full items-center shadow-xl z-50 select-none touch-none ring-1 ring-black/5"
+                style={{
+                    transform: `translate3d(${toolbarPos.x}px, ${toolbarPos.y}px, 0)`,
+                    left: 'calc(50% - 250px)',
+                    top: '20px',
+                }}
+                onPointerDown={handleToolbarPointerDown}
+                onPointerMove={handleToolbarPointerMove}
+                onPointerUp={handleToolbarPointerUp}
+                onPointerCancel={handleToolbarPointerUp}
+            >
+                {/* Drag Handle */}
+                <div className="drag-handle cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 px-1 border-r border-border mr-1.5 py-1">
+                    <GripVertical className="w-4 h-4" />
+                </div>
 
-                    <div className="flex items-center gap-0.5 bg-muted p-0.5 rounded-lg shrink-0">
-                        <Button variant="ghost" size="sm" onClick={handleUndo} disabled={historyStep === 0} className="h-8 text-foreground disabled:opacity-30">
-                            <Undo className="w-4 h-4" />
+                <div className="flex items-center gap-1 md:gap-2 min-w-0">
+                    <Button variant="ghost" size="icon" onClick={onClose} className="shrink-0 h-8 w-8 text-foreground hover:bg-muted rounded-full"><X className="w-4 h-4" /></Button>
+
+                    <div className="flex items-center gap-0.5 bg-muted/60 dark:bg-slate-800/60 p-0.5 rounded-full shrink-0">
+                        <Button variant="ghost" size="sm" onClick={handleUndo} disabled={historyStep === 0} className="h-7 w-7 p-0 text-foreground disabled:opacity-30 rounded-full">
+                            <Undo className="w-3.5 h-3.5" />
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={handleRedo} disabled={historyStep === history.length - 1} className="h-8 text-foreground disabled:opacity-30">
-                            <Redo className="w-4 h-4" />
+                        <Button variant="ghost" size="sm" onClick={handleRedo} disabled={historyStep === history.length - 1} className="h-7 w-7 p-0 text-foreground disabled:opacity-30 rounded-full">
+                            <Redo className="w-3.5 h-3.5" />
                         </Button>
                         <AlertDialog>
                             <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="sm" disabled={pages[currentPageIndex]?.length === 0} className="h-8 text-red-600">
-                                    <Trash2 className="w-4 h-4" />
+                                <Button variant="ghost" size="sm" disabled={pages[currentPageIndex]?.length === 0} className="h-7 w-7 p-0 text-red-600 rounded-full">
+                                    <Trash2 className="w-3.5 h-3.5" />
                                 </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent className="rounded-[2rem] border-none shadow-2xl z-[1000]">
@@ -527,49 +778,94 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                         </AlertDialog>
                     </div>
 
-                    <div className="flex items-center gap-1 md:gap-1.5 bg-muted p-0.5 rounded-lg flex-wrap sm:flex-nowrap">
+                    <div className="flex items-center gap-1 md:gap-1.5 bg-muted/60 dark:bg-slate-800/60 p-0.5 rounded-full flex-wrap sm:flex-nowrap">
                         <div className="flex items-center gap-1">
-                            <Button
-                                variant={!isEraser ? "secondary" : "ghost"}
-                                size="sm"
-                                onClick={() => setIsEraser(false)}
-                                className={`h-8 w-8 p-0 ${!isEraser ? 'bg-background shadow-sm ring-1 ring-border' : ''} text-foreground`}
-                            >
-                                <PenTool className={`w-4 h-4 ${!isEraser ? 'text-blue-600' : 'text-muted-foreground'}`} />
+                            <Button variant={toolMode === 'pen' ? "secondary" : "ghost"} size="sm" onClick={() => {setToolMode('pen'); setSelectedPathIndices([]);}} className={`h-8 w-8 p-0 ${toolMode==='pen' ? 'bg-background shadow-sm ring-1 ring-border' : ''} text-foreground`} title="Pen">
+                                <PenTool className={`w-4 h-4 ${toolMode==='pen' ? 'text-blue-600' : 'text-muted-foreground'}`} />
                             </Button>
-                            <Button
-                                variant={isEraser ? "secondary" : "ghost"}
-                                size="sm"
-                                onClick={() => setIsEraser(true)}
-                                className={`h-8 w-8 p-0 ${isEraser ? 'bg-background shadow-sm ring-1 ring-border' : ''} text-foreground`}
-                            >
-                                <Eraser className={`w-4 h-4 ${isEraser ? 'text-blue-600' : 'text-muted-foreground'}`} />
+                            <Button variant={toolMode === 'eraser' ? "secondary" : "ghost"} size="sm" onClick={() => {setToolMode('eraser'); setSelectedPathIndices([]);}} className={`h-8 w-8 p-0 ${toolMode==='eraser' ? 'bg-background shadow-sm ring-1 ring-border' : ''} text-foreground`} title="Eraser">
+                                <Eraser className={`w-4 h-4 ${toolMode==='eraser' ? 'text-blue-600' : 'text-muted-foreground'}`} />
                             </Button>
+                            <Button variant={toolMode === 'lasso' ? "secondary" : "ghost"} size="sm" onClick={() => {setToolMode('lasso'); setSelectedPathIndices([]);}} className={`h-8 w-8 p-0 ${toolMode==='lasso' ? 'bg-background shadow-sm ring-1 ring-border' : ''} text-foreground`} title="Lasso Select">
+                                <Scissors className={`w-4 h-4 ${toolMode==='lasso' ? 'text-blue-600' : 'text-muted-foreground'}`} />
+                            </Button>
+                            
+                            {toolMode === 'select' && selectedPathIndices.length > 0 && (
+                                <>
+                                  <div className="w-[1px] h-4 bg-border mx-1" />
+                                  <Button variant="ghost" size="sm" onClick={copySelection} className="h-8 text-pink-600 font-bold bg-pink-50 hover:bg-pink-100 rounded-md" title="Save snippet">
+                                      <Copy className="w-4 h-4 mr-1" /> Save
+                                  </Button>
+                                  <Button variant="ghost" size="sm" onClick={unselect} className="h-8 text-slate-500 hover:bg-slate-100 rounded-md">
+                                      Done
+                                  </Button>
+                                </>
+                            )}
 
-                            {!isEraser && (
+                            {toolMode === 'pen' && (
                                 <input
                                     type="color"
                                     value={penColor}
                                     onChange={(e) => setPenColor(e.target.value)}
-                                    className="w-7 h-7 p-0 border-0 rounded-md cursor-pointer ring-1 ring-border bg-transparent"
+                                    className="w-7 h-7 p-0 ml-1 border-0 rounded-md cursor-pointer ring-1 ring-border bg-transparent"
                                 />
                             )}
                         </div>
 
-                        <div className="flex items-center gap-2 px-2 border-l border-border h-6">
-                            <span className="text-[10px] font-bold text-muted-foreground w-4">{isEraser ? eraserSize : penSize}</span>
-                            <input
-                                type="range"
-                                min="1"
-                                max="20"
-                                value={isEraser ? eraserSize : penSize}
-                                onChange={(e) => {
-                                    const val = parseInt(e.target.value);
-                                    if (isEraser) setEraserSize(val);
-                                    else setPenSize(val);
-                                }}
-                                className="w-12 md:w-16 h-1 bg-muted rounded-lg appearance-none cursor-pointer accent-blue-600"
-                            />
+                        {(toolMode === 'pen' || toolMode === 'eraser') && (
+                            <div className="flex items-center gap-2 px-2 border-l border-border h-6">
+                                <span className="text-[10px] font-bold text-muted-foreground w-4">{toolMode === 'eraser' ? eraserSize : penSize}</span>
+                                <input
+                                    type="range"
+                                    min="1"
+                                    max="20"
+                                    value={toolMode === 'eraser' ? eraserSize : penSize}
+                                    onChange={(e) => {
+                                        const val = parseInt(e.target.value);
+                                        if (toolMode === 'eraser') setEraserSize(val);
+                                        else setPenSize(val);
+                                    }}
+                                    className="w-12 md:w-16 h-1 bg-muted rounded-lg appearance-none cursor-pointer accent-blue-600"
+                                />
+                            </div>
+                        )}
+                        
+                        {/* Saved Protocols Dropdown */}
+                        <div className="border-l border-border pl-2 flex items-center">
+                           <div className="relative" ref={dropdownRef}>
+                               <Button variant="ghost" size="sm" onClick={() => setIsDropdownOpen(!isDropdownOpen)} className="h-8 text-blue-600 bg-blue-50 hover:bg-blue-100 font-bold rounded-md">
+                                  <BookOpen className="w-4 h-4 mr-1" /> Snippets
+                                </Button>
+                                {isDropdownOpen && (
+                                    <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-border rounded-xl shadow-xl p-2 z-[100]">
+                                       {savedProtocols.length === 0 ? (
+                                           <p className="text-xs text-muted-foreground p-2">No snippets saved. Use lasso to select and save.</p>
+                                       ) : (
+                                           savedProtocols.map((p, i) => (
+                                               <div key={i} className="flex items-center justify-between hover:bg-slate-50 rounded-lg pr-1">
+                                                   <button onClick={() => { pasteProtocol(p.paths); setIsDropdownOpen(false); }} className="flex-1 text-left px-3 py-2 text-sm font-bold text-slate-700">
+                                                       {p.name}
+                                                   </button>
+                                                   <Button 
+                                                       variant="ghost" 
+                                                       size="icon" 
+                                                       className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                       onClick={() => {
+                                                           if (confirm('Delete this snippet?')) {
+                                                               const updated = savedProtocols.filter((_, idx) => idx !== i);
+                                                               setSavedProtocols(updated);
+                                                               localStorage.setItem('handwritten_protocols', JSON.stringify(updated));
+                                                           }
+                                                       }}
+                                                   >
+                                                       <Trash2 className="w-3.5 h-3.5" />
+                                                   </Button>
+                                               </div>
+                                           ))
+                                       )}
+                                    </div>
+                                )}
+                           </div>
                         </div>
                     </div>
 

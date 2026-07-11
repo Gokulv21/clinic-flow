@@ -3,7 +3,7 @@ import { useAuth, AppRole } from '@/lib/auth';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import {
-  Stethoscope, ClipboardPlus, Printer, BarChart3, Users, LogOut, Home, Menu, HelpCircle, Sun, Moon, Monitor, ChevronUp, Phone
+  Stethoscope, ClipboardPlus, Printer, BarChart3, Users, LogOut, Home, Menu, HelpCircle, Sun, Moon, Monitor, ChevronUp, Info
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -27,7 +27,6 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { label: 'Dashboard', path: '/', icon: <Home className="w-5 h-5" />, roles: ['doctor', 'superadmin', 'owner'] },
-  { label: 'Consult Staff', path: '/calls', icon: <Phone className="w-5 h-5" />, roles: ['staff', 'doctor', 'superadmin', 'owner'] },
   { label: 'Patient Entry', path: '/nurse', icon: <ClipboardPlus className="w-5 h-5" />, roles: ['staff', 'doctor', 'superadmin', 'owner'] },
   { label: 'Consultation', path: '/consultation', icon: <Stethoscope className="w-5 h-5" />, roles: ['doctor', 'superadmin', 'owner'] },
   { label: 'Print Queue', path: '/print', icon: <Printer className="w-5 h-5" />, roles: ['staff', 'doctor', 'superadmin', 'owner'] },
@@ -35,6 +34,7 @@ const navItems: NavItem[] = [
   { label: 'Analytics', path: '/analytics', icon: <BarChart3 className="w-5 h-5" />, roles: ['doctor', 'superadmin', 'owner'] },
   { label: 'Profile', path: '/profile', icon: <Users className="w-5 h-5" />, roles: ['doctor', 'superadmin', 'owner'] },
   { label: 'User Mgmt', path: '/users', icon: <Users className="w-5 h-5" />, roles: ['superadmin', 'owner'] },
+  { label: 'About', path: '/about', icon: <Info className="w-5 h-5" />, roles: ['staff', 'doctor', 'superadmin', 'owner'] },
   { label: 'Help', path: '/help', icon: <HelpCircle className="w-5 h-5" />, roles: ['staff', 'doctor', 'superadmin', 'owner'] },
 ];
 
@@ -67,7 +67,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   }, [location.pathname]);
 
   const { slug } = useParams();
-  
+
   const handleMobileNav = (path: string) => {
     const isGlobal = path === '/help';
     const fullPath = (slug && !isGlobal) ? `/${slug}${path === '/' ? '/dashboard' : path}` : path;
@@ -76,7 +76,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   };
 
   const visibleItems = navItems.filter(item => item.roles.some(r => roles.includes(r)));
-  
+
   const getFullPath = (itemPath: string) => {
     if (!slug || itemPath === '/help') return itemPath;
     if (itemPath === '/') return `/${slug}/dashboard`;
@@ -120,7 +120,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
     const distanceX = touchStartX.current - touchEndX;
     const distanceY = touchStartY.current - touchEndY;
-    
+
     // Must be mostly horizontal and exceed threshold
     if (Math.abs(distanceX) > Math.abs(distanceY) && Math.abs(distanceX) > 60) {
       if (distanceX > 0) {
@@ -132,8 +132,8 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   };
 
   return (
-    <div 
-      className="min-h-screen flex bg-slate-50 dark:bg-[#000000] font-jakarta-sans relative overflow-hidden" 
+    <div
+      className="min-h-screen flex bg-slate-50 dark:bg-[#000000] font-jakarta-sans relative overflow-hidden"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
@@ -151,7 +151,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         onMouseLeave={() => setIsSidebarExpanded(false)}
         className="hidden md:flex flex-col glass-regular sticky top-0 h-screen z-50 border-r border-white/20 select-none overflow-hidden"
       >
-        <div 
+        <div
           className={cn(
             "border-b border-white/10 flex transition-all duration-300 overflow-hidden relative px-4 py-4",
             isSidebarExpanded ? "h-[100px] flex-row items-center justify-between" : "h-[140px] flex-col items-center justify-center gap-4"
@@ -179,8 +179,8 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             </AnimatePresence>
           </motion.div>
 
-          <motion.div 
-            initial={{ opacity: 0 }} 
+          <motion.div
+            initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             className={cn(!isSidebarExpanded && "mt-1")}
           >
@@ -193,7 +193,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           {visibleItems.map((item) => {
             const fullPath = getFullPath(item.path);
             const isActive = location.pathname === fullPath || (item.path === '/' && location.pathname.endsWith('/dashboard'));
-            
+
             return (
               <button
                 key={item.path}
@@ -286,106 +286,157 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           scale: isMobileMenuOpen ? 0.9 : 1
         }}
         transition={{ type: "spring", stiffness: 400, damping: 40 }}
-        className="fixed bottom-6 left-1/2 z-[100] glass-thick flex md:hidden h-16 px-6 rounded-full items-center gap-2 shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-white/30 max-w-[95vw] w-fit"
+        className="fixed bottom-6 left-1/2 z-[100] flex md:hidden items-center gap-2 max-w-[95vw]"
       >
-        {visibleItems.slice(0, 4).map(item => {
-          const fullPath = getFullPath(item.path);
-          const isActive = location.pathname === fullPath || (item.path === '/' && location.pathname.endsWith('/dashboard'));
-          return (
-            <button
-              key={item.path}
-              onClick={() => navigate(fullPath)}
-              className={cn(
-                "flex-1 min-w-[60px] flex flex-col items-center justify-center gap-1 transition-all relative px-2 h-12 rounded-full",
-                isActive ? "text-blue-600" : "text-slate-950 dark:text-white"
-              )}
-            >
-              {isActive && (
-                <motion.div
-                  layoutId="dock-active"
-                  className="absolute inset-0 bg-blue-600/10 rounded-full"
-                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                />
-              )}
-              <div className="drop-shadow-sm font-bold">{item.icon}</div>
-              <span className="text-[10px] font-black uppercase tracking-tighter opacity-100 leading-none">{item.label}</span>
-            </button>
-          );
-        })}
-        <div className="w-[1px] h-6 bg-white/20 mx-1" />
+        {/* Nav pills */}
+        <div className="glass-thick h-[60px] px-3 rounded-full flex items-center gap-0.5 shadow-[0_20px_60px_rgba(0,0,0,0.25)] border border-white/30">
+          {visibleItems.slice(0, 4).map(item => {
+            const fullPath = getFullPath(item.path);
+            const isActive = location.pathname === fullPath || (item.path === '/' && location.pathname.endsWith('/dashboard'));
+            return (
+              <button
+                key={item.path}
+                onClick={() => navigate(fullPath)}
+                className={cn(
+                  "flex flex-col items-center justify-center gap-0.5 transition-all relative px-2.5 h-11 rounded-full shrink-0 select-none",
+                  isActive ? "text-blue-600" : "text-slate-600 dark:text-slate-400"
+                )}
+              >
+                {isActive && (
+                  <motion.div
+                    layoutId="dock-active"
+                    className="absolute inset-0 bg-blue-600/10 dark:bg-blue-500/15 rounded-full"
+                    transition={{ type: "spring", bounce: 0.2, duration: 0.5 }}
+                  />
+                )}
+                <div className="relative z-10 w-5 h-5 flex items-center justify-center">{item.icon}</div>
+                <span className={cn(
+                  "text-[8px] font-black uppercase tracking-tighter leading-none relative z-10 whitespace-nowrap",
+                  isActive ? "text-blue-600" : "text-slate-500 dark:text-slate-400"
+                )}>{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
 
-        {/* Mobile menu trigger */}
+        {/* More button — gradient pill */}
         <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
           <SheetTrigger asChild>
-            <button className="h-12 w-12 rounded-full flex items-center justify-center bg-white/5 active:scale-90">
-              <Menu className="w-5 h-5 text-slate-600 dark:text-slate-400" />
-            </button>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.92 }}
+              className="h-[60px] px-5 rounded-full flex items-center gap-2 shrink-0 select-none bg-gradient-to-br from-blue-600 to-indigo-600 shadow-[0_8px_30px_rgba(59,130,246,0.5)] border border-blue-400/30"
+            >
+              <Menu className="w-5 h-5 text-white" />
+              <span className="text-[10px] font-black uppercase tracking-widest text-white">More</span>
+            </motion.button>
           </SheetTrigger>
-          <SheetContent side="bottom" className="p-0 rounded-t-[rem] glass-water border-t-0 shadow-[0_-20px_80px_rgba(0,0,0,0.5)] h-[65vh] overflow-hidden flex flex-col transition-transform duration-700">
-            <div className="p-6 border-b border-white/5 flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-4">
-                <div>
-                  <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tighter">Menu</h3>
-                  <p className="text-[9px] text-blue-600 font-black uppercase tracking-[0.2em]">{profile?.full_name}</p>
-                </div>
-                <NotificationCenter />
-              </div>
-              <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(false)} className="rounded-full bg-white/5 active:scale-75 transition-all">
-                <ChevronUp className="w-4 h-4 rotate-180" />
-              </Button>
-            </div>
+          <SheetContent
+            side="bottom"
+            className="p-0 border-0 bg-transparent shadow-none overflow-visible"
+            style={{ height: 'auto', maxHeight: '72vh' }}
+          >
+            {/* True glassmorphic panel */}
+            <div
+              className="mx-3 mb-4 rounded-[2rem] overflow-hidden border border-white/25 dark:border-white/10 shadow-[0_-30px_80px_rgba(0,0,0,0.4)]"
+              style={{
+                background: 'linear-gradient(160deg,rgba(255,255,255,0.82) 0%,rgba(235,242,255,0.80) 100%)',
+                backdropFilter: 'blur(50px) saturate(220%)',
+                WebkitBackdropFilter: 'blur(50px) saturate(220%)',
+              }}
+            >
+              <div className="dark:[background:linear-gradient(160deg,rgba(12,16,36,0.90)_0%,rgba(8,12,30,0.94)_100%)] rounded-[2rem]">
 
-            <div className="flex-1 overflow-auto p-4 grid grid-cols-5 gap-2 pb-6">
-              {visibleItems.map(item => {
-                const fullPath = getFullPath(item.path);
-                const isActive = location.pathname === fullPath || (item.path === '/' && location.pathname.endsWith('/dashboard'));
-                return (
+                {/* Drag handle */}
+                <div className="flex justify-center pt-3 pb-1">
+                  <div className="w-10 h-1 rounded-full bg-slate-300 dark:bg-slate-600" />
+                </div>
+
+                {/* Header */}
+                <div className="px-5 pt-2 pb-3 flex items-center justify-between border-b border-black/[0.06] dark:border-white/[0.06]">
+                  <div>
+                    <h3 className="text-base font-black text-slate-900 dark:text-white tracking-tight">Navigation</h3>
+                    <p className="text-[9px] text-blue-600 dark:text-blue-400 font-black uppercase tracking-[0.2em] mt-0.5">{profile?.full_name}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <NotificationCenter />
+                    <Button
+                      variant="ghost" size="icon"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="rounded-full w-8 h-8 bg-black/[0.06] dark:bg-white/10 active:scale-75 transition-all"
+                    >
+                      <ChevronUp className="w-4 h-4 text-slate-600 dark:text-slate-300" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Nav grid */}
+                <div className="p-4 grid grid-cols-5 gap-2">
+                  {visibleItems.map(item => {
+                    const fullPath = getFullPath(item.path);
+                    const isActive = location.pathname === fullPath || (item.path === '/' && location.pathname.endsWith('/dashboard'));
+                    return (
+                      <button
+                        key={item.path}
+                        onClick={() => handleMobileNav(item.path)}
+                        className={cn(
+                          "flex flex-col items-center justify-center gap-1.5 p-2 rounded-2xl transition-all active:scale-90 select-none",
+                          isActive
+                            ? "bg-blue-600/10 dark:bg-blue-500/20 border border-blue-500/30"
+                            : "bg-black/[0.04] dark:bg-white/[0.08] border border-transparent"
+                        )}
+                      >
+                        <div className={cn(
+                          "w-9 h-9 rounded-xl flex items-center justify-center transition-all shrink-0",
+                          isActive
+                            ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30"
+                            : "bg-slate-200 dark:bg-white/15 text-slate-600 dark:text-slate-300"
+                        )}>
+                          <div className="w-4 h-4">{item.icon}</div>
+                        </div>
+                        <span className={cn(
+                          "text-[8px] font-black uppercase tracking-tight text-center leading-tight",
+                          isActive ? "text-blue-600 dark:text-blue-400" : "text-slate-600 dark:text-slate-400"
+                        )}>{item.label}</span>
+                      </button>
+                    );
+                  })}
+                  {/* Logout tile */}
                   <button
-                    key={item.path}
-                    onClick={() => handleMobileNav(item.path)}
-                    className={cn(
-                      "flex flex-col items-center justify-center gap-2 p-3 rounded-[2.5rem] transition-all active:scale-90 glass-droplet",
-                      isActive ? "text-blue-600 border-blue-500/30 scale-105 shadow-[0_20px_40px_rgba(59,130,246,0.3)]" : "text-white"
-                    )}
+                    onClick={signOut}
+                    className="flex flex-col items-center justify-center gap-1.5 p-2 rounded-2xl bg-red-50/80 dark:bg-red-950/40 border border-red-200/60 dark:border-red-900/30 active:scale-90 transition-all"
                   >
-                    <div className={cn(
-                      "w-10 h-10 rounded-full flex items-center justify-center shadow-inner transition-transform relative overflow-hidden",
-                      isActive ? "bg-blue-600 text-white" : "bg-white/20 dark:bg-black/40"
-                    )}>
-                      {/* Internal Liquid Shimmer */}
-                      {isActive && <div className="absolute inset-0 bg-gradient-to-t from-white/30 to-transparent animate-pulse" />}
-                      <div className="relative z-10 drop-shadow-md scale-90">{item.icon}</div>
+                    <div className="w-9 h-9 rounded-xl bg-red-500 text-white flex items-center justify-center shadow-lg shadow-red-500/30">
+                      <LogOut className="w-4 h-4" />
                     </div>
-                    <span className="text-[9px] font-black uppercase tracking-tight text-center drop-shadow-xl leading-tight text-white">{item.label}</span>
+                    <span className="text-[8px] font-black uppercase tracking-tight text-center leading-tight text-red-500">Logout</span>
                   </button>
-                );
-              })}
-
-              <button
-                onClick={signOut}
-                className="flex flex-col items-center justify-center gap-2 p-2 rounded-[2rem] text-red-500 glass-droplet border-red-500/10 active:scale-95 transition-all font-black"
-              >
-                <div className="w-10 h-10 rounded-full bg-red-600/10 flex items-center justify-center shadow-inner border border-red-500/5">
-                  <LogOut className="w-4 h-4" />
                 </div>
-                <span className="text-[8px] font-black uppercase tracking-tight text-center leading-tight">Logout</span>
-              </button>
-            </div>
 
-            <div className="p-6 bg-blue-600/[0.02] border-t border-white/5 shrink-0">
-              <div className="flex bg-white/5 p-1 rounded-2xl border border-white/5">
-                {['light', 'dark', 'system'].map(v => (
-                  <button
-                    key={v}
-                    onClick={() => setTheme(v as any)}
-                    className={cn(
-                      "flex-1 py-1.5 items-center justify-center flex rounded-[0.9rem] transition-all text-[9px] font-black uppercase tracking-widest active:scale-95",
-                      theme === v ? "bg-white dark:bg-slate-800 text-blue-600 shadow-md" : "text-slate-500"
-                    )}
-                  >
-                    {v}
-                  </button>
-                ))}
+                {/* Theme toggle */}
+                <div className="px-4 pb-5">
+                  <div className="flex bg-black/[0.05] dark:bg-white/[0.08] p-1 rounded-xl border border-black/[0.05] dark:border-white/[0.05]">
+                    {[
+                      { v: 'light', icon: <Sun className="w-3 h-3" /> },
+                      { v: 'dark', icon: <Moon className="w-3 h-3" /> },
+                      { v: 'system', icon: <Monitor className="w-3 h-3" /> },
+                    ].map(({ v, icon }) => (
+                      <button
+                        key={v}
+                        onClick={() => setTheme(v as any)}
+                        className={cn(
+                          "flex-1 py-1.5 items-center justify-center flex gap-1 rounded-[0.6rem] transition-all text-[9px] font-black uppercase tracking-widest active:scale-95",
+                          theme === v
+                            ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm"
+                            : "text-slate-500 dark:text-slate-500"
+                        )}
+                      >
+                        {icon}{v}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
               </div>
             </div>
           </SheetContent>

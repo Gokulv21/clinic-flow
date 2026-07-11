@@ -18,8 +18,6 @@ import PatientList from "@/pages/PatientList";
 import Analytics from "@/pages/Analytics";
 import UserManagement from "@/pages/UserManagement";
 import DoctorProfile from "@/pages/DoctorProfile";
-import Help from "@/pages/Help";
-import Calls from "@/pages/Calls.tsx";
 import ClinicSelection from "@/pages/ClinicSelection";
 import SaaSManagement from "@/pages/SaaSManagement";
 import PublicPrescription from "@/pages/PublicPrescription";
@@ -27,6 +25,8 @@ import NotFound from "./pages/NotFound.tsx";
 import { CommunicationProvider } from "@/lib/communication";
 import CallOverlay from "@/components/CallOverlay";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import About from "@/pages/About";
+import Help from "@/pages/Help";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -287,7 +287,7 @@ const App = () => (
                   <Route path="profile" element={<ProtectedRoute allowedRoles={['doctor', 'superadmin', 'owner']}><DoctorProfile /></ProtectedRoute>} />
                   <Route path="users" element={<ProtectedRoute allowedRoles={['superadmin', 'owner']}><UserManagement /></ProtectedRoute>} />
                   <Route path="saas" element={<ProtectedRoute allowedRoles={['superadmin']}><SaaSManagement /></ProtectedRoute>} />
-                  <Route path="calls" element={<Calls />} />
+                  <Route path="about" element={<About />} />
                 </Route>
 
                 <Route path="*" element={<NotFound />} />
