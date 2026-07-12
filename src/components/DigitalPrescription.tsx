@@ -49,12 +49,11 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
     const [penColor, setPenColor] = useState('#00009F');
     const [penSize, setPenSize] = useState(1);
     const [eraserSize, setEraserSize] = useState(7);
-    const [isEraser, setIsEraser] = useState(false);
     const [pointerPos, setPointerPos] = useState({ x: 0, y: 0 });
     const [isPointerInCanvas, setIsPointerInCanvas] = useState(false);
 
     // Draggable Floating Toolbar State
-    const [toolbarPos, setToolbarPos] = useState({ x: 0, y: 15 });
+    const [toolbarPos, setToolbarPos] = useState({ x: 0, y: 185 });
     const isDraggingToolbarRef = useRef(false);
     const dragStartRef = useRef({ x: 0, y: 0 });
     const dashOffsetRef = useRef(0);
@@ -89,6 +88,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
 
     // Lasso and Selection State
     const [toolMode, setToolMode] = useState<'pen' | 'eraser' | 'lasso' | 'select'>('pen');
+    const isEraser = toolMode === 'eraser';
     const [lassoPath, setLassoPath] = useState<{x: number, y: number}[]>([]);
     const [selectedPathIndices, setSelectedPathIndices] = useState<number[]>([]);
     const [isDraggingSelection, setIsDraggingSelection] = useState(false);
@@ -102,12 +102,17 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
         }
     });
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-    const dropdownRef = React.useRef(null);
+    const dropdownRef = React.useRef<HTMLDivElement>(null);
+    const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
+    const actionsMenuRef = React.useRef<HTMLDivElement>(null);
 
     React.useEffect(() => {
-        const handleClickOutside = (e) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
                 setIsDropdownOpen(false);
+            }
+            if (actionsMenuRef.current && !actionsMenuRef.current.contains(e.target as Node)) {
+                setIsActionsMenuOpen(false);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
@@ -236,6 +241,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                 ctx.strokeStyle = '#3b82f6';
                 ctx.lineWidth = 2;
                 ctx.setLineDash([5, 5]);
+                ctx.lineDashOffset = -dashOffsetRef.current;
                 ctx.beginPath();
                 ctx.moveTo(currentPathRef.current[0].x * canvas.width, currentPathRef.current[0].y * canvas.height);
                 for(let i=1; i<currentPathRef.current.length; i++) {
@@ -243,6 +249,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                 }
                 ctx.stroke();
                 ctx.setLineDash([]);
+                ctx.lineDashOffset = 0;
             } else if (toolMode === 'pen' || toolMode === 'eraser') {
                 renderPath(ctx, {
                     points: currentPathRef.current,
@@ -315,7 +322,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
 
     // ── Animation Loop
     const animate = useCallback((time: number) => {
-        if (selectedPathIndices.length > 0) {
+        if (selectedPathIndices.length > 0 || (isDrawingRef.current && toolMode === 'lasso')) {
             dashOffsetRef.current = (dashOffsetRef.current + 0.3) % 10;
             isDirtyRef.current = true;
         }
@@ -323,7 +330,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
             redrawPage();
         }
         requestRef.current = requestAnimationFrame(animate);
-    }, [redrawPage, selectedPathIndices]);
+    }, [redrawPage, selectedPathIndices, toolMode]);
 
     useEffect(() => {
         requestRef.current = requestAnimationFrame(animate);
@@ -409,7 +416,9 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
 
         // Restore Palm Rejection: Strictly ONLY allow Stylus/Pen for drawing. 
         // This ensures fingers can still be used for Pinch-to-zoom gestures.
-        if (e.pointerType !== 'pen') return;
+        if (e.pointerType !== 'pen' && toolMode !== 'lasso' && toolMode !== 'select' && toolMode !== 'eraser') return;
+
+        setIsPointerInCanvas(true);
 
         const pos = getCanvasPos(e.clientX, e.clientY);
         
@@ -438,8 +447,9 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
         e.preventDefault();
 
         // Restore palm rejection: Only track the active pen
-        if (e.pointerType !== 'pen') return;
+        if (e.pointerType !== 'pen' && toolMode !== 'lasso' && toolMode !== 'select' && toolMode !== 'eraser') return;
         
+        setIsPointerInCanvas(true);
         const pos = getCanvasPos(e.clientX, e.clientY);
         setPointerPos({ x: e.clientX, y: e.clientY });
         
@@ -473,7 +483,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
 
     // Shared commit logic for pointerup / pointercancel / pointerleave
     const commitStroke = (e?: React.PointerEvent) => {
-        if (e && e.pointerType !== 'pen') return;
+        if (e && e.pointerType !== 'pen' && toolMode !== 'lasso' && toolMode !== 'select' && toolMode !== 'eraser') return;
 
         if (toolMode === 'select' && isDraggingSelection) {
             setIsDraggingSelection(false);
@@ -565,6 +575,120 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
             setSelectedPathIndices([]);
             isDirtyRef.current = true;
         }
+    };
+
+    const clearSelectedPaths = () => {
+        if (selectedPathIndices.length === 0) return;
+        const updatedPages = [...pages];
+        const page = (updatedPages[currentPageIndex] || []).filter((_, idx) => !selectedPathIndices.includes(idx));
+        updatedPages[currentPageIndex] = page;
+        setPages(updatedPages);
+        setSelectedPathIndices([]);
+        setToolMode('pen');
+        
+        const newHistory = history.slice(0, historyStep + 1);
+        newHistory.push(updatedPages);
+        setHistory(newHistory);
+        setHistoryStep(newHistory.length - 1);
+        
+        if (onPathsChange) onPathsChange(updatedPages);
+        redrawStatic(page);
+        isDirtyRef.current = true;
+    };
+
+    const duplicateSelection = () => {
+        if (selectedPathIndices.length === 0) return;
+        const selectedPaths = selectedPathIndices.map(idx => pages[currentPageIndex][idx]);
+        const duplicatedPaths = selectedPaths.map(path => ({
+            ...path,
+            points: path.points.map(p => ({ x: p.x + 0.03, y: p.y + 0.03 }))
+        }));
+        const updatedPages = [...pages];
+        const startIdx = (updatedPages[currentPageIndex] || []).length;
+        updatedPages[currentPageIndex] = [...(updatedPages[currentPageIndex] || []), ...duplicatedPaths];
+        setPages(updatedPages);
+        
+        const newSelected = duplicatedPaths.map((_, i) => startIdx + i);
+        setSelectedPathIndices(newSelected);
+        
+        const newHistory = history.slice(0, historyStep + 1);
+        newHistory.push(updatedPages);
+        setHistory(newHistory);
+        setHistoryStep(newHistory.length - 1);
+        
+        if (onPathsChange) onPathsChange(updatedPages);
+        redrawStatic(updatedPages[currentPageIndex]);
+        isDirtyRef.current = true;
+    };
+
+    const changeSelectionColor = (newColor: string) => {
+        if (selectedPathIndices.length === 0) return;
+        const updatedPages = [...pages];
+        const page = [...updatedPages[currentPageIndex]];
+        selectedPathIndices.forEach(idx => {
+            if (page[idx]) {
+                page[idx] = { ...page[idx], color: newColor };
+            }
+        });
+        updatedPages[currentPageIndex] = page;
+        setPages(updatedPages);
+        
+        const newHistory = history.slice(0, historyStep + 1);
+        newHistory.push(updatedPages);
+        setHistory(newHistory);
+        setHistoryStep(newHistory.length - 1);
+        
+        if (onPathsChange) onPathsChange(updatedPages);
+        redrawStatic(page);
+        isDirtyRef.current = true;
+    };
+
+    const scaleSelection = (factor: number) => {
+        if (selectedPathIndices.length === 0) return;
+        
+        let minX = 1, minY = 1, maxX = 0, maxY = 0;
+        let hasPoints = false;
+        selectedPathIndices.forEach(idx => {
+           const path = pages[currentPageIndex][idx];
+           if(path) {
+               path.points.forEach(p => {
+                   if(!hasPoints) { minX = p.x; maxX = p.x; minY = p.y; maxY = p.y; hasPoints = true; }
+                   if(p.x < minX) minX = p.x;
+                   if(p.x > maxX) maxX = p.x;
+                   if(p.y < minY) minY = p.y;
+                   if(p.y > maxY) maxY = p.y;
+               });
+           }
+        });
+        if (!hasPoints) return;
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+        
+        const updatedPages = [...pages];
+        const page = [...updatedPages[currentPageIndex]];
+        selectedPathIndices.forEach(idx => {
+            if (page[idx]) {
+                page[idx] = {
+                    ...page[idx],
+                    points: page[idx].points.map(p => ({
+                        ...p,
+                        x: centerX + (p.x - centerX) * factor,
+                        y: centerY + (p.y - centerY) * factor
+                    }))
+                };
+            }
+        });
+        updatedPages[currentPageIndex] = page;
+        setPages(updatedPages);
+        
+        const newHistory = history.slice(0, historyStep + 1);
+        newHistory.push(updatedPages);
+        setHistory(newHistory);
+        setHistoryStep(newHistory.length - 1);
+        
+        if (onPathsChange) onPathsChange(updatedPages);
+        redrawStatic(page);
+        isDirtyRef.current = true;
     };
 
     const pasteProtocol = (protocolPaths = []) => {
@@ -702,32 +826,42 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
             }}
             onWheel={handleWheel}
         >
-            {/* ── Eraser Cursor Overly */}
-            {isEraser && isPointerInCanvas && (
-                <div 
-                    style={{
-                        position: 'fixed',
-                        left: pointerPos.x,
-                        top: pointerPos.y,
-                        width: eraserSize * 5 * canvasTransform.scale * (800 / 1240), // Approximating canvas to screen scale
-                        height: eraserSize * 5 * canvasTransform.scale * (800 / 1240),
-                        border: '2px solid rgba(255, 255, 255, 0.5)',
-                        borderRadius: '50%',
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        transform: 'translate(-50%, -50%)',
-                        pointerEvents: 'none',
-                        zIndex: 200,
-                        boxShadow: '0 0 10px rgba(0,0,0,0.2)'
-                    }}
-                />
-            )}
+            {/* ── Eraser Cursor Overlay */}
+            {isEraser && isPointerInCanvas && (() => {
+                const getEraserSizeOnScreen = () => {
+                    const canvas = canvasRef.current;
+                    if (!canvas) return eraserSize * 5;
+                    const rect = canvas.getBoundingClientRect();
+                    const scaleX = rect.width / canvas.width;
+                    return eraserSize * 5 * scaleX;
+                };
+                const sizeOnScreen = getEraserSizeOnScreen();
+                return (
+                    <div 
+                        style={{
+                            position: 'fixed',
+                            left: pointerPos.x,
+                            top: pointerPos.y,
+                            width: sizeOnScreen,
+                            height: sizeOnScreen,
+                            border: '2px solid rgba(255, 255, 255, 0.75)',
+                            borderRadius: '50%',
+                            backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                            transform: 'translate(-50%, -50%)',
+                            pointerEvents: 'none',
+                            zIndex: 200,
+                            boxShadow: '0 0 10px rgba(0,0,0,0.2)'
+                        }}
+                    />
+                );
+            })()}
             {/* ── Floating Draggable Canvas Toolbar (Hidden on Mobile, premium glassmorphism card on Desktop) */}
             <div 
                 className="hidden md:flex fixed bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-border px-3 py-2 rounded-full items-center shadow-xl z-50 select-none touch-none ring-1 ring-black/5"
                 style={{
-                    transform: `translate3d(${toolbarPos.x}px, ${toolbarPos.y}px, 0)`,
-                    left: 'calc(50% - 250px)',
-                    top: '20px',
+                    transform: `translate3d(calc(-50% + ${toolbarPos.x}px), ${toolbarPos.y}px, 0)`,
+                    left: '50%',
+                    top: '0px',
                 }}
                 onPointerDown={handleToolbarPointerDown}
                 onPointerMove={handleToolbarPointerMove}
@@ -793,9 +927,72 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                             {toolMode === 'select' && selectedPathIndices.length > 0 && (
                                 <>
                                   <div className="w-[1px] h-4 bg-border mx-1" />
+                                  
+                                  {/* Clear Selection */}
+                                  <Button variant="ghost" size="sm" onClick={clearSelectedPaths} className="h-8 text-red-650 font-bold bg-red-50 hover:bg-red-100 rounded-md" title="Clear selection">
+                                      <Trash2 className="w-4 h-4 mr-1" /> Clear
+                                  </Button>
+
+                                  {/* Save Snippet */}
                                   <Button variant="ghost" size="sm" onClick={copySelection} className="h-8 text-pink-600 font-bold bg-pink-50 hover:bg-pink-100 rounded-md" title="Save snippet">
                                       <Copy className="w-4 h-4 mr-1" /> Save
                                   </Button>
+
+                                  {/* Three Dots More Actions Menu */}
+                                  <div className="relative font-bold text-sm text-foreground" ref={actionsMenuRef}>
+                                      <Button 
+                                          variant="ghost" 
+                                          size="sm" 
+                                          onClick={() => setIsActionsMenuOpen(!isActionsMenuOpen)} 
+                                          className="h-8 w-8 p-0 text-slate-600 bg-slate-50 hover:bg-slate-100 rounded-md"
+                                          title="More actions"
+                                      >
+                                          <Settings2 className="w-4 h-4" />
+                                      </Button>
+                                      {isActionsMenuOpen && (
+                                          <div className="absolute top-full left-0 mt-1 w-44 bg-white dark:bg-slate-900 border border-border rounded-xl shadow-xl p-2 z-[101]">
+                                              <button 
+                                                  onClick={() => { duplicateSelection(); setIsActionsMenuOpen(false); }} 
+                                                  className="w-full text-left px-3 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg flex items-center gap-2"
+                                              >
+                                                  <Copy className="w-3.5 h-3.5" /> Duplicate
+                                              </button>
+                                              
+                                              <div className="h-[1px] bg-border my-1" />
+                                              
+                                              <div className="px-3 py-1 text-[9px] font-bold text-slate-400 uppercase">Scale</div>
+                                              <div className="flex gap-1 px-2 pb-1">
+                                                  <button 
+                                                      onClick={() => { scaleSelection(1.1); }} 
+                                                      className="flex-1 text-center py-1 text-[10px] font-black bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 rounded border border-border"
+                                                  >
+                                                      +10%
+                                                  </button>
+                                                  <button 
+                                                      onClick={() => { scaleSelection(0.9); }} 
+                                                      className="flex-1 text-center py-1 text-[10px] font-black bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 rounded border border-border"
+                                                  >
+                                                      -10%
+                                                  </button>
+                                              </div>
+
+                                              <div className="h-[1px] bg-border my-1" />
+                                              
+                                              <div className="px-3 py-1 text-[9px] font-bold text-slate-400 uppercase">Color</div>
+                                              <div className="flex gap-1.5 px-3 py-1 justify-center">
+                                                  {['#00009F', '#dc2626', '#16a34a', '#000000'].map((color) => (
+                                                      <button
+                                                          key={color}
+                                                          onClick={() => { changeSelectionColor(color); setIsActionsMenuOpen(false); }}
+                                                          className="w-4 h-4 rounded-full border border-black/10 shadow-sm shrink-0"
+                                                          style={{ backgroundColor: color }}
+                                                      />
+                                                  ))}
+                                              </div>
+                                          </div>
+                                      )}
+                                  </div>
+
                                   <Button variant="ghost" size="sm" onClick={unselect} className="h-8 text-slate-500 hover:bg-slate-100 rounded-md">
                                       Done
                                   </Button>

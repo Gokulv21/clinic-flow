@@ -568,18 +568,25 @@ export default function ConsultationForm({
             onClick={savePrescription} 
             disabled={saving} 
             className={cn(
-              "h-11 shadow-lg transition-all rounded-xl text-white font-bold",
+              "h-11 shadow-lg transition-all rounded-xl text-white font-bold text-xs sm:text-sm w-full",
               saveError ? "bg-red-600 hover:bg-red-700 animate-pulse" : "bg-blue-600 hover:bg-blue-750"
             )}
           >
             {saving ? (
-              <span className="flex items-center"><Loader2 className="w-4 h-4 animate-spin mr-2" /> Saving...</span>
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Saving...</span>
+              </>
+            ) : saveError ? (
+              <>
+                <RefreshCw className="w-4 h-4" />
+                <span>Retry Save</span>
+              </>
             ) : (
-              saveError ? (
-                <span className="flex items-center"><RefreshCw className="w-4 h-4 mr-2" /> Retry Save</span>
-              ) : (
-                <span className="flex items-center"><Save className="w-4 h-4 mr-2" /> Save & Complete</span>
-              )
+              <>
+                <Save className="w-4 h-4" />
+                <span>Save & Complete</span>
+              </>
             )}
           </Button>
         </div>
