@@ -9,6 +9,40 @@ import prescriptionLogo from '@/assets/prescriptionLogo.png';
 const EXPORT_W = 1240;
 const EXPORT_H = 1754;
 
+const renderFrequencyForPrescription = (freq: string) => {
+  if (!freq) return '—';
+  const parts = freq.trim().split('-');
+  if (parts.length === 3) {
+    return (
+      <span style={{ display: 'inline-flex', gap: '4px', alignItems: 'center', fontWeight: 800 }}>
+        {parts.map((part, index) => {
+          const val = parseFloat(part);
+          if (isNaN(val)) return <span key={index}>{part}</span>;
+          if (val === 0) return <span key={index} style={{ color: '#cbd5e1' }}>0</span>;
+          
+          const integer = Math.floor(val);
+          const fraction = val - integer;
+          
+          return (
+            <span key={index} style={{ display: 'inline-flex', alignItems: 'baseline' }}>
+              {integer > 0 && <span style={{ marginRight: '3px' }}>{integer}</span>}
+              {fraction === 0.5 && (
+                <span style={{ fontSize: '0.85em', fontWeight: 700, position: 'relative', top: '-0.05em' }}>
+                  ½
+                </span>
+              )}
+            </span>
+          );
+        }).reduce<React.ReactNode[]>((acc, elem, idx) => {
+          if (idx === 0) return [elem];
+          return [...acc, <span key={`dash-${idx}`} style={{ color: '#94a3b8', margin: '0 4px' }}>-</span>, elem];
+        }, [])}
+      </span>
+    );
+  }
+  return freq;
+};
+
 interface VitalSign {
     label: string;
     value: any;
@@ -509,7 +543,7 @@ function PageOne({
                                                 </td>
                                                 <td style={{ padding: '0.8em 0.4em', fontWeight: 800, color: '#2563eb', verticalAlign: 'top', textTransform: 'uppercase', fontSize: '0.85em' }}>{m?.route || '—'}</td>
                                                 <td style={{ padding: '0.8em 0.4em', fontWeight: 700, color: '#334155', verticalAlign: 'top' }}>{m?.dosage || m?.count || '—'}</td>
-                                                <td style={{ padding: '0.8em 0.4em', fontWeight: 800, color: '#0f172a', verticalAlign: 'top' }}>{m?.frequency || '—'}</td>
+                                                <td style={{ padding: '0.8em 0.4em', fontWeight: 800, color: '#0f172a', verticalAlign: 'top' }}>{renderFrequencyForPrescription(m?.frequency)}</td>
                                                 <td style={{ padding: '0.8em 0.4em', fontWeight: 700, color: '#475569', verticalAlign: 'top' }}>{m?.duration || '—'}</td>
                                                 <td style={{ padding: '0.8em 0.4em', borderLeft: '1px solid #f1f5f9', verticalAlign: 'top' }}>
                                                     <div style={{ fontSize: '0.85em', fontWeight: 700, color: '#475569', fontStyle: 'italic', lineHeight: 1.4, opacity: 0.9 }}>{m?.notes || '—'}</div>

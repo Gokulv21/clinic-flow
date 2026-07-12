@@ -42,6 +42,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
     const staticCanvasRef = useRef<HTMLCanvasElement | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const eraserCursorRef = useRef<HTMLDivElement>(null);
     const [isEnlarged, setIsEnlarged] = useState(false);
     const [scale, setScale] = useState(1);
 
@@ -49,14 +50,21 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
     const [penColor, setPenColor] = useState('#00009F');
     const [penSize, setPenSize] = useState(1);
     const [eraserSize, setEraserSize] = useState(7);
-    const [pointerPos, setPointerPos] = useState({ x: 0, y: 0 });
-    const [isPointerInCanvas, setIsPointerInCanvas] = useState(false);
 
     // Draggable Floating Toolbar State
-    const [toolbarPos, setToolbarPos] = useState({ x: 0, y: 185 });
+    const [toolbarPos, setToolbarPos] = useState({ x: 0, y: 20 });
     const isDraggingToolbarRef = useRef(false);
     const dragStartRef = useRef({ x: 0, y: 0 });
     const dashOffsetRef = useRef(0);
+
+    useEffect(() => {
+        const isTabletPortrait = window.innerWidth >= 768 && window.innerWidth <= 1024 && window.innerHeight > window.innerWidth;
+        if (isTabletPortrait) {
+            setToolbarPos({ x: 0, y: window.innerHeight - 80 });
+        } else {
+            setToolbarPos({ x: 0, y: 20 });
+        }
+    }, []);
 
     const handleToolbarPointerDown = (e: React.PointerEvent) => {
         const target = e.target as HTMLElement;
@@ -94,6 +102,10 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
     const [isDraggingSelection, setIsDraggingSelection] = useState(false);
     const [dragStartPos, setDragStartPos] = useState({x: 0, y: 0});
     const [dragOffset, setDragOffset] = useState({x: 0, y: 0});
+    const [isResizingSelection, setIsResizingSelection] = useState(false);
+    const [scaleFactor, setScaleFactor] = useState(1);
+    const [resizeStartPos, setResizeStartPos] = useState({ x: 0, y: 0 });
+    const resizeBoundsRef = useRef({ minX: 0, minY: 0, maxX: 0, maxY: 0 });
     const [savedProtocols, setSavedProtocols] = useState<{name: string, paths: any[]}[]>(() => {
         try {
             return JSON.parse(localStorage.getItem('handwritten_protocols') || '[]');
@@ -260,7 +272,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
             }
         }
         
-        // Draw selection highlight and dragged paths
+        // Draw selection highlight and dragged/resized paths
         if (selectedPathIndices.length > 0) {
             // Draw dragged paths
             if (isDraggingSelection) {
@@ -270,14 +282,14 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                // Re-clear selected original paths by using globalCompositeOperation
                ctx.globalCompositeOperation = 'destination-out';
                selectedPathIndices.forEach(idx => {
-                   const path = pages[currentPageIndex][idx];
+                   const path = pages[currentPageIndex]?.[idx];
                    if(path) renderPath(ctx, {...path, isEraser: false, size: path.size + 2}, canvas.width, canvas.height);
                });
                ctx.globalCompositeOperation = 'source-over';
                
                // Draw them at offset
                selectedPathIndices.forEach(idx => {
-                   const path = pages[currentPageIndex][idx];
+                   const path = pages[currentPageIndex]?.[idx];
                    if(path) {
                        const offsetPath = {
                            ...path,
@@ -286,17 +298,47 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                        renderPath(ctx, offsetPath, canvas.width, canvas.height);
                    }
                });
+            } else if (isResizingSelection) {
+               ctx.clearRect(0,0, canvas.width, canvas.height);
+               if (staticCanvasRef.current) ctx.drawImage(staticCanvasRef.current, 0, 0);
+               
+               // Re-clear selected original paths
+               ctx.globalCompositeOperation = 'destination-out';
+               selectedPathIndices.forEach(idx => {
+                   const path = pages[currentPageIndex]?.[idx];
+                   if(path) renderPath(ctx, {...path, isEraser: false, size: path.size + 2}, canvas.width, canvas.height);
+               });
+               ctx.globalCompositeOperation = 'source-over';
+
+               // Get anchor (top-left of bounds)
+               const { minX, minY } = resizeBoundsRef.current;
+               
+               // Draw them scaled
+               selectedPathIndices.forEach(idx => {
+                   const path = pages[currentPageIndex]?.[idx];
+                   if(path) {
+                       const scaledPath = {
+                           ...path,
+                           points: path.points.map(p => ({
+                               ...p,
+                               x: minX + (p.x - minX) * scaleFactor,
+                               y: minY + (p.y - minY) * scaleFactor
+                           }))
+                       };
+                       renderPath(ctx, scaledPath, canvas.width, canvas.height);
+                   }
+               });
             }
             
             // Draw Bounding Box
             let minX=1, minY=1, maxX=0, maxY=0;
             let hasPoints = false;
             selectedPathIndices.forEach(idx => {
-               const path = pages[currentPageIndex][idx];
+               const path = pages[currentPageIndex]?.[idx];
                if(path) {
                    path.points.forEach(p => {
-                       const x = p.x + (isDraggingSelection ? dragOffset.x : 0);
-                       const y = p.y + (isDraggingSelection ? dragOffset.y : 0);
+                       const x = p.x;
+                       const y = p.y;
                        if(!hasPoints) { minX=x; maxX=x; minY=y; maxY=y; hasPoints=true; }
                        if(x < minX) minX = x;
                        if(x > maxX) maxX = x;
@@ -305,20 +347,59 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                    });
                }
             });
+
             if (hasPoints) {
+                // Apply offsets/scale for display
+                let displayMinX = minX;
+                let displayMinY = minY;
+                let displayMaxX = maxX;
+                let displayMaxY = maxY;
+
+                if (isDraggingSelection) {
+                    displayMinX += dragOffset.x;
+                    displayMinY += dragOffset.y;
+                    displayMaxX += dragOffset.x;
+                    displayMaxY += dragOffset.y;
+                } else if (isResizingSelection) {
+                    displayMaxX = minX + (maxX - minX) * scaleFactor;
+                    displayMaxY = minY + (maxY - minY) * scaleFactor;
+                }
+
+                const rectLeft = displayMinX * canvas.width - 5;
+                const rectTop = displayMinY * canvas.height - 5;
+                const rectWidth = (displayMaxX - displayMinX) * canvas.width + 10;
+                const rectHeight = (displayMaxY - displayMinY) * canvas.height + 10;
+
                 ctx.strokeStyle = '#ec4899'; // pink
                 ctx.lineWidth = 2;
                 ctx.setLineDash([6, 4]);
                 ctx.lineDashOffset = -dashOffsetRef.current;
-                ctx.strokeRect(minX*canvas.width - 5, minY*canvas.height - 5, (maxX-minX)*canvas.width + 10, (maxY-minY)*canvas.height + 10);
+                ctx.strokeRect(rectLeft, rectTop, rectWidth, rectHeight);
                 ctx.setLineDash([]);
                 ctx.lineDashOffset = 0;
+
+                // Draw resize handle (circle) at bottom-right corner
+                const handleX = rectLeft + rectWidth;
+                const handleY = rectTop + rectHeight;
+                ctx.fillStyle = '#ec4899';
+                ctx.beginPath();
+                ctx.arc(handleX, handleY, 8, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
             }
         }
 
         ctx.globalCompositeOperation = 'source-over';
         isDirtyRef.current = false;
-    }, [penColor, penSize, isEraser]);
+    }, [penColor, penSize, isEraser, toolMode, selectedPathIndices, isDraggingSelection, dragOffset, isResizingSelection, scaleFactor, pages, currentPageIndex]);
+
+    useEffect(() => {
+        if (toolMode !== 'eraser' && eraserCursorRef.current) {
+            eraserCursorRef.current.style.display = 'none';
+        }
+    }, [toolMode]);
 
     // ── Animation Loop
     const animate = useCallback((time: number) => {
@@ -418,15 +499,77 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
         // This ensures fingers can still be used for Pinch-to-zoom gestures.
         if (e.pointerType !== 'pen' && toolMode !== 'lasso' && toolMode !== 'select' && toolMode !== 'eraser') return;
 
-        setIsPointerInCanvas(true);
+        if (toolMode === 'eraser' && eraserCursorRef.current) {
+            eraserCursorRef.current.style.display = 'block';
+        }
 
         const pos = getCanvasPos(e.clientX, e.clientY);
         
+        // Handle bounding box clicks for dragging/resizing or clearing selection
+        let isInsideBoundingBox = false;
         if (toolMode === 'select' && selectedPathIndices.length > 0) {
-            setDragStartPos(pos);
-            setIsDraggingSelection(true);
-            isDrawingRef.current = false;
-            return;
+            let minX=1, minY=1, maxX=0, maxY=0;
+            let hasPoints = false;
+            selectedPathIndices.forEach(idx => {
+               const path = pages[currentPageIndex]?.[idx];
+               if(path) {
+                   path.points.forEach(p => {
+                       const x = p.x;
+                       const y = p.y;
+                       if(!hasPoints) { minX=x; maxX=x; minY=y; maxY=y; hasPoints=true; }
+                       if(x < minX) minX = x;
+                       if(x > maxX) maxX = x;
+                       if(y < minY) minY = y;
+                       if(y > maxY) maxY = y;
+                   });
+               }
+            });
+
+            if (hasPoints) {
+                const canvas = canvasRef.current;
+                if (canvas) {
+                    const rectLeft = minX * canvas.width - 5;
+                    const rectTop = minY * canvas.height - 5;
+                    const rectWidth = (maxX - minX) * canvas.width + 10;
+                    const rectHeight = (maxY - minY) * canvas.height + 10;
+
+                    const canvasPos = getCanvasPos(e.clientX, e.clientY);
+                    const clickX = canvasPos.x * canvas.width;
+                    const clickY = canvasPos.y * canvas.height;
+
+                    // Check if clicked the resize handle first
+                    const handleX = rectLeft + rectWidth;
+                    const handleY = rectTop + rectHeight;
+                    const distToHandle = Math.hypot(clickX - handleX, clickY - handleY);
+                    if (distToHandle < 20) {
+                        setIsResizingSelection(true);
+                        setResizeStartPos(canvasPos);
+                        resizeBoundsRef.current = { minX, minY, maxX, maxY };
+                        isDrawingRef.current = false;
+                        return;
+                    }
+
+                    // Check if clicked inside the bounding box
+                    if (clickX >= rectLeft && clickX <= rectLeft + rectWidth &&
+                        clickY >= rectTop && clickY <= rectTop + rectHeight) {
+                        isInsideBoundingBox = true;
+                    }
+                }
+            }
+        }
+
+        if (toolMode === 'select' && selectedPathIndices.length > 0) {
+            if (isInsideBoundingBox) {
+                setDragStartPos(pos);
+                setIsDraggingSelection(true);
+                isDrawingRef.current = false;
+                return;
+            } else {
+                // Clicked outside selection: clear selection and switch back to lasso to draw a new selection
+                setSelectedPathIndices([]);
+                setToolMode('lasso');
+                // Continue execution to start drawing lasso immediately
+            }
         }
 
         // If another pen stroke is already active, ignore
@@ -449,10 +592,36 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
         // Restore palm rejection: Only track the active pen
         if (e.pointerType !== 'pen' && toolMode !== 'lasso' && toolMode !== 'select' && toolMode !== 'eraser') return;
         
-        setIsPointerInCanvas(true);
+        if (eraserCursorRef.current) {
+            if (toolMode === 'eraser') {
+                const canvas = canvasRef.current;
+                let sizeOnScreen = eraserSize * 5;
+                if (canvas) {
+                    const rect = canvas.getBoundingClientRect();
+                    const scaleX = rect.width / canvas.width;
+                    sizeOnScreen = eraserSize * 5 * scaleX;
+                }
+                eraserCursorRef.current.style.width = `${sizeOnScreen}px`;
+                eraserCursorRef.current.style.height = `${sizeOnScreen}px`;
+                eraserCursorRef.current.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0) translate(-50%, -50%)`;
+                eraserCursorRef.current.style.display = 'block';
+            } else {
+                eraserCursorRef.current.style.display = 'none';
+            }
+        }
         const pos = getCanvasPos(e.clientX, e.clientY);
-        setPointerPos({ x: e.clientX, y: e.clientY });
         
+        if (toolMode === 'select' && isResizingSelection) {
+            const { minX, maxX } = resizeBoundsRef.current;
+            const startWidth = maxX - minX;
+            const dx = pos.x - resizeStartPos.x;
+            const newWidth = startWidth + dx;
+            const scale = startWidth > 0 ? Math.max(0.1, newWidth / startWidth) : 1;
+            setScaleFactor(scale);
+            isDirtyRef.current = true;
+            return;
+        }
+
         if (toolMode === 'select' && isDraggingSelection) {
             setDragOffset({
                 x: pos.x - dragStartPos.x,
@@ -484,6 +653,40 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
     // Shared commit logic for pointerup / pointercancel / pointerleave
     const commitStroke = (e?: React.PointerEvent) => {
         if (e && e.pointerType !== 'pen' && toolMode !== 'lasso' && toolMode !== 'select' && toolMode !== 'eraser') return;
+
+        if (toolMode === 'select' && isResizingSelection) {
+            setIsResizingSelection(false);
+            if (scaleFactor !== 1) {
+                const { minX, minY } = resizeBoundsRef.current;
+                const updatedPages = [...pages];
+                const page = [...updatedPages[currentPageIndex]];
+                selectedPathIndices.forEach(idx => {
+                    if (page[idx]) {
+                        page[idx] = {
+                            ...page[idx],
+                            points: page[idx].points.map((p) => ({
+                                ...p,
+                                x: minX + (p.x - minX) * scaleFactor,
+                                y: minY + (p.y - minY) * scaleFactor
+                            }))
+                        };
+                    }
+                });
+                updatedPages[currentPageIndex] = page;
+                setPages(updatedPages);
+                
+                const newHistory = history.slice(0, historyStep + 1);
+                newHistory.push(updatedPages);
+                setHistory(newHistory);
+                setHistoryStep(newHistory.length - 1);
+                
+                if (onPathsChange) onPathsChange(updatedPages);
+                redrawStatic(page);
+            }
+            setScaleFactor(1);
+            isDirtyRef.current = true;
+            return;
+        }
 
         if (toolMode === 'select' && isDraggingSelection) {
             setIsDraggingSelection(false);
@@ -575,6 +778,28 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
             setSelectedPathIndices([]);
             isDirtyRef.current = true;
         }
+    };
+
+    const getSelectionBounds = () => {
+        if (selectedPathIndices.length === 0) return null;
+        let minX = 1, minY = 1, maxX = 0, maxY = 0;
+        let hasPoints = false;
+        selectedPathIndices.forEach(idx => {
+            const path = pages[currentPageIndex]?.[idx];
+            if (path) {
+                path.points.forEach(p => {
+                    const x = p.x;
+                    const y = p.y;
+                    if (!hasPoints) { minX = x; maxX = x; minY = y; hasPoints = true; }
+                    if (x < minX) minX = x;
+                    if (x > maxX) maxX = x;
+                    if (y < minY) minY = y;
+                    if (y > maxY) maxY = y;
+                });
+            }
+        });
+        if (!hasPoints) return null;
+        return { minX, minY, maxX, maxY };
     };
 
     const clearSelectedPaths = () => {
@@ -726,6 +951,9 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
         currentPathRef.current = [];
         lastTouchDistanceRef.current = null;
         isDirtyRef.current = true;
+        if (eraserCursorRef.current) {
+            eraserCursorRef.current.style.display = 'none';
+        }
     };
 
     const handleUndo = () => {
@@ -827,34 +1055,24 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
             onWheel={handleWheel}
         >
             {/* ── Eraser Cursor Overlay */}
-            {isEraser && isPointerInCanvas && (() => {
-                const getEraserSizeOnScreen = () => {
-                    const canvas = canvasRef.current;
-                    if (!canvas) return eraserSize * 5;
-                    const rect = canvas.getBoundingClientRect();
-                    const scaleX = rect.width / canvas.width;
-                    return eraserSize * 5 * scaleX;
-                };
-                const sizeOnScreen = getEraserSizeOnScreen();
-                return (
-                    <div 
-                        style={{
-                            position: 'fixed',
-                            left: pointerPos.x,
-                            top: pointerPos.y,
-                            width: sizeOnScreen,
-                            height: sizeOnScreen,
-                            border: '2px solid rgba(255, 255, 255, 0.75)',
-                            borderRadius: '50%',
-                            backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                            transform: 'translate(-50%, -50%)',
-                            pointerEvents: 'none',
-                            zIndex: 200,
-                            boxShadow: '0 0 10px rgba(0,0,0,0.2)'
-                        }}
-                    />
-                );
-            })()}
+            <div 
+                ref={eraserCursorRef}
+                style={{
+                    position: 'fixed',
+                    left: 0,
+                    top: 0,
+                    width: 0,
+                    height: 0,
+                    border: '2px solid rgba(255, 255, 255, 0.75)',
+                    borderRadius: '50%',
+                    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                    transform: 'translate3d(-50%, -50%, 0)',
+                    pointerEvents: 'none',
+                    zIndex: 200,
+                    boxShadow: '0 0 10px rgba(0,0,0,0.2)',
+                    display: 'none'
+                }}
+            />
             {/* ── Floating Draggable Canvas Toolbar (Hidden on Mobile, premium glassmorphism card on Desktop) */}
             <div 
                 className="hidden md:flex fixed bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-border px-3 py-2 rounded-full items-center shadow-xl z-50 select-none touch-none ring-1 ring-black/5"
@@ -928,11 +1146,6 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                                 <>
                                   <div className="w-[1px] h-4 bg-border mx-1" />
                                   
-                                  {/* Clear Selection */}
-                                  <Button variant="ghost" size="sm" onClick={clearSelectedPaths} className="h-8 text-red-650 font-bold bg-red-50 hover:bg-red-100 rounded-md" title="Clear selection">
-                                      <Trash2 className="w-4 h-4 mr-1" /> Clear
-                                  </Button>
-
                                   {/* Save Snippet */}
                                   <Button variant="ghost" size="sm" onClick={copySelection} className="h-8 text-pink-600 font-bold bg-pink-50 hover:bg-pink-100 rounded-md" title="Save snippet">
                                       <Copy className="w-4 h-4 mr-1" /> Save
@@ -1162,11 +1375,59 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                         onPointerUp={onPointerUp}
                         onPointerLeave={(e) => {
                             onPointerUp(e);
-                            setIsPointerInCanvas(false);
+                            if (eraserCursorRef.current) {
+                                eraserCursorRef.current.style.display = 'none';
+                            }
                         }}
-                        onPointerEnter={() => setIsPointerInCanvas(true)}
+                        onPointerEnter={(e) => {
+                            if (toolMode === 'eraser' && eraserCursorRef.current) {
+                                eraserCursorRef.current.style.display = 'block';
+                            }
+                        }}
                         onPointerCancel={onPointerCancel}
                     />
+                    {(() => {
+                        const bounds = getSelectionBounds();
+                        if (!bounds || isDraggingSelection || isResizingSelection) return null;
+                        
+                        const topPercent = bounds.minY * 100;
+                        const leftPercent = bounds.maxX * 100;
+
+                        return (
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    clearSelectedPaths();
+                                }}
+                                style={{
+                                    position: 'absolute',
+                                    top: `calc(${topPercent}% - 42px)`,
+                                    left: `calc(${leftPercent}%)`,
+                                    transform: 'translateX(-100%)',
+                                    zIndex: 100,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    backgroundColor: '#ef4444',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    borderRadius: '8px',
+                                    padding: '6px 12px',
+                                    fontSize: '11px',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    boxShadow: '0 10px 15px -3px rgba(239, 68, 68, 0.3), 0 4px 6px -4px rgba(239, 68, 68, 0.3)',
+                                    transition: 'all 0.2s',
+                                    fontFamily: 'sans-serif'
+                                }}
+                                onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#dc2626')}
+                                onMouseOut={(e) => (e.currentTarget.style.backgroundColor = '#ef4444')}
+                            >
+                                <Trash2 className="w-3.5 h-3.5" /> Clear
+                            </button>
+                        );
+                    })()}
                 </div>
             </div>
 

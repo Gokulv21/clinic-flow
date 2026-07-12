@@ -103,21 +103,21 @@ export default function ConsultationForm({
   const [openFreqPopoverIndex, setOpenFreqPopoverIndex] = useState<number | null>(null);
 
   const getPillState = (frequency: string) => {
-    const match = (frequency || '').trim().match(/^([0-9])\s*-\s*([0-9])\s*-\s*([0-9])$/);
-    if (match) {
+    const parts = (frequency || '').trim().split('-');
+    if (parts.length === 3) {
       return {
-        m: parseInt(match[1]) > 0,
-        a: parseInt(match[2]) > 0,
-        n: parseInt(match[3]) > 0
+        m: parseFloat(parts[0]) || 0,
+        a: parseFloat(parts[1]) || 0,
+        n: parseFloat(parts[2]) || 0
       };
     }
-    return { m: false, a: false, n: false };
+    return { m: 0, a: 0, n: 0 };
   };
 
   const handlePillToggle = (index: number, currentFreq: string, pill: 'm' | 'a' | 'n') => {
     const state = getPillState(currentFreq);
-    state[pill] = !state[pill];
-    const newFreq = `${state.m ? '1' : '0'}-${state.a ? '1' : '0'}-${state.n ? '1' : '0'}`;
+    state[pill] = state[pill] > 0 ? 0 : 1;
+    const newFreq = `${state.m}-${state.a}-${state.n}`;
     updateMedicine(index, 'frequency', newFreq);
   };
 
@@ -447,26 +447,64 @@ export default function ConsultationForm({
                               className="h-10 pr-9 text-sm font-bold border-purple-500/20 bg-purple-500/5 rounded-lg text-purple-600 dark:text-purple-400 placeholder:text-purple-200/50" 
                             />
                             {med.type !== 'Inj.' && (
-                              <div className="flex items-center gap-1 mt-1 justify-center">
+                              <div className="flex items-center gap-2 mt-1.5 justify-center">
                                 {(['m', 'a', 'n'] as const).map(pill => {
                                   const label = pill === 'm' ? 'M' : pill === 'a' ? 'A' : 'N';
                                   const title = pill === 'm' ? 'Morning' : pill === 'a' ? 'Afternoon' : 'Night';
-                                  const isActive = getPillState(med.frequency || '')[pill];
+                                  const val = getPillState(med.frequency || '')[pill];
+                                  
+                                  const formatVal = (v: number) => {
+                                    if (v === 0) return '0';
+                                    const integer = Math.floor(v);
+                                    const fraction = v - integer;
+                                    if (fraction === 0.5) {
+                                      return integer > 0 ? `${integer} ½` : '½';
+                                    }
+                                    return String(v);
+                                  };
+
+                                  const updatePillVal = (newVal: number) => {
+                                    const state = getPillState(med.frequency || '');
+                                    state[pill] = Math.max(0, newVal);
+                                    const newFreq = `${state.m}-${state.a}-${state.n}`;
+                                    updateMedicine(i, 'frequency', newFreq);
+                                  };
+
                                   return (
-                                    <button
-                                      key={pill}
-                                      type="button"
-                                      title={title}
-                                      onClick={() => handlePillToggle(i, med.frequency || '', pill)}
-                                      className={cn(
-                                        "w-6 h-6 rounded-full text-[10px] font-extrabold flex items-center justify-center border transition-all select-none",
-                                        isActive 
-                                          ? "bg-purple-650 text-white border-purple-650 shadow-sm"
-                                          : "bg-white dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700 hover:border-purple-300"
-                                      )}
-                                    >
-                                      {label}
-                                    </button>
+                                    <div key={pill} className="flex flex-col items-center gap-1 bg-purple-500/5 dark:bg-purple-500/10 p-1.5 rounded-lg border border-purple-500/10 min-w-[3.5rem]">
+                                      <button
+                                        type="button"
+                                        title={title}
+                                        onClick={() => updatePillVal(val > 0 ? 0 : 1)}
+                                        className={cn(
+                                          "w-6 h-6 rounded-full text-[10px] font-extrabold flex items-center justify-center border transition-all select-none",
+                                          val > 0 
+                                            ? "bg-purple-650 text-white border-purple-650 shadow-sm"
+                                            : "bg-white dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700 hover:border-purple-300"
+                                        )}
+                                      >
+                                        {label}
+                                      </button>
+                                      <span className="text-[10px] font-bold text-purple-700 dark:text-purple-350 text-center min-h-[14px]">
+                                        {formatVal(val)}
+                                      </span>
+                                      <div className="flex items-center gap-1">
+                                        <button
+                                          type="button"
+                                          onClick={() => updatePillVal(val - 0.5)}
+                                          className="w-4 h-4 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-[10px] font-bold text-slate-650 dark:text-slate-300 hover:bg-purple-500/10 shadow-sm"
+                                        >
+                                          -
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => updatePillVal(val + 0.5)}
+                                          className="w-4 h-4 rounded bg-white dark:bg-slate-800 border border-slate-250 dark:border-slate-700 flex items-center justify-center text-[10px] font-bold text-slate-650 dark:text-slate-300 hover:bg-purple-500/10 shadow-sm"
+                                        >
+                                          +
+                                        </button>
+                                      </div>
+                                    </div>
                                   );
                                 })}
                               </div>
