@@ -60,7 +60,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
     useEffect(() => {
         const isTabletPortrait = window.innerWidth >= 768 && window.innerWidth <= 1024 && window.innerHeight > window.innerWidth;
         if (isTabletPortrait) {
-            setToolbarPos({ x: 0, y: window.innerHeight - 80 });
+            setToolbarPos({ x: 0, y: 135 });
         } else {
             setToolbarPos({ x: 0, y: 20 });
         }
@@ -497,7 +497,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
 
         // Restore Palm Rejection: Strictly ONLY allow Stylus/Pen for drawing. 
         // This ensures fingers can still be used for Pinch-to-zoom gestures.
-        if (e.pointerType !== 'pen' && toolMode !== 'lasso' && toolMode !== 'select' && toolMode !== 'eraser') return;
+        if (e.pointerType !== 'pen' && toolMode !== 'select') return;
 
         if (toolMode === 'eraser' && eraserCursorRef.current) {
             eraserCursorRef.current.style.display = 'block';
@@ -565,10 +565,17 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                 isDrawingRef.current = false;
                 return;
             } else {
-                // Clicked outside selection: clear selection and switch back to lasso to draw a new selection
+                // Clicked outside selection: clear selection.
+                // If it is pen, switch back to lasso and start drawing immediately.
+                // If it is touch/finger, just clear selection, reset to pen and return (don't draw lasso).
                 setSelectedPathIndices([]);
-                setToolMode('lasso');
-                // Continue execution to start drawing lasso immediately
+                if (e.pointerType === 'pen') {
+                    setToolMode('lasso');
+                } else {
+                    setToolMode('pen');
+                    isDrawingRef.current = false;
+                    return;
+                }
             }
         }
 
@@ -590,7 +597,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
         e.preventDefault();
 
         // Restore palm rejection: Only track the active pen
-        if (e.pointerType !== 'pen' && toolMode !== 'lasso' && toolMode !== 'select' && toolMode !== 'eraser') return;
+        if (e.pointerType !== 'pen' && toolMode !== 'select') return;
         
         if (eraserCursorRef.current) {
             if (toolMode === 'eraser') {
@@ -652,7 +659,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
 
     // Shared commit logic for pointerup / pointercancel / pointerleave
     const commitStroke = (e?: React.PointerEvent) => {
-        if (e && e.pointerType !== 'pen' && toolMode !== 'lasso' && toolMode !== 'select' && toolMode !== 'eraser') return;
+        if (e && e.pointerType !== 'pen' && toolMode !== 'select') return;
 
         if (toolMode === 'select' && isResizingSelection) {
             setIsResizingSelection(false);
