@@ -68,6 +68,12 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
   const dialingToneRef = useRef<HTMLAudioElement | null>(null);
   const presenceChannelRef = useRef<any>(null);
   const [sessionId] = useState(() => Math.random().toString(36).substring(7));
+  const callStateRef = useRef<CallState>('idle');
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    callStateRef.current = callState;
+  }, [callState]);
 
   // Initialize Audio Assets
   useEffect(() => {
@@ -233,7 +239,7 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
       })
       .on('broadcast', { event: 'call-invite' }, ({ payload }) => {
         if (payload.toUserId !== user.id) return;
-        if (callState === 'idle') {
+        if (callStateRef.current === 'idle') {
           setIncomingCall({ 
             from: payload.fromUserId, 
             fromName: payload.fromName, 
@@ -266,7 +272,7 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
 
     presenceChannelRef.current = channel;
     return () => { channel.unsubscribe(); };
-  }, [user?.id, callState]);
+  }, [user?.id]);
 
   const cleanupCall = () => {
     if (roomRef.current) {

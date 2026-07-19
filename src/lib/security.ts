@@ -8,6 +8,8 @@ export type SecurityEventType =
   | 'SUSPICIOUS_TRAFFIC'
   | 'API_ERROR';
 
+let isLogging = false;
+
 /**
  * Logs a security event to the central audit table.
  * This should be used for sensitive actions or error detection.
@@ -17,6 +19,8 @@ export async function logSecurityEvent(
   metadata: Record<string, any> = {},
   clinicId?: string
 ) {
+  if (isLogging) return;
+  isLogging = true;
   try {
     const { data: { user } } = await supabase.auth.getUser();
     
@@ -47,5 +51,7 @@ export async function logSecurityEvent(
   } catch (err) {
     // Silent fail to avoid disrupting user experience
     console.warn("Security logger failed:", err);
+  } finally {
+    isLogging = false;
   }
 }

@@ -136,17 +136,22 @@ export function useConsultation(clinic: any, allUsers: any[], onlineUsers: any[]
     const hasContent = diagnosis || clinicalNotes || medicines.some(m => m.name) || advice || prescriptionImage;
     if (!hasContent) return;
 
-    // 1. Back up locally
+    // 1. Back up locally (contains full data including drawings)
     localStorage.setItem(`draft_${visitId}`, JSON.stringify(draftData));
     localStorage.setItem('active_consultation_id', visitId);
 
-    // 2. Sync to Cloud
+    // 2. Sync to Cloud (lightweight version excluding heavy base64 images and paths)
     if (navigator.onLine) {
       setSyncStatus('syncing');
       try {
+        const cloudDraftData = {
+          ...draftData,
+          prescriptionImage: null,
+          prescriptionPaths: []
+        };
         const { error } = await supabase
           .from('visits')
-          .update({ draft_data: draftData as any })
+          .update({ draft_data: cloudDraftData as any })
           .eq('id', visitId);
         
         if (error) throw error;
@@ -207,13 +212,21 @@ export function useConsultation(clinic: any, allUsers: any[], onlineUsers: any[]
 
     // Load draft
     let restoredDraft = null;
+    const savedDraft = localStorage.getItem(`draft_${visit.id}`);
+    let localDraft = null;
+    if (savedDraft) {
+      try { localDraft = JSON.parse(savedDraft); } catch {}
+    }
+
     if (visit.draft_data) {
-      restoredDraft = visit.draft_data;
-    } else {
-      const savedDraft = localStorage.getItem(`draft_${visit.id}`);
-      if (savedDraft) {
-        try { restoredDraft = JSON.parse(savedDraft); } catch {}
-      }
+      // Merge cloud draft text with local draft drawings
+      restoredDraft = {
+        ...visit.draft_data,
+        prescriptionImage: localDraft?.prescriptionImage || visit.draft_data.prescriptionImage || null,
+        prescriptionPaths: localDraft?.prescriptionPaths || visit.draft_data.prescriptionPaths || []
+      };
+    } else if (localDraft) {
+      restoredDraft = localDraft;
     }
 
     if (checkForDrafts && restoredDraft) {
