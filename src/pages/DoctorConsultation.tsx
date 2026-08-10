@@ -718,7 +718,7 @@ Wishing you a quick recovery!
       </Dialog>
 
       {/* What's New Floating Trigger Button */}
-      <div className="fixed bottom-4 left-4 z-[40]">
+      <div className="fixed bottom-4 left-4 z-[40] hidden md:block">
         <Button
           onClick={() => setShowChangelog(true)}
           className="bg-indigo-650 hover:bg-indigo-700 text-white font-extrabold text-[10px] rounded-full shadow-lg h-9 px-4 flex items-center gap-1.5 uppercase tracking-wider transition-all hover:scale-105 active:scale-95"

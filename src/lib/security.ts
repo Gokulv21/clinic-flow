@@ -9,49 +9,67 @@ export type SecurityEventType =
   | 'API_ERROR';
 
 let isLogging = false;
+let lastLogTime = 0;
 
 /**
  * Logs a security event to the central audit table.
- * This should be used for sensitive actions or error detection.
+ * Strictly non-blocking and safe from recursive error cascades.
  */
 export async function logSecurityEvent(
   eventType: SecurityEventType, 
   metadata: Record<string, any> = {},
-  clinicId?: string
+  clinicId?: string,
+  userId?: string
 ) {
-  if (isLogging) return;
+  // Prevent re-entrancy and throttle excessive error logging (max 1 log per second)
+  const now = Date.now();
+  if (isLogging || (now - lastLogTime < 1000 && eventType === 'API_ERROR')) {
+    return;
+  }
+
   isLogging = true;
+  lastLogTime = now;
+
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    // Read session from local cache to avoid blocking network roundtrips
+    let actorId = userId;
+    if (!actorId) {
+      const { data } = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
+      actorId = data?.session?.user?.id;
+    }
     
-    // We attempt to get clinic id from profile if not provided
     let finalClinicId = clinicId;
-    if (!finalClinicId && user) {
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('clinic_id')
-            .eq('user_id', user.id)
-            .maybeSingle();
-        finalClinicId = profile?.clinic_id;
+    if (!finalClinicId && actorId) {
+      try {
+        const savedProfile = sessionStorage.getItem('user_profile');
+        if (savedProfile) {
+          const parsed = JSON.parse(savedProfile);
+          finalClinicId = parsed?.clinic_id;
+        }
+      } catch {
+        // Ignore JSON parse errors
+      }
     }
 
-    const { error } = await supabase.from('security_audit_logs').insert({
+    await supabase.from('security_audit_logs').insert({
       event_type: eventType,
-      actor_id: user?.id,
+      actor_id: actorId,
       clinic_id: finalClinicId,
       metadata: {
         ...metadata,
-        url: window.location.href,
+        url: typeof window !== 'undefined' ? window.location.href : '',
         timestamp: new Date().toISOString()
       },
-      user_agent: navigator.userAgent
+      user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : 'Unknown'
+    }).catch(err => {
+      console.warn("[Security Logger] Insert failed (safe bypass):", err?.message);
     });
 
-    if (error) console.error("Failed to log security event:", error);
   } catch (err) {
-    // Silent fail to avoid disrupting user experience
-    console.warn("Security logger failed:", err);
+    // Silent fail to guarantee zero disruption to user workflow
+    console.warn("[Security Logger] Safe bypass on error:", err);
   } finally {
     isLogging = false;
   }
 }
+

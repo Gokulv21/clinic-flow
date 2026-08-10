@@ -6,7 +6,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { Button } from "@/components/ui/button";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { Loader2, WifiOff, RefreshCw, ShieldAlert, Building2 } from "lucide-react";
+import { Loader2, WifiOff, RefreshCw, ShieldAlert, Building2, LogOut } from "lucide-react";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import AppLayout from "@/components/AppLayout";
 import Login from "@/pages/Login";
@@ -25,8 +25,10 @@ import NotFound from "./pages/NotFound.tsx";
 import { CommunicationProvider } from "@/lib/communication";
 import CallOverlay from "@/components/CallOverlay";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import About from "@/pages/About";
 import Help from "@/pages/Help";
+import { logSecurityEvent } from "@/lib/security";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -82,17 +84,34 @@ function ClinicWrapper() {
     };
   }, [slug, refetch]);
 
-
-  if (isLoading) return <div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin w-8 h-8 text-blue-600"/></div>;
+  if (isLoading) {
+    return (
+      <div className="flex flex-col justify-center items-center h-screen space-y-4 bg-slate-50 dark:bg-slate-950 font-jakarta-sans">
+        <Loader2 className="animate-spin w-8 h-8 text-blue-600"/>
+        <p className="text-xs text-slate-500 font-bold tracking-widest uppercase">Connecting to Clinical Environment...</p>
+      </div>
+    );
+  }
 
   if (error || !clinic) {
     console.error("[ClinicWrapper] Access Denied or Clinic Not Found:", { slug, error, user: user?.id, roles });
     return (
-      <div className="flex flex-col justify-center items-center h-screen space-y-4">
-        <h1 className="text-2xl font-bold">Clinic not found</h1>
-        <p className="text-muted-foreground">Slug: <span className="font-mono">{slug}</span></p>
-        {error && <p className="text-red-500 text-sm">Error: {(error as any).message}</p>}
-        <Button onClick={() => navigate('/')}>Back to Selection</Button>
+      <div className="flex flex-col justify-center items-center h-screen space-y-4 p-6 text-center bg-slate-50 dark:bg-slate-950 font-jakarta-sans">
+        <div className="w-16 h-16 rounded-2xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 flex items-center justify-center">
+          <Building2 className="w-8 h-8" />
+        </div>
+        <h1 className="text-2xl font-black">Clinic Not Found</h1>
+        <p className="text-muted-foreground text-sm max-w-sm">
+          Could not find clinic environment matching <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{slug}</span>.
+        </p>
+        <div className="flex gap-3 pt-2">
+          <Button variant="outline" onClick={() => refetch()} className="rounded-xl font-bold">
+            <RefreshCw className="w-4 h-4 mr-2" /> Retry
+          </Button>
+          <Button onClick={() => navigate('/')} className="rounded-xl font-bold bg-blue-600 text-white">
+            Back to Clinics
+          </Button>
+        </div>
       </div>
     );
   }
@@ -137,8 +156,6 @@ function ClinicWrapper() {
     );
   }
 
-
-  // We expose clinic to the window for older queries just in case, but robustly we should use Context
   (window as any).__ACTIVE_CLINIC_ID = clinic.id;
 
   return (
@@ -153,21 +170,34 @@ function ProtectedRoute({ children, allowedRoles }: { children: ReactNode; allow
   const location = useLocation();
   const navigate = useNavigate();
 
-  if (loading) return (
-    <div className="flex items-center justify-center min-h-screen bg-white">
-      <div className="relative">
-        <Loader2 className="w-10 h-10 animate-spin text-slate-200" />
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-950 font-jakarta-sans space-y-4">
+        <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
+        <p className="text-xs font-black uppercase tracking-widest text-slate-400">Verifying Credentials...</p>
       </div>
-    </div>
-  );
+    );
+  }
 
   if (error && roles.length === 0) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4 text-center">
-        <div className="space-y-6 max-w-sm">
-          <WifiOff className="w-8 h-8 text-destructive mx-auto" />
-          <h1 className="text-xl font-bold">Network Issue</h1>
-          <Button onClick={refresh} className="w-full gap-2 font-bold bg-primary text-white">Retry Connection</Button>
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-6 text-center font-jakarta-sans">
+        <div className="space-y-6 max-w-sm w-full bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl">
+          <div className="w-16 h-16 rounded-2xl bg-red-50 dark:bg-red-950/40 text-red-600 flex items-center justify-center mx-auto">
+            <WifiOff className="w-8 h-8" />
+          </div>
+          <div>
+            <h1 className="text-xl font-black text-slate-900 dark:text-white">Connection Issue</h1>
+            <p className="text-xs text-slate-500 mt-1">{error || 'Could not verify your security permissions.'}</p>
+          </div>
+          <div className="flex flex-col gap-3">
+            <Button onClick={refresh} className="w-full h-12 rounded-xl gap-2 font-bold bg-blue-600 text-white">
+              <RefreshCw className="w-4 h-4" /> Retry Connection
+            </Button>
+            <Button variant="outline" onClick={() => signOut()} className="w-full h-12 rounded-xl gap-2 font-bold">
+              <LogOut className="w-4 h-4" /> Sign Out
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -177,8 +207,24 @@ function ProtectedRoute({ children, allowedRoles }: { children: ReactNode; allow
 
   if (roles.length === 0) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4 text-center">
-        <ShieldAlert className="w-8 h-8 mx-auto" />
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-6 text-center font-jakarta-sans">
+        <div className="space-y-6 max-w-sm w-full bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl">
+          <div className="w-16 h-16 rounded-2xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 flex items-center justify-center mx-auto">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <div>
+            <h1 className="text-xl font-black text-slate-900 dark:text-white">Permissions Pending</h1>
+            <p className="text-xs text-slate-500 mt-1">No active clinic role assigned to this account.</p>
+          </div>
+          <div className="flex flex-col gap-3">
+            <Button onClick={refresh} className="w-full h-12 rounded-xl gap-2 font-bold bg-blue-600 text-white">
+              <RefreshCw className="w-4 h-4" /> Refresh Roles
+            </Button>
+            <Button variant="outline" onClick={() => signOut()} className="w-full h-12 rounded-xl gap-2 font-bold">
+              <LogOut className="w-4 h-4" /> Sign Out / Switch User
+            </Button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -192,12 +238,16 @@ function ProtectedRoute({ children, allowedRoles }: { children: ReactNode; allow
 
 function PublicRoute({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
-  if (loading) return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-950">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
   if (user) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
-
-
 
 // -----------------------------------------------------
 // APP ROOT ROUTING
@@ -205,42 +255,53 @@ function PublicRoute({ children }: { children: ReactNode }) {
 function RootRouter() {
   const { user, loading } = useAuth();
 
-  if (loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin" /></div>;
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-50 dark:bg-slate-950">
+        <Loader2 className="animate-spin text-blue-600 w-8 h-8" />
+      </div>
+    );
+  }
 
   if (user) {
      return <ClinicSelection />;
   }
 
-  return <Navigate to="/login" />;
+  return <Navigate to="/login" replace />;
 }
 
-import { logSecurityEvent } from "@/lib/security";
-
-// Monitering for suspicious behavior and API errors
+// Monitoring for suspicious behavior and API errors
 function SecuritySentinel() {
   const { user } = useAuth();
   
   useEffect(() => {
     const handleError = (event: ErrorEvent) => {
+      // Filter out benign browser noise
+      if (event.message?.includes('ResizeObserver') || event.message?.includes('Script error')) {
+        return;
+      }
       logSecurityEvent('API_ERROR', { 
         message: event.message,
         filename: event.filename,
         lineno: event.lineno
-      });
+      }, undefined, user?.id);
     };
 
     const handleRejection = (event: PromiseRejectionEvent) => {
       const error = event.reason;
-      if (error?.message?.includes('JWT') || error?.message?.includes('permission denied')) {
+      if (!error) return;
+      
+      const msg = typeof error === 'string' ? error : error?.message || '';
+      // Filter out expected aborts
+      if (msg.includes('AbortError') || msg.includes('canceled') || msg.includes('cancelled')) {
+        return;
+      }
+
+      if (msg.includes('JWT') || msg.includes('permission denied') || msg.includes('row-level security')) {
         logSecurityEvent('SUSPICIOUS_TRAFFIC', { 
           reason: 'Unauthorized Database Attempt',
-          details: error.message 
-        });
-      } else {
-        logSecurityEvent('API_ERROR', { 
-          message: error?.message || 'Unhandle Promise Rejection',
-          stack: error?.stack 
-        });
+          details: msg 
+        }, undefined, user?.id);
       }
     };
 
@@ -251,53 +312,55 @@ function SecuritySentinel() {
       window.removeEventListener('error', handleError);
       window.removeEventListener('unhandledrejection', handleRejection);
     };
-  }, [user]);
+  }, [user?.id]);
 
   return null;
 }
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <ThemeProvider defaultTheme="system" storageKey="prescripto-theme">
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter basename="/prescripto">
-          <AuthProvider>
-            <SecuritySentinel />
-            <CommunicationProvider>
-              <CallOverlay />
-              <Routes>
-                {/* 1. Public Routes */}
-                <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-                <Route path="/rx/:visitId" element={<PublicPrescription />} />
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider defaultTheme="system" storageKey="prescripto-theme">
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter basename="/prescripto">
+            <AuthProvider>
+              <SecuritySentinel />
+              <CommunicationProvider>
+                <CallOverlay />
+                <Routes>
+                  {/* 1. Public Routes */}
+                  <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+                  <Route path="/rx/:visitId" element={<PublicPrescription />} />
 
-                {/* 2. Root Redirector & Global Pages */}
-                <Route path="/" element={<RootRouter />} />
-                <Route path="/help" element={<ProtectedRoute><AppLayout><Help /></AppLayout></ProtectedRoute>} />
+                  {/* 2. Root Redirector & Global Pages */}
+                  <Route path="/" element={<RootRouter />} />
+                  <Route path="/help" element={<ProtectedRoute><AppLayout><Help /></AppLayout></ProtectedRoute>} />
 
-                {/* 3. Multi-Clinic Scoped Routes */}
-                <Route path="/:slug" element={<ProtectedRoute><ClinicWrapper /></ProtectedRoute>}>
-                  <Route path="dashboard" element={<Dashboard />} />
-                  <Route path="nurse" element={<ProtectedRoute allowedRoles={['staff', 'doctor', 'superadmin', 'owner']}><NurseEntry /></ProtectedRoute>} />
-                  <Route path="consultation" element={<ProtectedRoute allowedRoles={['doctor', 'superadmin', 'owner']}><DoctorConsultation /></ProtectedRoute>} />
-                  <Route path="print" element={<ProtectedRoute allowedRoles={['staff', 'doctor', 'superadmin', 'owner']}><PrintQueue /></ProtectedRoute>} />
-                  <Route path="patients" element={<ProtectedRoute allowedRoles={['staff', 'doctor', 'superadmin', 'owner']}><PatientList /></ProtectedRoute>} />
-                  <Route path="analytics" element={<ProtectedRoute allowedRoles={['doctor', 'superadmin', 'owner']}><Analytics /></ProtectedRoute>} />
-                  <Route path="profile" element={<ProtectedRoute allowedRoles={['doctor', 'superadmin', 'owner']}><DoctorProfile /></ProtectedRoute>} />
-                  <Route path="users" element={<ProtectedRoute allowedRoles={['superadmin', 'owner']}><UserManagement /></ProtectedRoute>} />
-                  <Route path="saas" element={<ProtectedRoute allowedRoles={['superadmin']}><SaaSManagement /></ProtectedRoute>} />
-                  <Route path="about" element={<About />} />
-                </Route>
+                  {/* 3. Multi-Clinic Scoped Routes */}
+                  <Route path="/:slug" element={<ProtectedRoute><ClinicWrapper /></ProtectedRoute>}>
+                    <Route path="dashboard" element={<Dashboard />} />
+                    <Route path="nurse" element={<ProtectedRoute allowedRoles={['staff', 'doctor', 'superadmin', 'owner']}><NurseEntry /></ProtectedRoute>} />
+                    <Route path="consultation" element={<ProtectedRoute allowedRoles={['doctor', 'superadmin', 'owner']}><DoctorConsultation /></ProtectedRoute>} />
+                    <Route path="print" element={<ProtectedRoute allowedRoles={['staff', 'doctor', 'superadmin', 'owner']}><PrintQueue /></ProtectedRoute>} />
+                    <Route path="patients" element={<ProtectedRoute allowedRoles={['staff', 'doctor', 'superadmin', 'owner']}><PatientList /></ProtectedRoute>} />
+                    <Route path="analytics" element={<ProtectedRoute allowedRoles={['doctor', 'superadmin', 'owner']}><Analytics /></ProtectedRoute>} />
+                    <Route path="profile" element={<ProtectedRoute allowedRoles={['doctor', 'superadmin', 'owner']}><DoctorProfile /></ProtectedRoute>} />
+                    <Route path="users" element={<ProtectedRoute allowedRoles={['superadmin', 'owner']}><UserManagement /></ProtectedRoute>} />
+                    <Route path="saas" element={<ProtectedRoute allowedRoles={['superadmin']}><SaaSManagement /></ProtectedRoute>} />
+                    <Route path="about" element={<About />} />
+                  </Route>
 
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </CommunicationProvider>
-          </AuthProvider>
-        </BrowserRouter>
-      </TooltipProvider>
-    </ThemeProvider>
-  </QueryClientProvider>
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </CommunicationProvider>
+            </AuthProvider>
+          </BrowserRouter>
+        </TooltipProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;

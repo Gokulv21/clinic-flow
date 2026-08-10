@@ -9,7 +9,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   roles: AppRole[];
-  profile: { id?: string; full_name: string; clinic_id?: string } | null;
+  profile: { id?: string; full_name: string; clinic_id?: string; role?: string } | null;
   loading: boolean;
   error: string | null;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
@@ -20,23 +20,34 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function getSafeStorageItem<T>(key: string, fallback: T): T {
+  try {
+    const saved = sessionStorage.getItem(key);
+    if (!saved) return fallback;
+    return JSON.parse(saved);
+  } catch {
+    return fallback;
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [roles, setRoles] = useState<AppRole[]>(() => {
-    const saved = sessionStorage.getItem('app_roles');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [profile, setProfile] = useState<{ id?: string; full_name: string; clinic_id?: string } | null>(() => {
-    const saved = sessionStorage.getItem('user_profile');
-    return saved ? JSON.parse(saved) : null;
-  });
+  const [roles, setRoles] = useState<AppRole[]>(() => getSafeStorageItem<AppRole[]>('app_roles', []));
+  const [profile, setProfile] = useState<{ id?: string; full_name: string; clinic_id?: string; role?: string } | null>(() => 
+    getSafeStorageItem<{ id?: string; full_name: string; clinic_id?: string; role?: string } | null>('user_profile', null)
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const lastFetchedId = useRef<string | null>(null);
   const isFetching = useRef(false);
 
   const fetchUserData = async (userId: string, force = false) => {
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
+
     if (isFetching.current && !force) return;
 
     if (userId === lastFetchedId.current && roles.length > 0 && !force) {
@@ -47,32 +58,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isFetching.current = true;
     setLoading(true);
     setError(null);
+
+    // Hard 6-second timeout promise to prevent infinite hanging
+    const timeoutPromise = new Promise<{ isTimeout: true }>((resolve) => {
+      setTimeout(() => resolve({ isTimeout: true }), 6000);
+    });
+
     try {
-      const [rolesRes, profileRes] = await Promise.all([
+      const fetchPromise = Promise.all([
         supabase.from('user_roles').select('role').eq('user_id', userId),
-        supabase.from('profiles').select('id, full_name, is_superadmin, clinic_id').eq('user_id', userId).maybeSingle(),
+        supabase.from('profiles').select('id, full_name, is_superadmin, clinic_id, role').eq('user_id', userId).maybeSingle(),
       ]);
+
+      const raceResult = await Promise.race([fetchPromise, timeoutPromise]);
+
+      if ('isTimeout' in raceResult) {
+        console.warn('[Auth] Fetch user data timed out. Using fallback state.');
+        if (roles.length === 0) {
+          setError('Connection timed out. Please check your network.');
+        }
+        return;
+      }
+
+      const [rolesRes, profileRes] = raceResult;
 
       if (rolesRes.error) throw rolesRes.error;
 
       const rolesFromDB = (rolesRes.data || []).map(r => r.role as AppRole);
       const profileData = profileRes.data || null;
       const isSuper = !!profileData?.is_superadmin;
-      const newRoles = isSuper ? [...rolesFromDB, 'superadmin' as AppRole] : rolesFromDB;
+      
+      let newRoles: AppRole[] = isSuper ? [...rolesFromDB, 'superadmin' as AppRole] : rolesFromDB;
+      
+      // Fallback: If user_roles table didn't have rows, check role on profile table
+      if (newRoles.length === 0 && profileData?.role) {
+        newRoles = [profileData.role as AppRole];
+      }
 
       setRoles(newRoles);
       setProfile(profileData);
 
-      // Security: Update last activity
-      if (userId) {
-        supabase.from('profiles')
-          .update({ last_login_at: new Date().toISOString() })
-          .eq('user_id', userId)
-          .then();
-      }
+      // Security: Update last activity non-blockingly
+      supabase.from('profiles')
+        .update({ last_login_at: new Date().toISOString() })
+        .eq('user_id', userId)
+        .then()
+        .catch(() => {});
 
-      sessionStorage.setItem('app_roles', JSON.stringify(newRoles));
-      sessionStorage.setItem('user_profile', JSON.stringify(profileData));
+      try {
+        sessionStorage.setItem('app_roles', JSON.stringify(newRoles));
+        sessionStorage.setItem('user_profile', JSON.stringify(profileData));
+      } catch {
+        // Ignore storage write issues
+      }
 
       lastFetchedId.current = userId;
     } catch (err: any) {
@@ -91,6 +129,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user) {
       lastFetchedId.current = null;
       await fetchUserData(user.id, true);
+    } else {
+      setLoading(false);
     }
   };
 
@@ -112,8 +152,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
+
     const initAuth = async () => {
-      const timeoutId = setTimeout(() => mounted && setLoading(false), 8000);
+      // Global fallback safety timer (5s)
+      const safetyTimer = setTimeout(() => {
+        if (mounted) setLoading(false);
+      }, 5000);
+
       try {
         const { data: { session: initialSession } } = await supabase.auth.getSession();
         if (mounted && initialSession) {
@@ -124,9 +169,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setLoading(false);
         }
       } catch (err) {
+        console.warn('[Auth] Initial session error:', err);
         if (mounted) setLoading(false);
       } finally {
-        if (mounted) clearTimeout(timeoutId);
+        clearTimeout(safetyTimer);
       }
 
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
@@ -137,7 +183,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (currentUser) {
           if (event === 'SIGNED_IN') {
-             logSecurityEvent('LOGIN_SUCCESS', { method: 'password' });
+             logSecurityEvent('LOGIN_SUCCESS', { method: 'password' }, undefined, currentUser.id);
              fetchUserData(currentUser.id);
           } else if (event === 'TOKEN_REFRESHED') {
             fetchUserData(currentUser.id);
@@ -148,50 +194,63 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setProfile(null);
           setError(null);
           lastFetchedId.current = null;
+          try {
+            sessionStorage.clear();
+          } catch {}
           setLoading(false);
         }
       });
       return subscription;
     };
+
     const subPromise = initAuth();
     return () => {
       mounted = false;
-      subPromise.then(sub => sub?.unsubscribe());
+      subPromise.then(sub => sub?.unsubscribe()).catch(() => {});
     };
   }, []);
 
   const signIn = async (email: string, password: string) => {
     setLoading(true);
     
-    // Check Rate Limit (DB call)
+    // Check Rate Limit (DB call with safe timeout)
     try {
-        const { data: allowed, error: limitError } = await supabase.rpc('check_rate_limit', {
-            p_identifier: email,
-            p_bucket: 'login',
-            p_max_requests: 5,
-            p_interval_seconds: 600
-        });
+      const { data: allowed, error: limitError } = await supabase.rpc('check_rate_limit', {
+        p_identifier: email,
+        p_bucket: 'login',
+        p_max_requests: 5,
+        p_interval_seconds: 600
+      });
 
-        if (limitError) {
-            console.error("Rate limit check failed:", limitError);
-        } else if (allowed === false) {
-             const limitErr = new Error('Too many login attempts. Please try again in 10 minutes.');
-             logSecurityEvent('SUSPICIOUS_TRAFFIC', { reason: 'Brute Force Attempt Detected', email });
-             return { error: limitErr };
-        }
-    } catch (e) {
-        console.warn("Security check failed, bypassing to allow access...");
+      if (limitError) {
+        console.error("Rate limit check failed:", limitError);
+      } else if (allowed === false) {
+        const limitErr = new Error('Too many login attempts. Please try again in 10 minutes.');
+        logSecurityEvent('SUSPICIOUS_TRAFFIC', { reason: 'Brute Force Attempt Detected', email });
+        setLoading(false);
+        return { error: limitErr };
+      }
+    } catch {
+      console.warn("Security check bypassed to allow access.");
     }
 
-    const result = await supabase.auth.signInWithPassword({ email, password });
-    if (result.error) logSecurityEvent('LOGIN_FAILURE', { email });
-    return { error: result.error as Error | null };
+    try {
+      const result = await supabase.auth.signInWithPassword({ email, password });
+      if (result.error) {
+        logSecurityEvent('LOGIN_FAILURE', { email });
+      }
+      return { error: result.error as Error | null };
+    } catch (err: any) {
+      return { error: err as Error };
+    } finally {
+      setLoading(false);
+    }
   };
 
   const signOut = async () => {
     setLoading(true);
     try {
-      await supabase.auth.signOut();
+      await supabase.auth.signOut().catch(() => {});
     } finally {
       setUser(null);
       setSession(null);
@@ -199,8 +258,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfile(null);
       setError(null);
       lastFetchedId.current = null;
-      sessionStorage.clear();
-      localStorage.clear();
+      try {
+        sessionStorage.clear();
+        localStorage.removeItem('supabase.auth.token');
+      } catch {}
       setLoading(false);
     }
   };

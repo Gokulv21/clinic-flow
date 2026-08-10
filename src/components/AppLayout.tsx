@@ -3,7 +3,7 @@ import { useAuth, AppRole } from '@/lib/auth';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import {
-  Stethoscope, ClipboardPlus, Printer, BarChart3, Users, LogOut, Home, Menu, HelpCircle, Sun, Moon, Monitor, ChevronUp, Info
+  Stethoscope, ClipboardPlus, Printer, BarChart3, Users, LogOut, Home, Menu, HelpCircle, Sun, Moon, Monitor, ChevronDown, Info
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -286,161 +286,163 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           scale: isMobileMenuOpen ? 0.9 : 1
         }}
         transition={{ type: "spring", stiffness: 400, damping: 40 }}
-        className="fixed bottom-6 left-1/2 z-[100] flex md:hidden items-center gap-2 max-w-[95vw]"
+        className="fixed bottom-6 left-1/2 z-[100] flex md:hidden items-center justify-between w-[92vw] max-w-[420px] glass-thick h-[68px] px-3.5 rounded-full shadow-[0_20px_60px_rgba(0,0,0,0.3)] border border-white/30"
       >
-        {/* Nav pills */}
-        <div className="glass-thick h-[60px] px-3 rounded-full flex items-center gap-0.5 shadow-[0_20px_60px_rgba(0,0,0,0.25)] border border-white/30">
-          {visibleItems.slice(0, 4).map(item => {
-            const fullPath = getFullPath(item.path);
-            const isActive = location.pathname === fullPath || (item.path === '/' && location.pathname.endsWith('/dashboard'));
-            return (
+        {/* Nav items */}
+        {visibleItems.slice(0, 3).map(item => {
+          const fullPath = getFullPath(item.path);
+          const isActive = location.pathname === fullPath || (item.path === '/' && location.pathname.endsWith('/dashboard'));
+          return (
+            <button
+              key={item.path}
+              onClick={() => navigate(fullPath)}
+              className={cn(
+                "flex-1 flex flex-col items-center justify-center gap-1 transition-all relative h-12 rounded-2xl select-none",
+                isActive ? "text-blue-600 dark:text-blue-400 font-bold" : "text-slate-600 dark:text-slate-400"
+              )}
+            >
+              {isActive && (
+                <motion.div
+                  layoutId="dock-active"
+                  className="absolute inset-0 bg-blue-600/10 dark:bg-blue-500/15 rounded-2xl"
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.5 }}
+                />
+              )}
+              <div className="relative z-10 w-5 h-5 flex items-center justify-center">{item.icon}</div>
+              <span className={cn(
+                "text-[9px] font-bold uppercase tracking-tight leading-none relative z-10 whitespace-nowrap",
+                isActive ? "text-blue-600 dark:text-blue-400" : "text-slate-500 dark:text-slate-400"
+              )}>{item.label}</span>
+            </button>
+          );
+        })}
+
+        {/* More button */}
+        {visibleItems.length > 3 && (
+          <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+            <SheetTrigger asChild>
               <button
-                key={item.path}
-                onClick={() => navigate(fullPath)}
                 className={cn(
-                  "flex flex-col items-center justify-center gap-0.5 transition-all relative px-2.5 h-11 rounded-full shrink-0 select-none",
-                  isActive ? "text-blue-600" : "text-slate-600 dark:text-slate-400"
+                  "flex-1 flex flex-col items-center justify-center gap-1 transition-all relative h-12 rounded-2xl select-none",
+                  isMobileMenuOpen ? "text-blue-600 dark:text-blue-400 font-bold" : "text-slate-600 dark:text-slate-400"
                 )}
               >
-                {isActive && (
-                  <motion.div
-                    layoutId="dock-active"
-                    className="absolute inset-0 bg-blue-600/10 dark:bg-blue-500/15 rounded-full"
-                    transition={{ type: "spring", bounce: 0.2, duration: 0.5 }}
-                  />
-                )}
-                <div className="relative z-10 w-5 h-5 flex items-center justify-center">{item.icon}</div>
-                <span className={cn(
-                  "text-[8px] font-black uppercase tracking-tighter leading-none relative z-10 whitespace-nowrap",
-                  isActive ? "text-blue-600" : "text-slate-500 dark:text-slate-400"
-                )}>{item.label}</span>
+                <div className="relative z-10 w-5 h-5 flex items-center justify-center">
+                  <Menu className="w-5 h-5" />
+                </div>
+                <span className="text-[9px] font-bold uppercase tracking-tight leading-none relative z-10">More</span>
               </button>
-            );
-          })}
-        </div>
-
-        {/* More button — gradient pill */}
-        <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-          <SheetTrigger asChild>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.92 }}
-              className="h-[60px] px-5 rounded-full flex items-center gap-2 shrink-0 select-none bg-gradient-to-br from-blue-600 to-indigo-600 shadow-[0_8px_30px_rgba(59,130,246,0.5)] border border-blue-400/30"
+            </SheetTrigger>
+            <SheetContent
+              side="bottom"
+              className="p-0 border-0 bg-transparent shadow-none overflow-visible animate-in slide-in-from-bottom-full duration-300"
+              style={{ height: 'auto', maxHeight: '75vh' }}
             >
-              <Menu className="w-5 h-5 text-white" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-white">More</span>
-            </motion.button>
-          </SheetTrigger>
-          <SheetContent
-            side="bottom"
-            className="p-0 border-0 bg-transparent shadow-none overflow-visible"
-            style={{ height: 'auto', maxHeight: '72vh' }}
-          >
-            {/* True glassmorphic panel */}
-            <div
-              className="mx-3 mb-4 rounded-[2rem] overflow-hidden border border-white/25 dark:border-white/10 shadow-[0_-30px_80px_rgba(0,0,0,0.4)]"
-              style={{
-                background: 'linear-gradient(160deg,rgba(255,255,255,0.82) 0%,rgba(235,242,255,0.80) 100%)',
-                backdropFilter: 'blur(50px) saturate(220%)',
-                WebkitBackdropFilter: 'blur(50px) saturate(220%)',
-              }}
-            >
-              <div className="dark:[background:linear-gradient(160deg,rgba(12,16,36,0.90)_0%,rgba(8,12,30,0.94)_100%)] rounded-[2rem]">
-
-                {/* Drag handle */}
-                <div className="flex justify-center pt-3 pb-1">
-                  <div className="w-10 h-1 rounded-full bg-slate-300 dark:bg-slate-600" />
-                </div>
-
-                {/* Header */}
-                <div className="px-5 pt-2 pb-3 flex items-center justify-between border-b border-black/[0.06] dark:border-white/[0.06]">
-                  <div>
-                    <h3 className="text-base font-black text-slate-900 dark:text-white tracking-tight">Navigation</h3>
-                    <p className="text-[9px] text-blue-600 dark:text-blue-400 font-black uppercase tracking-[0.2em] mt-0.5">{profile?.full_name}</p>
+              {/* True glassmorphic panel */}
+              <div
+                className="mx-4 mb-5 rounded-[1.5rem] overflow-hidden border border-white/20 dark:border-white/10 shadow-[0_-20px_50px_rgba(0,0,0,0.3)]"
+                style={{
+                  background: 'linear-gradient(160deg,rgba(255,255,255,0.85) 0%,rgba(235,242,255,0.82) 100%)',
+                  backdropFilter: 'blur(50px) saturate(220%)',
+                  WebkitBackdropFilter: 'blur(50px) saturate(220%)',
+                }}
+              >
+                <div className="dark:[background:linear-gradient(160deg,rgba(12,16,36,0.92)_0%,rgba(8,12,30,0.96)_100%)] rounded-[1.5rem]">
+                  {/* Drag handle */}
+                  <div className="flex justify-center pt-2.5 pb-0.5">
+                    <div className="w-8 h-1 rounded-full bg-slate-350 dark:bg-slate-650" />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <NotificationCenter />
-                    <Button
-                      variant="ghost" size="icon"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className="rounded-full w-8 h-8 bg-black/[0.06] dark:bg-white/10 active:scale-75 transition-all"
-                    >
-                      <ChevronUp className="w-4 h-4 text-slate-600 dark:text-slate-300" />
-                    </Button>
-                  </div>
-                </div>
 
-                {/* Nav grid */}
-                <div className="p-4 grid grid-cols-5 gap-2">
-                  {visibleItems.map(item => {
-                    const fullPath = getFullPath(item.path);
-                    const isActive = location.pathname === fullPath || (item.path === '/' && location.pathname.endsWith('/dashboard'));
-                    return (
-                      <button
-                        key={item.path}
-                        onClick={() => handleMobileNav(item.path)}
-                        className={cn(
-                          "flex flex-col items-center justify-center gap-1.5 p-2 rounded-2xl transition-all active:scale-90 select-none",
-                          isActive
-                            ? "bg-blue-600/10 dark:bg-blue-500/20 border border-blue-500/30"
-                            : "bg-black/[0.04] dark:bg-white/[0.08] border border-transparent"
-                        )}
-                      >
-                        <div className={cn(
-                          "w-9 h-9 rounded-xl flex items-center justify-center transition-all shrink-0",
-                          isActive
-                            ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30"
-                            : "bg-slate-200 dark:bg-white/15 text-slate-600 dark:text-slate-300"
-                        )}>
-                          <div className="w-4 h-4">{item.icon}</div>
-                        </div>
-                        <span className={cn(
-                          "text-[8px] font-black uppercase tracking-tight text-center leading-tight",
-                          isActive ? "text-blue-600 dark:text-blue-400" : "text-slate-600 dark:text-slate-400"
-                        )}>{item.label}</span>
-                      </button>
-                    );
-                  })}
-                  {/* Logout tile */}
-                  <button
-                    onClick={signOut}
-                    className="flex flex-col items-center justify-center gap-1.5 p-2 rounded-2xl bg-red-50/80 dark:bg-red-950/40 border border-red-200/60 dark:border-red-900/30 active:scale-90 transition-all"
-                  >
-                    <div className="w-9 h-9 rounded-xl bg-red-500 text-white flex items-center justify-center shadow-lg shadow-red-500/30">
-                      <LogOut className="w-4 h-4" />
+                  {/* Header */}
+                  <div className="px-5 pt-1.5 pb-2 flex items-center justify-between border-b border-black/[0.05] dark:border-white/[0.05]">
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-white tracking-tight">Navigation</h3>
+                      <p className="text-[8px] text-blue-600 dark:text-blue-400 font-bold uppercase tracking-[0.15em] mt-0.5">{profile?.full_name}</p>
                     </div>
-                    <span className="text-[8px] font-black uppercase tracking-tight text-center leading-tight text-red-500">Logout</span>
-                  </button>
-                </div>
-
-                {/* Theme toggle */}
-                <div className="px-4 pb-5">
-                  <div className="flex bg-black/[0.05] dark:bg-white/[0.08] p-1 rounded-xl border border-black/[0.05] dark:border-white/[0.05]">
-                    {[
-                      { v: 'light', icon: <Sun className="w-3 h-3" /> },
-                      { v: 'dark', icon: <Moon className="w-3 h-3" /> },
-                      { v: 'system', icon: <Monitor className="w-3 h-3" /> },
-                    ].map(({ v, icon }) => (
-                      <button
-                        key={v}
-                        onClick={() => setTheme(v as any)}
-                        className={cn(
-                          "flex-1 py-1.5 items-center justify-center flex gap-1 rounded-[0.6rem] transition-all text-[9px] font-black uppercase tracking-widest active:scale-95",
-                          theme === v
-                            ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm"
-                            : "text-slate-500 dark:text-slate-500"
-                        )}
+                    <div className="flex items-center gap-1.5">
+                      <NotificationCenter />
+                      <Button
+                        variant="ghost" size="icon"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="rounded-full w-7 h-7 bg-black/[0.05] dark:bg-white/10 active:scale-75 transition-all"
                       >
-                        {icon}{v}
-                      </button>
-                    ))}
+                        <ChevronDown className="w-3.5 h-3.5 text-slate-600 dark:text-slate-300" />
+                      </Button>
+                    </div>
                   </div>
-                </div>
 
+                  {/* Nav grid */}
+                  <div className="p-4 grid grid-cols-4 gap-2">
+                    {visibleItems.map(item => {
+                      const fullPath = getFullPath(item.path);
+                      const isActive = location.pathname === fullPath || (item.path === '/' && location.pathname.endsWith('/dashboard'));
+                      return (
+                        <button
+                          key={item.path}
+                          onClick={() => handleMobileNav(item.path)}
+                          className={cn(
+                            "flex flex-col items-center justify-center gap-1.5 p-2 rounded-xl transition-all active:scale-95 select-none",
+                            isActive
+                              ? "bg-blue-600/10 dark:bg-blue-500/20 border border-blue-500/30 text-blue-600 dark:text-blue-400 font-bold"
+                              : "bg-black/[0.02] dark:bg-white/[0.04] border border-transparent text-slate-700 dark:text-slate-300 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+                          )}
+                        >
+                          <div className={cn(
+                            "w-8 h-8 rounded-lg flex items-center justify-center transition-all shrink-0",
+                            isActive
+                              ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                              : "bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-300"
+                          )}>
+                            <div className="w-4 h-4">{item.icon}</div>
+                          </div>
+                          <span className={cn(
+                            "text-[8px] font-bold uppercase tracking-tight text-center leading-normal",
+                            isActive ? "text-blue-600 dark:text-blue-400" : "text-slate-600 dark:text-slate-400"
+                          )}>{item.label}</span>
+                        </button>
+                      );
+                    })}
+                    {/* Logout tile */}
+                    <button
+                      onClick={signOut}
+                      className="flex flex-col items-center justify-center gap-1.5 p-2 rounded-xl bg-red-50/60 dark:bg-red-950/15 border border-red-200/40 dark:border-red-900/20 active:scale-95 transition-all text-red-500 hover:bg-red-100/40 dark:hover:bg-red-950/30"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-red-500 text-white flex items-center justify-center shadow-md shadow-red-500/20">
+                        <LogOut className="w-4 h-4" />
+                      </div>
+                      <span className="text-[8px] font-bold uppercase tracking-tight text-center leading-normal">Logout</span>
+                    </button>
+                  </div>
+
+                  {/* Theme toggle */}
+                  <div className="px-5 pb-5">
+                    <div className="flex bg-black/[0.04] dark:bg-white/[0.06] p-0.5 rounded-lg border border-black/[0.04] dark:border-white/[0.04]">
+                      {[
+                        { v: 'light', icon: <Sun className="w-2.5 h-2.5" /> },
+                        { v: 'dark', icon: <Moon className="w-2.5 h-2.5" /> },
+                        { v: 'system', icon: <Monitor className="w-2.5 h-2.5" /> },
+                      ].map(({ v, icon }) => (
+                        <button
+                          key={v}
+                          onClick={() => setTheme(v as any)}
+                          className={cn(
+                            "flex-1 py-1 items-center justify-center flex gap-1 rounded-[0.4rem] transition-all text-[8px] font-bold uppercase tracking-widest active:scale-95",
+                            theme === v
+                              ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm"
+                              : "text-slate-500 dark:text-slate-400"
+                          )}
+                        >
+                          {icon}{v}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                </div>
               </div>
-            </div>
-          </SheetContent>
-        </Sheet>
+            </SheetContent>
+          </Sheet>
+        )}
       </motion.nav>
 
       <main ref={scrollRef} className="flex-1 overflow-auto bg-transparent relative h-screen">
