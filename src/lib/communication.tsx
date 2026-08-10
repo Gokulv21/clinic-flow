@@ -94,27 +94,25 @@ export function CommunicationProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Fetch Users for Directory
+  // Fetch Users for Directory (Lightweight single query)
   const fetchUsers = async () => {
     if (!user) return;
     try {
-      const [{ data: profData }, { data: rolesData }] = await Promise.all([
-        supabase.from('profiles').select('*').neq('is_superadmin', true),
-        supabase.from('user_roles').select('*')
-      ]);
+      const { data: profData, error } = await supabase
+        .from('profiles')
+        .select('user_id, full_name, email, role')
+        .neq('is_superadmin', true)
+        .limit(50);
       
-      if (profData) {
-        setAllUsers(profData.map((p: any) => {
-          const r = rolesData?.find(role => role.user_id === p.user_id);
-          return {
-            id: p.user_id,
-            full_name: p.full_name || p.email || 'Staff Member',
-            role: r?.role || 'staff'
-          };
-        }));
+      if (!error && profData) {
+        setAllUsers(profData.map((p: any) => ({
+          id: p.user_id,
+          full_name: p.full_name || p.email || 'Staff Member',
+          role: p.role || 'staff'
+        })));
       }
     } catch (err) {
-      console.error('[LiveKit] Error fetching staff directory:', err);
+      console.warn('[LiveKit] Directory fetch bypassed:', err);
     }
   };
 

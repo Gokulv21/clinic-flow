@@ -213,34 +213,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = async (email: string, password: string) => {
     setLoading(true);
     
-    // Check Rate Limit (DB call with safe timeout)
+    // Check Rate Limit (DB call with 2s max timeout so slow DB never blocks user)
     try {
-      const { data: allowed, error: limitError } = await supabase.rpc('check_rate_limit', {
+      const rateLimitPromise = supabase.rpc('check_rate_limit', {
         p_identifier: email,
         p_bucket: 'login',
         p_max_requests: 5,
         p_interval_seconds: 600
       });
+      const timeoutPromise = new Promise<{ data: null, error: null }>((resolve) => setTimeout(() => resolve({ data: null, error: null }), 2000));
+      const raceResult = await Promise.race([rateLimitPromise, timeoutPromise]);
 
-      if (limitError) {
-        console.error("Rate limit check failed:", limitError);
-      } else if (allowed === false) {
+      if (raceResult && (raceResult as any).data === false) {
         const limitErr = new Error('Too many login attempts. Please try again in 10 minutes.');
         logSecurityEvent('SUSPICIOUS_TRAFFIC', { reason: 'Brute Force Attempt Detected', email });
         setLoading(false);
         return { error: limitErr };
       }
     } catch {
-      console.warn("Security check bypassed to allow access.");
+      console.warn("Security rate-check bypassed to guarantee login access.");
     }
 
     try {
-      const result = await supabase.auth.signInWithPassword({ email, password });
+      const loginPromise = supabase.auth.signInWithPassword({ email, password });
+      // 25s timeout to allow Supabase free tier cold starts to wake up cleanly
+      const loginTimeout = new Promise<{ data: any, error: any }>((_, reject) => 
+        setTimeout(() => reject(new Error('Supabase server is taking longer to respond (Cold Start). Please try again in 5 seconds.')), 25000)
+      );
+
+      const result = await Promise.race([loginPromise, loginTimeout]);
       if (result.error) {
         logSecurityEvent('LOGIN_FAILURE', { email });
       }
       return { error: result.error as Error | null };
     } catch (err: any) {
+      console.error("[Auth] Login error:", err);
       return { error: err as Error };
     } finally {
       setLoading(false);

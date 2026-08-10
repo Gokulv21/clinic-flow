@@ -270,38 +270,20 @@ function RootRouter() {
   return <Navigate to="/login" replace />;
 }
 
-// Monitoring for suspicious behavior and API errors
+// Security Sentinel: Local diagnostics only (strictly zero database inserts to prevent connection pool exhaustion)
 function SecuritySentinel() {
   const { user } = useAuth();
   
   useEffect(() => {
     const handleError = (event: ErrorEvent) => {
-      // Filter out benign browser noise
-      if (event.message?.includes('ResizeObserver') || event.message?.includes('Script error')) {
-        return;
-      }
-      logSecurityEvent('API_ERROR', { 
-        message: event.message,
-        filename: event.filename,
-        lineno: event.lineno
-      }, undefined, user?.id);
+      // Local console logging only
+      console.warn("[App Error Captured]:", event.message);
     };
 
     const handleRejection = (event: PromiseRejectionEvent) => {
-      const error = event.reason;
-      if (!error) return;
-      
-      const msg = typeof error === 'string' ? error : error?.message || '';
-      // Filter out expected aborts
-      if (msg.includes('AbortError') || msg.includes('canceled') || msg.includes('cancelled')) {
-        return;
-      }
-
-      if (msg.includes('JWT') || msg.includes('permission denied') || msg.includes('row-level security')) {
-        logSecurityEvent('SUSPICIOUS_TRAFFIC', { 
-          reason: 'Unauthorized Database Attempt',
-          details: msg 
-        }, undefined, user?.id);
+      // Prevent unhandled promise crash loops
+      if (event.reason) {
+        console.warn("[Unhandled Rejection Captured]:", event.reason);
       }
     };
 
@@ -324,7 +306,10 @@ const App = () => (
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          <BrowserRouter basename="/prescripto">
+          <BrowserRouter 
+            basename="/prescripto" 
+            future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+          >
             <AuthProvider>
               <SecuritySentinel />
               <CommunicationProvider>

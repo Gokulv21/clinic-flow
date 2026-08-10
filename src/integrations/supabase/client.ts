@@ -13,5 +13,9 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
+    // Bypass browser navigator.locks to prevent "Lock broken by another request with steal option" deadlocks
+    lock: async (_name: string, _acquireTimeout: number, fn: () => Promise<any>) => {
+      return await fn();
+    },
   }
-});
+});

@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import type { Database } from '@/integrations/supabase/types';
 
 // Create a separate client for registration that DOES NOT persist session.
-// This prevents Supabase from automatically logging out the admin when a new user is created.
+// Uses isolated memory storage to avoid browser key collision warnings.
 export const registerClient = createClient<Database>(
   import.meta.env.VITE_SUPABASE_URL,
   import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
@@ -10,7 +10,13 @@ export const registerClient = createClient<Database>(
     auth: {
       persistSession: false,
       autoRefreshToken: false,
-      detectSessionInUrl: false
+      detectSessionInUrl: false,
+      storage: {
+        getItem: () => null,
+        setItem: () => {},
+        removeItem: () => {}
+      }
     }
   }
 );
+

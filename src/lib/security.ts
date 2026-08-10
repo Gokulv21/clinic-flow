@@ -51,19 +51,21 @@ export async function logSecurityEvent(
       }
     }
 
-    await supabase.from('security_audit_logs').insert({
-      event_type: eventType,
-      actor_id: actorId,
-      clinic_id: finalClinicId,
-      metadata: {
-        ...metadata,
-        url: typeof window !== 'undefined' ? window.location.href : '',
-        timestamp: new Date().toISOString()
-      },
-      user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : 'Unknown'
-    }).catch(err => {
-      console.warn("[Security Logger] Insert failed (safe bypass):", err?.message);
-    });
+    try {
+      await supabase.from('security_audit_logs').insert({
+        event_type: eventType,
+        actor_id: actorId,
+        clinic_id: finalClinicId,
+        metadata: {
+          ...metadata,
+          url: typeof window !== 'undefined' ? window.location.href : '',
+          timestamp: new Date().toISOString()
+        },
+        user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : 'Unknown'
+      });
+    } catch (insertErr: any) {
+      console.warn("[Security Logger] Insert failed (safe bypass):", insertErr?.message);
+    }
 
   } catch (err) {
     // Silent fail to guarantee zero disruption to user workflow
