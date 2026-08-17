@@ -5,6 +5,7 @@ import { sanitizeText } from '@/lib/security-sanitize';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Medicine } from '@/types/consultation';
+import { uploadPrescriptionImage } from '@/lib/prescriptionStorage';
 
 export type SyncStatus = 'synced' | 'syncing' | 'offline_saved' | 'error';
 
@@ -453,13 +454,24 @@ export function useConsultation(clinic: any, allUsers: any[], onlineUsers: any[]
     }
 
     try {
+      // 1. Upload heavy canvas/handwriting drawing to Supabase Storage Bucket
+      let storedAdviceImage = finalAdviceImage;
+      if (isWriting && prescriptionImage) {
+        storedAdviceImage = await uploadPrescriptionImage(
+          prescriptionImage,
+          clinic?.id || 'global',
+          selectedVisit.id
+        );
+      }
+
+      // 2. Insert lightweight URL & details into DB
       const { error: rxError } = await supabase.from('prescriptions').upsert({
         visit_id: selectedVisit.id,
         patient_id: patient.id,
         diagnosis: finalDiagnosis,
         clinical_notes: finalClinicalNotes,
         medicines: finalMedicines as any,
-        advice_image: finalAdviceImage,
+        advice_image: storedAdviceImage,
         raw_paths: finalPaths as any,
         is_writing_mode: isWritingMode,
         doctor_id: user?.id,
