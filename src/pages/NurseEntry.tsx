@@ -254,27 +254,43 @@ export default function NurseEntry() {
         const calculatedDob = calculateDobFromAge(parseFloat(patient.age), ageUnit);
 
         console.log('[NurseEntry] Creating new patient with Reg ID:', regId);
-        const { data: newPatient, error } = await supabase
+        const insertPayload: any = {
+          title: patient.title,
+          name: sanitizedName,
+          age: ageInYears,
+          sex: patient.sex,
+          phone: sanitizedPhone,
+          address: sanitizedAddress || null,
+          registration_id: String(regId),
+          last_opened_at: new Date().toISOString(),
+          clinic_id: clinic?.id
+        };
+
+        let newPatient: any = null;
+        const { data: pData, error: pError } = await supabase
           .from('patients')
-          .insert({
-            title: patient.title,
-            name: sanitizedName,
-            age: ageInYears,
-            dob: calculatedDob,
-            sex: patient.sex,
-            phone: sanitizedPhone,
-            address: sanitizedAddress || null,
-            registration_id: String(regId),
-            last_opened_at: new Date().toISOString(),
-            clinic_id: clinic?.id
-          })
+          .insert({ ...insertPayload, dob: calculatedDob })
           .select()
           .single();
-        
-        if (error) {
-          console.error('[NurseEntry] Patient insert error:', error);
-          throw error;
+
+        if (pError) {
+          if (pError.message?.includes('dob') || pError.message?.includes('schema cache')) {
+            console.warn('[NurseEntry] dob column not in schema, retrying standard insert');
+            const { data: retryData, error: retryError } = await supabase
+              .from('patients')
+              .insert(insertPayload)
+              .select()
+              .single();
+            if (retryError) throw retryError;
+            newPatient = retryData;
+          } else {
+            console.error('[NurseEntry] Patient insert error:', pError);
+            throw pError;
+          }
+        } else {
+          newPatient = pData;
         }
+
         patientId = newPatient.id;
         console.log('[NurseEntry] Patient created successfully:', patientId);
       } else {

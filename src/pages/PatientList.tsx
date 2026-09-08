@@ -126,15 +126,26 @@ export default function PatientList() {
     if (editForm.ageUnit === 'days') ageInYears = ageInYears / 365;
     const calculatedDob = calculateDobFromAge(parseFloat(editForm.age), editForm.ageUnit);
 
-    const { error } = await supabase.from('patients').update({
+    const updatePayload: any = {
       title: editForm.title,
       name: editForm.name,
       age: ageInYears,
-      dob: calculatedDob,
+      created_at: new Date().toISOString(), // Anchors today as the base day for the new edited age
       sex: editForm.sex,
       phone: editForm.phone,
       address: editForm.address || null,
+    };
+
+    let { error } = await supabase.from('patients').update({
+      ...updatePayload,
+      dob: calculatedDob,
     }).eq('id', selectedPatient.id);
+
+    if (error && (error.message?.includes('dob') || error.message?.includes('schema cache'))) {
+      const { error: retryError } = await supabase.from('patients').update(updatePayload).eq('id', selectedPatient.id);
+      error = retryError;
+    }
+
     if (error) toast.error(error.message);
     else {
       toast.success('Patient updated');
