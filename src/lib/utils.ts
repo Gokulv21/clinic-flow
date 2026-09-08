@@ -74,8 +74,20 @@ export function getPatientDetailedAge(
       birthDate = new Date(patient.dob);
     } else if (patient.created_at && patient.age !== null && patient.age !== undefined && patient.age !== '') {
       // Auto derive birth date from created_at and initial age
-      const approxDob = calculateDobFromAge(patient.age, 'years', patient.created_at);
-      birthDate = new Date(approxDob);
+      const numAge = typeof patient.age === 'string' ? parseFloat(patient.age) : patient.age;
+      if (!isNaN(numAge)) {
+        if (numAge < 1) {
+          const daysFromAge = Math.round(numAge * 365.25);
+          if (daysFromAge < 32) {
+            birthDate = new Date(calculateDobFromAge(daysFromAge, 'days', patient.created_at));
+          } else {
+            const monthsFromAge = Math.round(numAge * 12);
+            birthDate = new Date(calculateDobFromAge(monthsFromAge, 'months', patient.created_at));
+          }
+        } else {
+          birthDate = new Date(calculateDobFromAge(numAge, 'years', patient.created_at));
+        }
+      }
     }
   } else if (typeof patient === 'string' && /^\d{4}-\d{2}-\d{2}/.test(patient)) {
     birthDate = new Date(patient);
@@ -161,6 +173,36 @@ export function formatAge(
   }
 
   // 3. Under 1 month (newborns)
+  return `${days}d`;
+}
+
+/**
+ * Formats age specifically for Prescriptions (Rx) where adults display
+ * clean whole integer years (e.g. "42y" or "42") and infants display months/days.
+ * As soon as age crosses 30/31 days (1 month), it formats as "1m", "2m", etc.
+ */
+export function formatPrescriptionAge(
+  input: any,
+  referenceDate: string | Date = new Date()
+): string {
+  if (input === null || input === undefined || input === '') return '—';
+
+  const detailed = getPatientDetailedAge(input, referenceDate);
+  if (!detailed) return '—';
+
+  const { years, months, days } = detailed;
+
+  // 1. If 1 year or older: show whole number of years (e.g. "42y" or "10y")
+  if (years >= 1) {
+    return `${years}y`;
+  }
+
+  // 2. Under 1 year: If 1 month or more (passed 30/31 days), show in months (e.g. "1m", "2m", "6m")
+  if (months >= 1) {
+    return `${months}m`;
+  }
+
+  // 3. Under 1 month (0 to 30/31 days): show in days (e.g. "15d", "28d")
   return `${days}d`;
 }
 

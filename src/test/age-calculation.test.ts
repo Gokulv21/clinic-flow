@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateDobFromAge, calculateAgeFromDob, getPatientCurrentAge, formatAge } from '@/lib/utils';
+import { calculateDobFromAge, calculateAgeFromDob, getPatientCurrentAge, formatAge, formatPrescriptionAge } from '@/lib/utils';
 
 describe('Dynamic Age and DOB Calculation Engine', () => {
   it('should auto-derive approximate DOB from entered age in years', () => {
@@ -28,7 +28,6 @@ describe('Dynamic Age and DOB Calculation Engine', () => {
   });
 
   it('should increment age when returning 3 years later', () => {
-    // Patient was 10 years old when registered on 2023-01-01 (DOB approx 2013-01-01)
     const patientWithDob = {
       dob: '2013-01-01',
       created_at: '2023-01-01T00:00:00Z',
@@ -42,7 +41,6 @@ describe('Dynamic Age and DOB Calculation Engine', () => {
   });
 
   it('should handle legacy patients without DOB using created_at fallback', () => {
-    // Legacy record: only has age: 10 and created_at 3 years ago
     const legacyPatient = {
       dob: null,
       age: 10,
@@ -62,30 +60,63 @@ describe('Dynamic Age and DOB Calculation Engine', () => {
       age: 10
     };
 
-    // Past consultation in 2023
     const pastVisitDate = new Date('2023-09-08T00:00:00Z');
     expect(formatAge(patient, pastVisitDate)).toBe('10y');
 
-    // Current consultation in 2026
     const currentVisitDate = new Date('2026-09-08T00:00:00Z');
     expect(formatAge(patient, currentVisitDate)).toBe('13y');
   });
 
-  it('should format detailed years and months (e.g. 22y 1m) when patient visits next month', () => {
-    // Patient registered at age 22 on 2026-08-08
+  it('should format detailed years and months (e.g. 22y 1m) in general directory', () => {
     const patient = {
       dob: '2004-08-08',
       created_at: '2026-08-08T00:00:00Z',
       age: 22
     };
 
-    // Patient visits exactly 1 month later on 2026-09-08
     const nextMonthVisit = new Date('2026-09-08T00:00:00Z');
     expect(formatAge(patient, nextMonthVisit)).toBe('22y 1m');
+  });
 
-    // Patient visits 5 months later
-    const fiveMonthsVisit = new Date('2027-01-08T00:00:00Z');
-    expect(formatAge(patient, fiveMonthsVisit)).toBe('22y 5m');
+  it('should format whole integer numbers in prescriptions for adults (e.g. 42y9m -> 42y)', () => {
+    // 42 years and 9 months
+    const adultPatient = {
+      dob: '1983-12-08',
+      created_at: '2026-09-08T00:00:00Z',
+      age: 42.75
+    };
+    const refDate = new Date('2026-09-08T00:00:00Z');
+    // General directory shows 42y 9m
+    expect(formatAge(adultPatient, refDate)).toBe('42y 9m');
+    // Prescription shows clean whole years: 42y
+    expect(formatPrescriptionAge(adultPatient, refDate)).toBe('42y');
+  });
+
+  it('should format days under 30/31 days and switch to months once passed 1 month in prescription', () => {
+    // 1. Baby 20 days old (born 2026-08-19, visit 2026-09-08)
+    const baby20Days = {
+      dob: '2026-08-19',
+      created_at: '2026-08-19T00:00:00Z',
+      age: 0.05
+    };
+    const visitDate = new Date('2026-09-08T00:00:00Z');
+    expect(formatPrescriptionAge(baby20Days, visitDate)).toBe('20d');
+
+    // 2. Baby 52 days old (1 month and 22 days) -> switches to 1m
+    const baby52Days = {
+      dob: '2026-07-18',
+      created_at: '2026-07-18T00:00:00Z',
+      age: 0.14
+    };
+    expect(formatPrescriptionAge(baby52Days, visitDate)).toBe('1m');
+
+    // 3. Baby 82 days old (2 months and 22 days) -> switches to 2m
+    const baby82Days = {
+      dob: '2026-06-18',
+      created_at: '2026-06-18T00:00:00Z',
+      age: 0.22
+    };
+    expect(formatPrescriptionAge(baby82Days, visitDate)).toBe('2m');
   });
 });
 

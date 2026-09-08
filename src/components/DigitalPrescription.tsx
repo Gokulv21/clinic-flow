@@ -1347,6 +1347,7 @@ export default function DigitalPrescription({ patient, visit, initialPaths = [],
                         <PrescriptionTemplate
                             patient={patient}
                             visit={visit}
+                            prescriptionCreatedAt={visit?.created_at}
                             handwrittenImage={null}
                         // Only show template on first page
                         />

@@ -3,7 +3,7 @@ import { MessageCircle } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { supabase } from "@/integrations/supabase/client";
 import { format, formatDistanceToNow } from "date-fns";
-import { formatAge } from '@/lib/utils';
+import { formatAge, formatPrescriptionAge } from '@/lib/utils';
 import prescriptionLogo from '@/assets/prescriptionLogo.png';
 
 const EXPORT_W = 1240;
@@ -484,7 +484,7 @@ function PageOne({
             }}>
                 {[
                     { label: 'Patient Name', value: (patient?.title ? patient.title + ' ' : '') + (patient?.name ?? '—'), color: '#0f172a' },
-                    { label: 'Age / Sex', value: patient ? `${formatAge(patient, displayDate)}/${patient.sex?.charAt(0) ?? '—'}` : '—' },
+                    { label: 'Age / Sex', value: patient ? `${formatPrescriptionAge(patient, displayDate)}/${patient.sex?.charAt(0) ?? '—'}` : '—' },
                     { label: 'Date', value: today },
                     { label: 'Time', value: time },
                     { label: 'Reg. ID', value: patient?.registration_id || (patient?.reg_no ? `REG-${patient.reg_no}` : '—') },
