@@ -286,6 +286,7 @@ Follow the instructions carefully.
                             visit={visit}
                             today={today}
                             time={time}
+                            displayDate={displayDate}
                             clinicalNotes={safeNotes}
                             diagnosis={safeDiagnosis}
                             medicines={safeMedicines}
@@ -356,6 +357,7 @@ interface PageOneProps {
     visit: any;
     today: string;
     time: string;
+    displayDate?: Date;
     clinicalNotes?: string;
     diagnosis?: string;
     medicines: any[];
@@ -380,7 +382,7 @@ interface PageOneProps {
 }
 
 function PageOne({
-    patient, visit, today, time, clinicalNotes, diagnosis, medicines, advice,
+    patient, visit, today, time, displayDate, clinicalNotes, diagnosis, medicines, advice,
     hasTyped, vitals, doctorProfile, isWritingMode,
     hideTypedDiagnosis, safeDiagnosis, safeNotes, safeAdvice, hasHandwritingInThisComponent,
     doctorName, doctorQualifications, doctorRegId,
@@ -482,7 +484,7 @@ function PageOne({
             }}>
                 {[
                     { label: 'Patient Name', value: (patient?.title ? patient.title + ' ' : '') + (patient?.name ?? '—'), color: '#0f172a' },
-                    { label: 'Age / Sex', value: patient ? `${formatAge(patient.age)}/${patient.sex?.charAt(0) ?? '—'}` : '—' },
+                    { label: 'Age / Sex', value: patient ? `${formatAge(patient, displayDate)}/${patient.sex?.charAt(0) ?? '—'}` : '—' },
                     { label: 'Date', value: today },
                     { label: 'Time', value: time },
                     { label: 'Reg. ID', value: patient?.registration_id || (patient?.reg_no ? `REG-${patient.reg_no}` : '—') },

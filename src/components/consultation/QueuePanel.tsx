@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
+import { cn, formatAge } from '@/lib/utils';
 import { Loader2, RefreshCw, Users, Bell, Clock, AlertTriangle } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -120,7 +120,7 @@ export default function QueuePanel({
                       </p>
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="text-[11px] font-bold text-muted-foreground">
-                          {visit.patients?.age}y · {visit.patients?.sex}
+                          {formatAge(visit.patients)} · {visit.patients?.sex}
                         </span>
                         {visit.status === 'waiting' && (
                           <>

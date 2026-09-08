@@ -17,8 +17,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
 import { toast } from 'sonner';
+import { getPatientCurrentAge, formatAge } from '@/lib/utils';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart as RePieChart, Pie, Cell, LineChart, Line, AreaChart, Area, Legend
@@ -201,15 +201,15 @@ export default function DoctorProfile() {
             
             if (patientIds.length > 0) {
                 // Supabase doesn't easily support WHERE id IN (array of 1000s), so we'll just fetch all and filter client side
-                const { data: patients } = await supabase.from('patients').select('id, sex, age').eq('clinic_id', clinic?.id);
+                const { data: patients } = await supabase.from('patients').select('id, sex, age, dob, created_at').eq('clinic_id', clinic?.id);
                 const docPatients = patients?.filter(p => patientIds.includes(p.id)) || [];
                 
                 const ageThreshold = 18;
                 demoData = [
-                    { name: 'Men (>= 18)', value: docPatients.filter(p => p.sex === 'Male' && (p.age || 0) >= ageThreshold).length, color: '#2563eb' },
-                    { name: 'Women (>= 18)', value: docPatients.filter(p => p.sex === 'Female' && (p.age || 0) >= ageThreshold).length, color: '#db2777' },
-                    { name: 'Boys (< 18)', value: docPatients.filter(p => p.sex === 'Male' && (p.age || 0) < ageThreshold).length, color: '#60a5fa' },
-                    { name: 'Girls (< 18)', value: docPatients.filter(p => p.sex === 'Female' && (p.age || 0) < ageThreshold).length, color: '#f472b6' },
+                    { name: 'Men (>= 18)', value: docPatients.filter(p => p.sex === 'Male' && (getPatientCurrentAge(p) ?? p.age ?? 0) >= ageThreshold).length, color: '#2563eb' },
+                    { name: 'Women (>= 18)', value: docPatients.filter(p => p.sex === 'Female' && (getPatientCurrentAge(p) ?? p.age ?? 0) >= ageThreshold).length, color: '#db2777' },
+                    { name: 'Boys (< 18)', value: docPatients.filter(p => p.sex === 'Male' && (getPatientCurrentAge(p) ?? p.age ?? 0) < ageThreshold).length, color: '#60a5fa' },
+                    { name: 'Girls (< 18)', value: docPatients.filter(p => p.sex === 'Female' && (getPatientCurrentAge(p) ?? p.age ?? 0) < ageThreshold).length, color: '#f472b6' },
                     { name: 'Other', value: docPatients.filter(p => p.sex === 'Other').length, color: '#94a3b8' }
                 ].filter(d => d.value > 0);
             }
@@ -217,7 +217,7 @@ export default function DoctorProfile() {
             // 5. Recent Activity
             const { data: recent } = await supabase
                 .from('visits')
-                .select('id, created_at, status, patients(name, age, sex)')
+                .select('id, created_at, status, patients(name, age, dob, created_at, sex)')
                 .eq('clinic_id', clinic?.id)
                 .order('created_at', { ascending: false })
                 .limit(8);

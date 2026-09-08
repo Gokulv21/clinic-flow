@@ -356,7 +356,7 @@ Wishing you a quick recovery!
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                   <div className="bg-muted/30 p-3 rounded-xl border border-border">
                     <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Age / Sex</p>
-                    <p className="text-base font-bold text-foreground">{formatAge(patient?.age)}/{patient?.sex?.charAt(0) ?? '—'}</p>
+                    <p className="text-base font-bold text-foreground">{formatAge(patient)}/{patient?.sex?.charAt(0) ?? '—'}</p>
                   </div>
                   <div className="bg-muted/30 p-3 rounded-xl border border-border">
                     <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Phone</p>

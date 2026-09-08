@@ -13,7 +13,7 @@ import { Search, User, History, Edit, Printer, Eye, X } from 'lucide-react';
 import { toast } from 'sonner';
 import PrescriptionTemplate from '@/components/PrescriptionTemplate';
 import { printPrescription } from '@/lib/printPrescription';
-import { formatAge } from '@/lib/utils';
+import { formatAge, getPatientCurrentAge, calculateDobFromAge } from '@/lib/utils';
 import {
   Pagination,
   PaginationContent,
@@ -75,10 +75,11 @@ export default function PatientList() {
     // Update last_opened_at in background
     supabase.from('patients').update({ last_opened_at: new Date().toISOString() }).eq('id', p.id).then();
 
+    const currentAge = getPatientCurrentAge(p);
     setEditForm({ 
       title: p.title || '', 
       name: p.name, 
-      age: String(p.age), 
+      age: currentAge !== null ? String(currentAge) : String(p.age || ''), 
       ageUnit: 'years', // Default to years when viewing existing
       sex: p.sex || 'Male',
       phone: p.phone, 
@@ -123,11 +124,13 @@ export default function PatientList() {
     let ageInYears = parseFloat(editForm.age);
     if (editForm.ageUnit === 'months') ageInYears = ageInYears / 12;
     if (editForm.ageUnit === 'days') ageInYears = ageInYears / 365;
+    const calculatedDob = calculateDobFromAge(parseFloat(editForm.age), editForm.ageUnit);
 
     const { error } = await supabase.from('patients').update({
       title: editForm.title,
       name: editForm.name,
       age: ageInYears,
+      dob: calculatedDob,
       sex: editForm.sex,
       phone: editForm.phone,
       address: editForm.address || null,
@@ -172,7 +175,7 @@ export default function PatientList() {
                     )}
                   </div>
                   <div className="text-sm text-muted-foreground font-medium">
-                    {p.phone} · {formatAge(p.age)} · {p.sex}
+                    {p.phone} · {formatAge(p)} · {p.sex}
                   </div>
                 </div>
               </div>
@@ -301,7 +304,7 @@ export default function PatientList() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div><span className="text-muted-foreground">Title:</span> {selectedPatient?.title || '—'}</div>
-                <div><span className="text-muted-foreground">Age:</span> {formatAge(selectedPatient?.age)}</div>
+                <div><span className="text-muted-foreground">Age:</span> {formatAge(selectedPatient)}</div>
                 <div><span className="text-muted-foreground">Sex:</span> {selectedPatient?.sex}</div>
                 <div><span className="text-muted-foreground">Phone:</span> {selectedPatient?.phone}</div>
                 <div className="col-span-2"><span className="text-muted-foreground">Address:</span> {selectedPatient?.address || '—'}</div>

@@ -12,7 +12,7 @@ import {
   Stethoscope, UserRound, LayoutDashboard, Database
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { cn } from '@/lib/utils';
+import { cn, getPatientCurrentAge } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -136,7 +136,7 @@ export default function Analytics() {
     let offset = 0;
     
     while(hasMore) {
-      const { data } = await supabase.from('patients').select('age, sex').eq('clinic_id', clinic?.id).range(offset, offset + 999);
+      const { data } = await supabase.from('patients').select('age, dob, created_at, sex').eq('clinic_id', clinic?.id).range(offset, offset + 999);
       if (data && data.length > 0) {
         allPatients.push(...data);
         if (data.length < 1000) hasMore = false;
@@ -162,10 +162,11 @@ export default function Analytics() {
       '60+ (Geriatric)': 0
     };
     allPatients.forEach(p => {
-      if (p.age <= 12) ageGroups['0-12 (Pediatric)']++;
-      else if (p.age <= 18) ageGroups['12-18 (Adolescence)']++;
-      else if (p.age <= 45) ageGroups['18-45 (Adult)']++;
-      else if (p.age <= 60) ageGroups['45-60 (Senior)']++;
+      const age = getPatientCurrentAge(p) ?? p.age ?? 0;
+      if (age <= 12) ageGroups['0-12 (Pediatric)']++;
+      else if (age <= 18) ageGroups['12-18 (Adolescence)']++;
+      else if (age <= 45) ageGroups['18-45 (Adult)']++;
+      else if (age <= 60) ageGroups['45-60 (Senior)']++;
       else ageGroups['60+ (Geriatric)']++;
     });
 

@@ -4,7 +4,7 @@ import { useAuth } from '@/lib/auth';
 
 import PageBanner from "@/components/PageBanner";
 import patientEntryBanner from "@/assets/patient_entry_banner.png";
-import { formatAge } from '@/lib/utils';
+import { formatAge, calculateDobFromAge, getPatientCurrentAge } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -144,10 +144,11 @@ export default function NurseEntry() {
   const selectOldPatient = (p: any) => {
     setSelectedPatientId(p.id);
     setSelectedPatientFull(p);
+    const dynamicAge = getPatientCurrentAge(p);
     setPatient({
       title: p.title || '',
       name: p.name,
-      age: String(p.age),
+      age: dynamicAge !== null ? String(dynamicAge) : String(p.age || ''),
       sex: p.sex,
       phone: p.phone,
       address: p.address || ''
@@ -249,7 +250,8 @@ export default function NurseEntry() {
         let ageInYearsRaw = parseFloat(patient.age);
         if (ageUnit === 'months') ageInYearsRaw = ageInYearsRaw / 12;
         if (ageUnit === 'days') ageInYearsRaw = ageInYearsRaw / 365;
-        const ageInYears = ageInYearsRaw >= 1 ? Math.floor(ageInYearsRaw) : ageInYearsRaw;
+        const ageInYears = ageInYearsRaw;
+        const calculatedDob = calculateDobFromAge(parseFloat(patient.age), ageUnit);
 
         console.log('[NurseEntry] Creating new patient with Reg ID:', regId);
         const { data: newPatient, error } = await supabase
@@ -258,6 +260,7 @@ export default function NurseEntry() {
             title: patient.title,
             name: sanitizedName,
             age: ageInYears,
+            dob: calculatedDob,
             sex: patient.sex,
             phone: sanitizedPhone,
             address: sanitizedAddress || null,
@@ -405,7 +408,7 @@ export default function NurseEntry() {
                             </div>
                             <div className="space-y-1">
                                 <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Age / Gender</Label>
-                                <div className="text-xl font-bold text-foreground">{formatAge(selectedPatientFull.age)} / {selectedPatientFull.sex}</div>
+                                <div className="text-xl font-bold text-foreground">{formatAge(selectedPatientFull)} / {selectedPatientFull.sex}</div>
                             </div>
                             <div className="space-y-1">
                                 <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Phone Number</Label>
@@ -473,7 +476,7 @@ export default function NurseEntry() {
                                                             <div className="text-sm text-muted-foreground font-medium flex items-center gap-2">
                                                                 <span>{p.phone || 'No Phone'}</span>
                                                                 <span>·</span>
-                                                                <span>{formatAge(p.age)}</span>
+                                                                <span>{formatAge(p)}</span>
                                                                 <span>·</span>
                                                                 <span>{p.sex}</span>
                                                             </div>
